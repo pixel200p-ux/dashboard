@@ -88,16 +88,19 @@ export function ProfilePage() {
       return Boolean(el.closest("[data-profile-scroll]"));
     }
 
-    function onWheel(e: WheelEvent) {
+        function onWheel(e: WheelEvent) {
       if (isInsideCardScroll(e.target)) return;
 
       const cur = Math.max(0, Math.min(1, Number(useUiStore.getState().profileDecor) || 0));
-      const goingUp = e.deltaY < 0;
-      if (cur <= 0 && !goingUp) return;
+      // Ở 0 chỉ cho cuộn xuống (tăng p), ở 1 chỉ cho cuộn lên (giảm p)
+      if (cur <= 0 && e.deltaY < 0) return;
+      if (cur >= 1 && e.deltaY > 0) return;
 
       e.preventDefault();
-      // Chuẩn hóa deltaY cho cả Trackpad lẫn Mouse Wheel
-      const step = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY) * 0.0025, 0.15);
+      // Tăng hệ số 0.0025 → 0.005 = lăn ít hơn đã full màn
+      // Muốn nhạy hơn nữa: 0.006 hoặc 0.007
+      // Muốn chậm hơn: 0.003
+      const step = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY) * 10, 0.6);
       const next = Math.max(0, Math.min(1, cur + step));
       setDecor(next);
     }
@@ -116,7 +119,7 @@ export function ProfilePage() {
       if (cur <= 0 && dy <= 0) return;
 
       e.preventDefault();
-      const next = Math.max(0, Math.min(1, cur + dy / 250));
+      const next = Math.max(0, Math.min(1, cur + dy / 100));
       setDecor(next);
     }
 
@@ -207,7 +210,9 @@ export function ProfilePage() {
         className="fixed inset-0 w-full h-full bg-[#4a5d4e] will-change-transform"
         style={{
           clipPath: "inset(0 0 var(--cover-clip) 0)",
-          zIndex: "calc(10 + Math.round(var(--p) * 90))",
+          // Thu nhỏ (p thấp) → z thấp hơn sidebar → sidebar không bị đè
+          // Phóng to (p cao) → z cao hơn sidebar → ảnh nền phủ lên sidebar
+          zIndex: target > 0.08 ? 45 : 30,
         }}
         onDoubleClick={() => coverRef.current?.click()}
       >
@@ -339,10 +344,10 @@ export function ProfilePage() {
         <div 
           className="mt-4 flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-transform"
           style={{
-            opacity: "calc(1 - var(--p) * 2.5)",
-            transform: "translate3d(0, calc(var(--p) * 60px), 0)",
-            pointerEvents: "calc(var(--p) > 0.05 ? 'none' : 'auto')" as any,
-          }}
+  opacity: "calc(1 - var(--p) * 2.5)",
+  transform: "translate3d(0, calc(var(--p) * 60px), 0)",
+  pointerEvents: "auto", // sẽ tắt bằng JS nếu cần, hoặc giữ nguyên auto
+}}
         >
           {/* Card 1: Thống kê */}
           <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5">

@@ -193,23 +193,28 @@ export function AppShell() {
         />
       )}
 
-      <aside
+            <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground transition-[width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "fixed inset-y-0 left-0 flex w-60 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground transition-[width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
           mobile ? "translate-x-0 shadow-2xl" : "max-md:-translate-x-full"
         )}
         style={
           decor > 0.01
             ? {
-                width: `calc(15rem * ${1 - decor})`,
+                // Khi phóng to: z thấp hơn cover (45) → ảnh nền phủ lên
+                // Khi thu nhỏ: z cao (50) → sidebar nằm trên, không bị đè
+                zIndex: decor > 0.08 ? 35 : 50,
+                width: `calc(15rem * ${1 - Math.min(1, decor * 1.4)})`,
                 minWidth: 0,
                 overflow: "hidden",
-                opacity: 1 - decor,
-                transform: `translateX(${-12 * decor}%)`,
-                pointerEvents: decor > 0.35 ? "none" : "auto",
-                borderColor: decor > 0.7 ? "transparent" : undefined,
+                opacity: Math.max(0, 1 - decor * 1.6),
+                transform: `translateX(${-18 * decor}%)`,
+                pointerEvents: decor > 0.2 ? "none" : "auto",
+                borderColor: decor > 0.4 ? "transparent" : undefined,
               }
-            : undefined
+            : {
+                zIndex: 50,
+              }
         }
       >
         <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-5">
