@@ -49,7 +49,7 @@ export function HoldingsTable({
           {rows.map((h) => (
             <tr key={h.assetId} className="border-b border-border/70">
               <td className="px-2 py-2">
-                <button
+                                <button
                   className="font-semibold hover:underline"
                   onClick={() =>
                     openTx({
@@ -60,7 +60,14 @@ export function HoldingsTable({
                     })
                   }
                 >
-                  {h.symbol}
+                  <span className="relative inline-block pl-2.5">
+                    {h.openLots.length > 0 ? (
+                      <span className="absolute left-0 top-0 -translate-y-0.5 text-[10px] font-semibold leading-none text-primary">
+                        {h.openLots.length}
+                      </span>
+                    ) : null}
+                    {h.symbol}
+                  </span>
                 </button>
                 {h.openTplusQty > 0 && (
                   <Badge tone="navy" className="ml-1">
@@ -146,11 +153,25 @@ export function HoldingsTable({
                         name: h.name,
                         assetType: h.assetType,
                         txType: "SELL",
+                        tplusSell: Boolean(
+                          (h.assetType === "STOCK" || h.assetType === "CRYPTO") && sellTplus[h.assetId],
+                        ),
                       })
                     }
                   >
                     Sell
                   </Button>
+                  {(h.assetType === "STOCK" || h.assetType === "CRYPTO") && (
+                    <label className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
+                      <Checkbox
+                        checked={Boolean(sellTplus[h.assetId])}
+                        onCheckedChange={(v) =>
+                          setSellTplus((m) => ({ ...m, [h.assetId]: v === true }))
+                        }
+                      />
+                      T+
+                    </label>
+                  )}
                 </div>
               </td>
             </tr>

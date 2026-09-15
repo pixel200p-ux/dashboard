@@ -17,7 +17,7 @@ import { deleteCalendarEvent, saveCalendarEvent } from "@/lib/api/calendar";
 import { useCalendar, useCalendarMutation } from "@/lib/use-calendar";
 import { cn } from "@/lib/utils";
 import { addDays, addMonths, format, getDay, startOfMonth, subMonths } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const WEEK = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -274,12 +274,12 @@ export function CalendarPage() {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex shrink-0 gap-1">
-                      <Button size="sm" variant="outline" onClick={() => openEdit(ev)}>
-                        Sửa
+                    <div className="flex shrink-0 gap-0.5">
+                      <Button size="icon" variant="outline" className="h-8 w-8 min-h-8 p-0" title="Sửa" aria-label="Sửa" onClick={() => openEdit(ev)}>
+                        <Pencil />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => delMut.mutate({ data: { id: ev.id } })}>
-                        Xóa
+                      <Button size="icon" variant="ghost" className="h-8 w-8 min-h-8 p-0" title="Xóa" aria-label="Xóa" onClick={() => delMut.mutate({ data: { id: ev.id } })}>
+                        <Trash2 />
                       </Button>
                     </div>
                   </li>

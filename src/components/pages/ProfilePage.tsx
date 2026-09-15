@@ -138,12 +138,23 @@ export function ProfilePage() {
     return () => setDecor(0);
   }, [setDecor]);
 
-  const txStats = useMemo(() => {
-    const empty = { open: 0, closed: 0, buys: 0, sells: 0, bankOpen: 0, bankClosed: 0 };
+    type TxStat = {
+    open: number;
+    closed: number;
+    buys: number;
+    sells: number;
+    bankOpen: number;
+    bankClosed: number;
+  };
+
+  const emptyStat: TxStat = { open: 0, closed: 0, buys: 0, sells: 0, bankOpen: 0, bankClosed: 0 };
+  const [openYear, setOpenYear] = useState<string | null>(null);
+
+  const { txStats, yearStats } = useMemo(() => {
+    const empty = { txStats: emptyStat, yearStats: [] as { year: string; stats: TxStat }[] };
     if (!portfolio) return empty;
+
     const txs = portfolio.ledger.transactions.filter((t) => !t.deletedAt);
-    const buys = txs.filter((t) => t.txType === "BUY");
-    const sells = txs.filter((t) => t.txType === "SELL");
     const tplusLeft = new Map<string, number>();
     for (const h of portfolio.state.holdings) {
       for (const lot of h.openLots) {
@@ -151,23 +162,50 @@ export function ProfilePage() {
       }
     }
     const coreOpen = new Set(portfolio.state.holdings.filter((h) => h.coreQty > 0).map((h) => h.assetId));
-    let open = 0;
-    for (const b of buys) {
-      if (b.tradeTplus) {
-        if ((tplusLeft.get(b.id) ?? 0) > 0) open += 1;
-      } else if (b.assetId && coreOpen.has(b.assetId)) {
-        open += 1;
-      }
-    }
     const banks = portfolio.ledger.banks.filter((b) => !b.deletedAt);
-    const bankOpen = portfolio.state.banks.filter((b) => b.status === "ACTIVE").length;
+    const activeIds = new Set(portfolio.state.banks.filter((b) => b.status === "ACTIVE").map((b) => b.id));
+
+    function yearOf(iso?: string | null) {
+      return iso && iso.length >= 4 ? iso.slice(0, 4) : null;
+    }
+
+    function isBuyOpen(b: (typeof txs)[number]) {
+      if (b.tradeTplus) return (tplusLeft.get(b.id) ?? 0) > 0;
+      return Boolean(b.assetId && coreOpen.has(b.assetId));
+    }
+
+    function count(year?: string): TxStat {
+      const buys = txs.filter((t) => t.txType === "BUY" && (!year || yearOf(t.txDate) === year));
+      const sells = txs.filter((t) => t.txType === "SELL" && (!year || yearOf(t.txDate) === year));
+      let open = 0;
+      for (const b of buys) if (isBuyOpen(b)) open += 1;
+      const bankOpen = banks.filter((b) => activeIds.has(b.id) && (!year || yearOf(b.openedAt) === year)).length;
+      const bankClosed = banks.filter((b) => !activeIds.has(b.id) && (!year || yearOf(b.openedAt) === year)).length;
+      return {
+        open,
+        closed: Math.max(0, buys.length - open),
+        buys: buys.length,
+        sells: sells.length,
+        bankOpen,
+        bankClosed,
+      };
+    }
+
+    const years = new Set<string>();
+    for (const t of txs) {
+      const y = yearOf(t.txDate);
+      if (y) years.add(y);
+    }
+    for (const b of banks) {
+      const y = yearOf(b.openedAt);
+      if (y) years.add(y);
+    }
+
     return {
-      open,
-      closed: buys.length - open,
-      buys: buys.length,
-      sells: sells.length,
-      bankOpen,
-      bankClosed: Math.max(0, banks.length - bankOpen),
+      txStats: count(),
+      yearStats: [...years]
+        .sort((a, b) => b.localeCompare(a))
+        .map((year) => ({ year, stats: count(year) })),
     };
   }, [portfolio]);
 
@@ -351,28 +389,63 @@ export function ProfilePage() {
         >
           {/* Card 1: Thống kê */}
           <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5">
-            <div className="shrink-0">
-              <CardTitle>Thống kê lệnh</CardTitle>
-              <CardDesc className="mb-3">Không tính lệnh đã xóa</CardDesc>
-            </div>
-            <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg bg-background/70 px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Đang mở</p>
-                  <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.open}</p>
+                  <div className="shrink-0">
+        <CardTitle>Thống kê lệnh</CardTitle>
+        <CardDesc className="mb-3">Tổng · không tính lệnh đã xóa</CardDesc>
+      </div>
+      <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-background/70 px-3 py-2">
+            <p className="text-[11px] text-muted-foreground">Đang mở</p>
+            <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.open}</p>
+          </div>
+          <div className="rounded-lg bg-background/70 px-3 py-2">
+            <p className="text-[11px] text-muted-foreground">Đã chốt</p>
+            <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.closed}</p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Mua {txStats.buys} · Bán {txStats.sells}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Sổ Bank: đang gửi {txStats.bankOpen} · tất toán {txStats.bankClosed}
+        </p>
+
+        {yearStats.map(({ year, stats }) => (
+          <div key={year} className="space-y-2 pt-1">
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 text-left"
+              onClick={() => setOpenYear((cur) => (cur === year ? null : year))}
+            >
+              <span className="rounded-xl border border-border bg-background/80 px-3 py-1.5 text-sm font-semibold tabular-nums">
+                {year}
+              </span>
+              <span className="h-px min-w-0 flex-1 bg-border" />
+            </button>
+            {openYear === year && (
+              <div className="space-y-2 pl-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-background/70 px-3 py-2">
+                    <p className="text-[11px] text-muted-foreground">Đang mở</p>
+                    <p className="font-mono text-2xl font-semibold tabular-nums">{stats.open}</p>
+                  </div>
+                  <div className="rounded-lg bg-background/70 px-3 py-2">
+                    <p className="text-[11px] text-muted-foreground">Đã chốt</p>
+                    <p className="font-mono text-2xl font-semibold tabular-nums">{stats.closed}</p>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-background/70 px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Đã chốt</p>
-                  <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.closed}</p>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Mua {stats.buys} · Bán {stats.sells}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Sổ Bank: đang gửi {stats.bankOpen} · tất toán {stats.bankClosed}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Mua {txStats.buys} · Bán {txStats.sells}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Sổ Bank: đang gửi {txStats.bankOpen} · tất toán {txStats.bankClosed}
-              </p>
-            </div>
+            )}
+          </div>
+        ))}
+      </div>
           </Card>
 
           {/* Card 2: Trống */}

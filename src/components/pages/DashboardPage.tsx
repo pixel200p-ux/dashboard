@@ -13,6 +13,7 @@ import { useUiStore } from "@/lib/ui-store";
 import { deleteCapital } from "@/lib/api/portfolio";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FilterMenu } from "@/components/FilterMenu";
+import { Pencil, Trash2 } from "lucide-react";
 
 const CAT_ORDER = ["DCDS", "ETF", "STOCK", "CRYPTO", "BANK"] as const;
 const CAT_LABEL: Record<string, string> = {
@@ -152,47 +153,51 @@ export function DashboardPage() {
               .slice()
               .reverse()
               .map((c) => (
-                <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-border/50 pb-2 last:border-0">
+                <li key={c.id} className="flex items-start gap-2 border-b border-border/50 pb-2 last:border-0">
                   <span className="min-w-0 flex-1">
                     {formatViDate(c.movementDate)} · {c.kind === "DEPOSIT" ? "Nạp" : "Rút"} · {c.bucket}
                     {c.notes ? (
                       <span className="mt-0.5 block text-xs text-muted-foreground">{c.notes}</span>
                     ) : null}
                   </span>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className={c.kind === "DEPOSIT" ? "text-profit" : "text-loss"}>
-                      {c.kind === "DEPOSIT" ? "+" : "−"}
-                      {displayMoney(c.amount, currency, usd)}
-                    </span>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          openCapitalEdit({
-                            id: c.id,
-                            kind: c.kind,
-                            amount: c.amount,
-                            movementDate: c.movementDate,
-                            notes: c.notes,
-                            bucket: c.bucket,
-                          })
-                        }
-                      >
-                        Sửa
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={delCapital.isPending}
-                        onClick={() => {
-                          if (!window.confirm("Bạn chắc chưa? Xóa dòng vốn gốc này?")) return;
-                          delCapital.mutate({ data: { id: c.id } });
-                        }}
-                      >
-                        Xóa
-                      </Button>
-                    </div>
+                  <span className={`shrink-0 font-mono tabular-nums ${c.kind === "DEPOSIT" ? "text-profit" : "text-loss"}`}>
+                    {c.kind === "DEPOSIT" ? "+" : "−"}
+                    {displayMoney(c.amount, currency, usd)}
+                  </span>
+                  <div className="flex shrink-0 gap-0.5">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-8 w-8 min-h-8 p-0"
+                      title="Sửa"
+                      aria-label="Sửa"
+                      onClick={() =>
+                        openCapitalEdit({
+                          id: c.id,
+                          kind: c.kind,
+                          amount: c.amount,
+                          movementDate: c.movementDate,
+                          notes: c.notes,
+                          bucket: c.bucket,
+                        })
+                      }
+                    >
+                      <Pencil />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 min-h-8 p-0"
+                      title="Xóa"
+                      aria-label="Xóa"
+                      disabled={delCapital.isPending}
+                      onClick={() => {
+                        if (!window.confirm("Bạn chắc chưa? Xóa dòng vốn gốc này?")) return;
+                        delCapital.mutate({ data: { id: c.id } });
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
                   </div>
                 </li>
               ))}

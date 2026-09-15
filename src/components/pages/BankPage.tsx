@@ -9,6 +9,7 @@ import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { NavOriginalCard, PnlCard } from "@/components/NavOriginalCards";
 
 export function BankPage() {
@@ -103,15 +104,15 @@ export function BankPage() {
                 </Button>
               </form>
             )}
-                        <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => openBank(b.id)}>
-                Sửa
+                        <div className="flex flex-wrap items-center gap-2">
+              <Button size="icon" variant="outline" className="h-8 w-8 min-h-8 p-0" title="Sửa" aria-label="Sửa" onClick={() => openBank(b.id)}>
+                <Pencil />
               </Button>
               <Button size="sm" variant="outline" onClick={() => redeemMut.mutate({ data: { id: b.id } })}>
                 Tất toán
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => delMut.mutate({ data: { id: b.id } })}>
-                Xóa
+              <Button size="icon" variant="ghost" className="h-8 w-8 min-h-8 p-0" title="Xóa" aria-label="Xóa" onClick={() => delMut.mutate({ data: { id: b.id } })}>
+                <Trash2 />
               </Button>
             </div>
           </Card>

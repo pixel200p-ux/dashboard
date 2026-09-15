@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { FilterMenu } from "@/components/FilterMenu";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 const TITLE: Record<AssetType, { title: string; sub: string }> = {
@@ -199,9 +200,25 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
           <Button onClick={() => openTx({ assetType, accountId: assetType === "STOCK" ? (stockFilter === "ssi" ? "ssi" : "vps") : undefined, txType: "BUY" })}>
             Buy
           </Button>
-          <Button variant="outline" onClick={() => openTx({ assetType, txType: "SELL" })}>
-            Sell
-          </Button>
+              <Button
+      variant="outline"
+      onClick={() =>
+        openTx({
+          assetType,
+          accountId: assetType === "STOCK" ? (stockFilter === "ssi" ? "ssi" : "vps") : undefined,
+          txType: "SELL",
+          tplusSell: (assetType === "STOCK" || assetType === "CRYPTO") && sellTplus,
+        })
+      }
+    >
+      Sell
+    </Button>
+    {(assetType === "STOCK" || assetType === "CRYPTO") && (
+      <label className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 text-sm">
+        <Checkbox checked={sellTplus} onCheckedChange={(v) => setSellTplus(v === true)} />
+        T+
+      </label>
+    )}
         </div>
       </div>
       <div className={kpiGrid}>
@@ -320,14 +337,14 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                         {t.price != null ? displayPrice(t.price, assetType, currency, usd) : displayMoney(t.amount, currency, usd)}
                       </td>
                       <td className="px-2 py-2 text-right">
-              <div className="flex justify-end gap-1">
-                <Button size="sm" variant="outline" onClick={() => editTx(t)}>
-                  Sửa
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => del.mutate({ data: { id: t.id } })}>
-                  Xóa
-                </Button>
-              </div>
+                                <div className="flex justify-end gap-0.5">
+                    <Button size="icon" variant="outline" className="h-8 w-8 min-h-8 p-0" title="Sửa" aria-label="Sửa" onClick={() => editTx(t)}>
+                      <Pencil />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 min-h-8 p-0" title="Xóa" aria-label="Xóa" onClick={() => del.mutate({ data: { id: t.id } })}>
+                      <Trash2 />
+                    </Button>
+                  </div>
             </td>
                     </tr>
                   );
