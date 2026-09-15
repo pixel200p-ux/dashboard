@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatViDate } from "@/engine/dates";
-import { formatQty, signedClass } from "@/engine/money";
+import { formatPct, formatQty, signedClass } from "@/engine/money";
 import { displayMoney, displayPrice } from "@/lib/display";
 import { useUiStore } from "@/lib/ui-store";
 import type { TplusCard } from "@/engine/types";
@@ -73,6 +73,17 @@ export function TplusOpenCard({
           <li key={l.buyTxId}>
             OPEN {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, c.assetType)} @{" "}
             {displayPrice(l.buyPrice, c.assetType, currency, usdVnd)}
+            {(() => {
+              const pnl = (c.currentPrice - l.buyPrice) * l.qtyRemaining;
+              const pct = l.buyPrice > 0 ? ((c.currentPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
+              return (
+                <>
+                  {" · "}
+                  {displayMoney(pnl, currency, usdVnd)}{" "}
+                  <span className={signedClass(pct)}>{formatPct(pct)}</span>
+                </>
+              );
+            })()}
           </li>
         ))}
       </ul>
@@ -103,6 +114,7 @@ export function TplusOpenCard({
               assetType: c.assetType,
               txType: "SELL",
               price: c.suggestedSell,
+              tplusSell: true,
             })
           }
         >

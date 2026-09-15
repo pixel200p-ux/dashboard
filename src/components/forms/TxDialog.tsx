@@ -198,10 +198,12 @@ export function TxDialog() {
 
 
   const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY";
+    const wantTplusSell = Boolean(prefill?.tplusSell || prefill?.matchAllOpen);
     const canMatch =
     (kind === "STOCK" || kind === "CRYPTO") &&
     txType === "SELL" &&
-    (openLots.length > 0 || (editing && (prefill?.matches?.length ?? 0) > 0));
+    (openLots.length > 0 || (editing && (prefill?.matches?.length ?? 0) > 0)) &&
+    (wantTplusSell || (editing && (prefill?.matches?.length ?? 0) > 0));
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
