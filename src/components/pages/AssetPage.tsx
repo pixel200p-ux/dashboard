@@ -14,6 +14,8 @@ import type { AssetType, Transaction } from "@/engine/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { FilterMenu } from "@/components/FilterMenu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useState } from "react";
 
 const TITLE: Record<AssetType, { title: string; sub: string }> = {
   DCDS: { title: "DCDS", sub: "Quỹ mở · số CCQ = tiền / giá, làm tròn 4 số" },
@@ -29,6 +31,7 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   const setStockFilter = useUiStore((s) => s.setStockFilter);
   const openTx = useUiStore((s) => s.openTx);
   const del = usePortfolioMutation((d: Parameters<typeof deleteTransaction>[0]) => deleteTransaction(d), "Đã xóa lệnh");
+  const [sellTplus, setSellTplus] = useState(false);
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const { state, ledger } = data;

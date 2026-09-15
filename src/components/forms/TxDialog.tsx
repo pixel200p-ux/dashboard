@@ -9,9 +9,9 @@ import { useUiStore } from "@/lib/ui-store";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { saveBank, saveTransaction } from "@/lib/api/portfolio";
 import { dcdsQty } from "@/engine/replay";
-import { parseBrokerPrice, parseDecimal, parseVndAmount, formatQty, formatBrokerPrice, formatThousandsInput } from "@/engine/money";
+import { parseBrokerPrice, parseDecimal, parseVndAmount, formatQty, formatBrokerPrice, formatThousandsInput, formatPct, signedClass } from "@/engine/money";
 import { todayYmd, formatViDate } from "@/engine/dates";
-import { displayPrice } from "@/lib/display";
+import { displayMoney, displayPrice } from "@/lib/display";
 import type { AssetType, FeeProfile, TxType } from "@/engine/types";
 import { useEffect, useMemo, useState } from "react";
 
@@ -506,10 +506,27 @@ export function TxDialog() {
                               disabled={locked}
                               onCheckedChange={() => toggleLot(l.buyTxId)}
                             />
-                            <span className="min-w-0 truncate">
-                              {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, assetType)}/{formatQty(l.qtyOriginal, assetType)} @{" "}
-                              {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
-                            </span>
+                                                      <span className="min-w-0 truncate">
+                            {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, assetType)}/{formatQty(l.qtyOriginal, assetType)} @{" "}
+                            {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
+                            {holding?.currentPrice ? (
+                              <>
+                                {" · "}
+                                {displayMoney(
+                                  (holding.currentPrice - l.buyPrice) * l.qtyRemaining,
+                                  currency,
+                                  usdVnd,
+                                )}{" "}
+                                <span className={signedClass(holding.currentPrice - l.buyPrice)}>
+                                  {formatPct(
+                                    l.buyPrice > 0
+                                      ? ((holding.currentPrice - l.buyPrice) / l.buyPrice) * 100
+                                      : 0,
+                                  )}
+                                </span>
+                              </>
+                            ) : null}
+                          </span>
                           </label>
                         );
                       })}

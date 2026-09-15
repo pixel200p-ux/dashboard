@@ -1,7 +1,6 @@
 import { AllocChart } from "@/components/AllocChart";
 import { HoldingsTable } from "@/components/HoldingsTable";
 import { NavCapitalChart } from "@/components/NavCapitalChart";
-import { TplusOpenCard } from "@/components/TplusOpenCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDesc, CardTitle } from "@/components/ui/card";
@@ -13,9 +12,7 @@ import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import { deleteCapital } from "@/lib/api/portfolio";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "@tanstack/react-router";
 import { FilterMenu } from "@/components/FilterMenu";
-import { useState } from "react";
 
 const CAT_ORDER = ["DCDS", "ETF", "STOCK", "CRYPTO", "BANK"] as const;
 const CAT_LABEL: Record<string, string> = {
@@ -34,7 +31,6 @@ export function DashboardPage() {
   const openCapital = useUiStore((s) => s.openCapital);
   const openCapitalEdit = useUiStore((s) => s.openCapitalEdit);
   const openTx = useUiStore((s) => s.openTx);
-  const [showAllCapital, setShowAllCapital] = useState(false);
   const delCapital = usePortfolioMutation(
     (d: Parameters<typeof deleteCapital>[0]) => deleteCapital(d),
     "Đã xóa dòng vốn gốc",
@@ -65,7 +61,7 @@ export function DashboardPage() {
     pct: state.allocation[k]?.pct ?? 0,
   }));
 
-  const recent = [...ledger.transactions].sort((a, b) => b.txDate.localeCompare(a.txDate) || b.createdAt.localeCompare(a.createdAt)).slice(0, 8);
+  const recent = [...ledger.transactions].sort((a, b) => b.txDate.localeCompare(a.txDate) || b.createdAt.localeCompare(a.createdAt));
 
   return (
     <div className="space-y-5">
@@ -105,28 +101,6 @@ export function DashboardPage() {
           usdVnd={usd}
         />
       </div>
-
-      {state.tplusCards.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-end justify-between gap-2">
-            <div>
-              <h2 className="text-base font-semibold">T+ đang mở</h2>
-              <p className="text-xs text-muted-foreground">
-                Qty T+ cộng vào Holdings. Lãi ròng chỉ hạ giá vốn khi Sell đã khớp COMPLETED.
-              </p>
-            </div>
-            <Link to="/tplus" className="text-sm text-primary hover:underline">
-              Trade T+
-            </Link>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {state.tplusCards.map((c) => (
-              <TplusOpenCard key={c.assetId} card={c} usdVnd={usd} />
-            ))}
-          </div>
-        </section>
-      )}
-
             {/* Hàng biểu đồ: Phân bổ (cột ngang) + NAV/Vốn gốc 6 tháng */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
@@ -170,14 +144,13 @@ export function DashboardPage() {
         <Card>
           <CardTitle>Vốn gốc</CardTitle>
           <CardDesc className="mb-2">Nạp / Rút · Sửa số tiền, ngày, danh mục, ghi chú</CardDesc>
-          <ul className="mt-3 space-y-2 text-sm">
+          <ul className="mt-3 max-h-[22.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {ledger.capital.length === 0 && (
               <li className="text-muted-foreground">Chưa nạp vốn. Bấm Nạp vốn gốc.</li>
             )}
             {ledger.capital
               .slice()
               .reverse()
-              .slice(0, showAllCapital ? undefined : 6)
               .map((c) => (
                 <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-border/50 pb-2 last:border-0">
                   <span className="min-w-0 flex-1">
@@ -224,21 +197,10 @@ export function DashboardPage() {
                 </li>
               ))}
           </ul>
-          {ledger.capital.length > 6 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-3 w-full"
-              onClick={() => setShowAllCapital((v) => !v)}
-            >
-              {showAllCapital ? "Thu gọn" : `Xem thêm (${ledger.capital.length - 6} dòng)`}
-            </Button>
-          )}
         </Card>
         <Card>
           <CardTitle>Giao dịch gần đây</CardTitle>
-          <ul className="mt-3 space-y-2 text-sm">
+          <ul className="mt-3 max-h-[13.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {recent.length === 0 && <li className="text-muted-foreground">Chưa có lệnh. Sổ cái đang trống.</li>}
             {recent.map((t) => {
               const asset = ledger.assets.find((a) => a.id === t.assetId);
