@@ -9,11 +9,13 @@ import { formatViDate } from "@/engine/dates";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { signedClass } from "@/engine/money";
 import { displayMoney } from "@/lib/display";
-import { usePortfolio } from "@/lib/use-portfolio";
+import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
+import { deleteCapital } from "@/lib/api/portfolio";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 import { FilterMenu } from "@/components/FilterMenu";
+import { useState } from "react";
 
 const CAT_ORDER = ["DCDS", "ETF", "STOCK", "CRYPTO", "BANK"] as const;
 const CAT_LABEL: Record<string, string> = {
@@ -30,7 +32,13 @@ export function DashboardPage() {
   const stockFilter = useUiStore((s) => s.stockFilter);
   const setStockFilter = useUiStore((s) => s.setStockFilter);
   const openCapital = useUiStore((s) => s.openCapital);
+  const openCapitalEdit = useUiStore((s) => s.openCapitalEdit);
   const openTx = useUiStore((s) => s.openTx);
+  const [showAllCapital, setShowAllCapital] = useState(false);
+  const delCapital = usePortfolioMutation(
+    (d: Parameters<typeof deleteCapital>[0]) => deleteCapital(d),
+    "Đã xóa dòng vốn gốc",
+  );
 
   if (isPending || !data) {
     return (
@@ -160,28 +168,73 @@ export function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle>Vốn gốc gần đây</CardTitle>
+          <CardTitle>Vốn gốc</CardTitle>
+          <CardDesc className="mb-2">Nạp / Rút · Sửa số tiền, ngày, danh mục, ghi chú</CardDesc>
           <ul className="mt-3 space-y-2 text-sm">
-            {ledger.capital.length === 0 && <li className="text-muted-foreground">Chưa nạp vốn. Bấm Nạp vốn gốc.</li>}
+            {ledger.capital.length === 0 && (
+              <li className="text-muted-foreground">Chưa nạp vốn. Bấm Nạp vốn gốc.</li>
+            )}
             {ledger.capital
               .slice()
               .reverse()
-              .slice(0, 6)
+              .slice(0, showAllCapital ? undefined : 6)
               .map((c) => (
-                <li key={c.id} className="flex justify-between gap-2">
-                  <span className="min-w-0">
+                <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-border/50 pb-2 last:border-0">
+                  <span className="min-w-0 flex-1">
                     {formatViDate(c.movementDate)} · {c.kind === "DEPOSIT" ? "Nạp" : "Rút"} · {c.bucket}
                     {c.notes ? (
                       <span className="mt-0.5 block text-xs text-muted-foreground">{c.notes}</span>
                     ) : null}
                   </span>
-                  <span className={c.kind === "DEPOSIT" ? "text-profit" : "text-loss"}>
-                    {c.kind === "DEPOSIT" ? "+" : "−"}
-                    {displayMoney(c.amount, currency, usd)}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={c.kind === "DEPOSIT" ? "text-profit" : "text-loss"}>
+                      {c.kind === "DEPOSIT" ? "+" : "−"}
+                      {displayMoney(c.amount, currency, usd)}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          openCapitalEdit({
+                            id: c.id,
+                            kind: c.kind,
+                            amount: c.amount,
+                            movementDate: c.movementDate,
+                            notes: c.notes,
+                            bucket: c.bucket,
+                          })
+                        }
+                      >
+                        Sửa
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={delCapital.isPending}
+                        onClick={() => {
+                          if (!window.confirm("Bạn chắc chưa? Xóa dòng vốn gốc này?")) return;
+                          delCapital.mutate({ data: { id: c.id } });
+                        }}
+                      >
+                        Xóa
+                      </Button>
+                    </div>
+                  </div>
                 </li>
               ))}
           </ul>
+          {ledger.capital.length > 6 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-3 w-full"
+              onClick={() => setShowAllCapital((v) => !v)}
+            >
+              {showAllCapital ? "Thu gọn" : `Xem thêm (${ledger.capital.length - 6} dòng)`}
+            </Button>
+          )}
         </Card>
         <Card>
           <CardTitle>Giao dịch gần đây</CardTitle>

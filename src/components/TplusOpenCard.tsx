@@ -103,7 +103,6 @@ export function TplusOpenCard({
               assetType: c.assetType,
               txType: "SELL",
               price: c.suggestedSell,
-              matchAllOpen: true,
             })
           }
         >

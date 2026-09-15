@@ -1,10 +1,19 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AssetType, TxType } from "@/engine/types";
+import type { AssetType, CapitalBucket, TxType } from "@/engine/types";
 
 export type ThemeMode = "light" | "dark";
 export type DisplayCurrency = "VND" | "USD";
 export type LoginThemeId = "default" | "spring" | "summer" | "autumn" | "winter";
+
+export type CapitalPrefill = {
+  id: string;
+  kind: "DEPOSIT" | "WITHDRAW";
+  amount: number;
+  movementDate: string;
+  notes: string | null;
+  bucket: CapitalBucket;
+};
 
 export type TxPrefill = {
   id?: string;
@@ -34,6 +43,7 @@ type UiState = {
   stockFilter: "ALL" | "vps" | "ssi";
   txOpen: TxPrefill | null;
   capitalOpen: "DEPOSIT" | "WITHDRAW" | null;
+  capitalEdit: CapitalPrefill | null;
   bankOpen: boolean;
   bankEditId: string | null;
   notifyOpen: boolean;
@@ -46,6 +56,7 @@ type UiState = {
   openTx: (p?: TxPrefill) => void;
   closeTx: () => void;
   openCapital: (k: "DEPOSIT" | "WITHDRAW") => void;
+  openCapitalEdit: (row: CapitalPrefill) => void;
   closeCapital: () => void;
   openBank: (id?: string) => void;
   closeBank: () => void;
@@ -58,11 +69,12 @@ export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
       theme: "light",
-      loginTheme: "aurora",
+      loginTheme: "default",
       currency: "VND",
       stockFilter: "ALL",
       txOpen: null,
       capitalOpen: null,
+      capitalEdit: null,
       bankOpen: false,
       bankEditId: null,
       notifyOpen: false,
@@ -74,8 +86,9 @@ export const useUiStore = create<UiState>()(
       setStockFilter: (stockFilter) => set({ stockFilter }),
       openTx: (p) => set({ txOpen: p ?? {} }),
       closeTx: () => set({ txOpen: null }),
-      openCapital: (capitalOpen) => set({ capitalOpen }),
-      closeCapital: () => set({ capitalOpen: null }),
+      openCapital: (capitalOpen) => set({ capitalOpen, capitalEdit: null }),
+      openCapitalEdit: (capitalEdit) => set({ capitalEdit, capitalOpen: capitalEdit.kind }),
+      closeCapital: () => set({ capitalOpen: null, capitalEdit: null }),
       openBank: (id) =>
         set({
           bankOpen: true,

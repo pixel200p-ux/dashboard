@@ -102,6 +102,33 @@ export const deleteCapital = createServerFn({ method: "POST" })
     return { ledger, state: replayPortfolio(ledger) };
   });
 
+const updateCapitalSchema = z.object({
+  id: z.string(),
+  amount: z.number().positive(),
+  movementDate: z.string(),
+  notes: z.string().optional(),
+  bucket: z.enum(["DCDS", "ETF", "VPS", "SSI", "CRYPTO", "BANK"]),
+});
+
+/** Sửa số tiền / ngày / ghi chú / danh mục. Không đổi Nạp ↔ Rút. */
+export const updateCapital = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(updateCapitalSchema)
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const notes = data.notes?.trim() ? data.notes.trim() : null;
+    await sql`
+      update capital_movements set
+        amount = ${data.amount},
+        movement_date = ${data.movementDate},
+        notes = ${notes},
+        bucket = ${data.bucket}
+      where id = ${data.id} and deleted_at is null
+    `;
+    const ledger = await loadSnapshot();
+    return { ledger, state: replayPortfolio(ledger) };
+  });
+
 const assetSchema = z.object({
   accountId: z.string(),
   symbol: z.string().min(1),

@@ -62,7 +62,7 @@ export function TxDialog() {
   const [stockDivQty, setStockDivQty] = useState("");
   const [feeOverride, setFeeOverride] = useState("");
   const [taxOverride, setTaxOverride] = useState("");
-  const [matchQty, setMatchQty] = useState<Record<string, string>>({});
+  const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
 
   const [bankName, setBankName] = useState("VietinBank");
   const [bankCustom, setBankCustom] = useState("");
@@ -116,9 +116,7 @@ export function TxDialog() {
       setAmount("");
     }
 
-    const next: Record<string, string> = {};
-        for (const m of prefill.matches ?? []) next[m.buyTxId] = formatThousandsInput(String(m.quantity));
-    setMatchQty(next);
+    setSelectedLotIds((prefill.matches ?? []).map((m) => m.buyTxId));
   }, [prefill, data?.state.usdVnd]);
 
   const isBank = kind === "BANK";
@@ -152,17 +150,52 @@ export function TxDialog() {
   const fee = feeOverride === "" ? autoFee : parseDecimal(feeOverride);
   const tax = taxOverride === "" ? autoTax : parseDecimal(taxOverride);
 
-  const openLots =
-    data?.state.holdings.find((h) => h.accountId === acc.id && h.symbol === symbol.trim().toUpperCase())?.openLots ?? [];
+  const holding = data?.state.holdings.find(
+    (h) => h.accountId === acc.id && h.symbol === symbol.trim().toUpperCase(),
+  );
+  const openLots = holding?.openLots ?? [];
+  const maxSellQty = holding?.quantity ?? 0;
+
+  const selectedRemaining = selectedLotIds.reduce((s, id) => {
+    const lot = openLots.find((l) => l.buyTxId === id);
+    return s + (lot?.qtyRemaining ?? 0);
+  }, 0);
+  const tplusCovered = parsedQty > 0 && selectedRemaining >= parsedQty;
 
   useEffect(() => {
-    if (!prefill?.matchAllOpen || openLots.length === 0) return;
-    const next: Record<string, string> = {};
-        for (const l of openLots) next[l.buyTxId] = formatThousandsInput(String(l.qtyRemaining));
-    setMatchQty(next);
-    const sum = openLots.reduce((s, l) => s + l.qtyRemaining, 0);
-    setQty(formatThousandsInput(String(sum)));
-  }, [prefill?.matchAllOpen, openLots.length]);
+    if (parsedQty <= 0) {
+      setSelectedLotIds((prev) => (prev.length ? [] : prev));
+      return;
+    }
+    setSelectedLotIds((prev) => {
+      let accQty = 0;
+      const next: string[] = [];
+      for (const id of prev) {
+        const lot = openLots.find((l) => l.buyTxId === id);
+        if (!lot) continue;
+        if (accQty >= parsedQty) break;
+        next.push(id);
+        accQty += lot.qtyRemaining;
+      }
+      if (next.length === prev.length && next.every((id, i) => id === prev[i])) return prev;
+      return next;
+    });
+  }, [parsedQty, openLots]);
+
+  function toggleLot(buyTxId: string) {
+    if (parsedQty <= 0) return;
+    setSelectedLotIds((prev) => {
+      if (prev.includes(buyTxId)) return prev.filter((id) => id !== buyTxId);
+      const sum = prev.reduce((s, id) => {
+        const lot = openLots.find((l) => l.buyTxId === id);
+        return s + (lot?.qtyRemaining ?? 0);
+      }, 0);
+      if (sum >= parsedQty) return prev;
+      return [...prev, buyTxId];
+    });
+  }
+
+
 
   const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY";
     const canMatch =
@@ -200,9 +233,17 @@ export function TxDialog() {
 
     const sym = symbol.trim().toUpperCase();
     if (!sym) return;
-    const matches = Object.entries(matchQty)
-      .map(([buyTxId, q]) => ({ buyTxId, quantity: parseDecimal(q) }))
-      .filter((m) => m.quantity > 0);
+    let left = computedQty;
+    const matches: { buyTxId: string; quantity: number }[] = [];
+    for (const id of selectedLotIds) {
+      if (left <= 0) break;
+      const lot = openLots.find((l) => l.buyTxId === id);
+      if (!lot) continue;
+      const take = Math.min(lot.qtyRemaining, left);
+      if (take <= 0) continue;
+      matches.push({ buyTxId: id, quantity: take });
+      left -= take;
+    }
 
     mut.mutate(
       {
@@ -251,7 +292,7 @@ export function TxDialog() {
     <Dialog open={!!prefill} onOpenChange={(o) => !o && close()}>
         <DialogContent title={editing ? "Sửa giao dịch" : "Giao dịch"} className="max-w-xl">
         <form className="space-y-3" onSubmit={submit}>
-                    {!editing && (
+        {!editing && !prefill?.assetType && (
           <div className="flex flex-wrap gap-1">
             {TYPES.map((t) => (
               <button
@@ -407,7 +448,17 @@ export function TxDialog() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label>Khối lượng</Label>
-                        <Input value={qty} onChange={setGrouped(setQty)} placeholder="1000" required />
+                        <Input
+                          value={qty}
+                          onChange={setGrouped(setQty)}
+                          placeholder=""
+                          required
+                        />
+                        {canMatch && (
+                          <p className="text-xs text-muted-foreground">
+                            tối đa {formatQty(maxSellQty, assetType)}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <Label>Giá {kind === "CRYPTO" ? "(USD)" : kind === "DCDS" ? "(VND)" : "(13.5 = 13.500 ₫)"}</Label>
@@ -430,27 +481,36 @@ export function TxDialog() {
                     </label>
                   )}
 
-                  {canMatch && (
+                                    {canMatch && (
                     <div className="space-y-2 rounded-lg border border-border p-3">
-                      <p className="text-sm font-medium">Khớp T+ thủ công</p>
-                      <p className="text-xs text-muted-foreground">Chọn lệnh BUY T+ đang OPEN để khớp. Phần không khớp trừ vị thế gốc.</p>
-                      {openLots.map((l) => (
-                        <div key={l.buyTxId} className="flex items-center gap-2 text-sm">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate">
-                              {formatViDate(l.buyDate)} · {l.qtyRemaining}/{l.qtyOriginal} @ {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
-                            </p>
-                          </div>
-                          <Input
-                            className="w-24"
-                            value={matchQty[l.buyTxId] ?? ""}
-                            onChange={(e) =>
-  setMatchQty((m) => ({ ...m, [l.buyTxId]: formatThousandsInput(e.target.value) }))
-}
-                            placeholder="0"
-                          />
-                        </div>
-                      ))}
+                      <p className="text-sm font-medium">Chọn lệnh BUY T+ đang OPEN để khớp</p>
+                      <p className="text-xs text-muted-foreground">
+                        {parsedQty <= 0
+                          ? "Nhập khối lượng bán trước, rồi tick lô. Tick vừa đủ số bán thì không tick thêm."
+                          : tplusCovered
+                            ? "Đã đủ số lượng bán. Bỏ tick nếu muốn chọn lô khác."
+                            : "Tick lô đến khi vừa đủ số lượng bán. Phần chưa tick (nếu còn) trừ vị thế gốc."}
+                      </p>
+                      {openLots.map((l) => {
+                        const checked = selectedLotIds.includes(l.buyTxId);
+                        const locked = parsedQty <= 0 || (!checked && tplusCovered);
+                        return (
+                          <label
+                            key={l.buyTxId}
+                            className={`flex items-center gap-2 text-sm ${locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={locked}
+                              onCheckedChange={() => toggleLot(l.buyTxId)}
+                            />
+                            <span className="min-w-0 truncate">
+                              {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, assetType)}/{formatQty(l.qtyOriginal, assetType)} @{" "}
+                              {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
 
