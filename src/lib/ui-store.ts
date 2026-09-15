@@ -4,7 +4,7 @@ import type { AssetType, TxType } from "@/engine/types";
 
 export type ThemeMode = "light" | "dark";
 export type DisplayCurrency = "VND" | "USD";
-export type LoginThemeId = "aurora" | "midnight" | "ember" | "forest" | "pixel";
+export type LoginThemeId = "default" | "spring" | "summer" | "autumn" | "winter";
 
 export type TxPrefill = {
   id?: string;

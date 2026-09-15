@@ -2,17 +2,69 @@ import { authClient, authEnabled } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BarChart3 } from "lucide-react";
-import { useState } from "react";
+import { BarChart3, Moon, Sun } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useUiStore, type LoginThemeId } from "@/lib/ui-store";
 
-const SKINS: { id: LoginThemeId; label: string; navy: string }[] = [
-  { id: "aurora", label: "Navy", navy: "#0a2540" },
-  { id: "midnight", label: "Midnight", navy: "#07111c" },
-  { id: "ember", label: "Ember", navy: "#1c1410" },
-  { id: "forest", label: "Forest", navy: "#0c2419" },
-  { id: "pixel", label: "Steel", navy: "#132338" },
+const SEASONS: {
+  id: LoginThemeId;
+  label: string;
+  swatch: string;
+  day?: string;
+  night?: string;
+  navy: string;
+  btn: string;
+}[] = [
+  {
+    id: "default",
+    label: "Mặc định",
+    swatch: "#0a2540",
+    navy: "#0a2540",
+    btn: "#c5d4e0",
+  },
+  {
+    id: "spring",
+    label: "Xuân",
+    swatch: "#3d8b6e",
+    day: "/login/spring-day.webp",
+    night: "/login/spring-night.webp",
+    navy: "#1a4d3a",
+    btn: "#d4e8dc",
+  },
+  {
+    id: "summer",
+    label: "Hạ",
+    swatch: "#d97706",
+    day: "/login/summer-day.webp",
+    night: "/login/summer-night.webp",
+    navy: "#7c2d12",
+    btn: "#f5e6d3",
+  },
+  {
+    id: "autumn",
+    label: "Thu",
+    swatch: "#c2410c",
+    day: "/login/autumn-day.webp",
+    night: "/login/autumn-night.webp",
+    navy: "#5c2a1a",
+    btn: "#f0e0d0",
+  },
+  {
+    id: "winter",
+    label: "Đông",
+    swatch: "#3b82a0",
+    day: "/login/winter-day.webp",
+    night: "/login/winter-night.webp",
+    navy: "#1a2f45",
+    btn: "#d6e4ee",
+  },
 ];
+
+const VALID_SEASONS = new Set(SEASONS.map((s) => s.id));
+
+function resolveSeason(id: string): LoginThemeId {
+  return VALID_SEASONS.has(id as LoginThemeId) ? (id as LoginThemeId) : "default";
+}
 
 export function LoginScreen() {
   const [mode, setMode] = useState<"in" | "up">("in");
@@ -21,9 +73,39 @@ export function LoginScreen() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const loginTheme = useUiStore((s) => s.loginTheme);
+  const theme = useUiStore((s) => s.theme);
+  const toggleTheme = useUiStore((s) => s.toggleTheme);
+  const loginThemeRaw = useUiStore((s) => s.loginTheme);
   const setLoginTheme = useUiStore((s) => s.setLoginTheme);
+  const season = resolveSeason(loginThemeRaw);
+  const skin = SEASONS.find((s) => s.id === season)!;
+
+  const bgUrl =
+    season === "default" ? null : theme === "dark" ? (skin.night ?? null) : (skin.day ?? null);
+
+  useEffect(() => {
+    if (!bgUrl) return;
+    const img = new Image();
+    img.src = bgUrl;
+  }, [bgUrl]);
+
+  useEffect(() => {
+    if (!VALID_SEASONS.has(loginThemeRaw as LoginThemeId)) {
+      setLoginTheme("default");
+    }
+  }, [loginThemeRaw, setLoginTheme]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
 
   async function onEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -50,25 +132,93 @@ export function LoginScreen() {
   }
 
   return (
-    <main className="login-stage grid min-h-dvh place-items-center p-4 sm:p-8" data-skin={loginTheme}>
-      {/* Nút theme — góc trên phải */}
-      <div className="absolute right-4 top-4 z-30 flex items-center gap-1.5 rounded-full border border-black/5 bg-white/80 p-1 shadow-sm backdrop-blur">
-        {SKINS.map((t) => (
+    <main
+      className="login-stage relative grid min-h-dvh place-items-center overflow-hidden p-4 sm:p-8"
+      data-skin={season}
+      style={
+        {
+          "--login-navy": skin.navy,
+          "--login-btn": skin.btn,
+        } as React.CSSProperties
+      }
+    >
+      {bgUrl ? (
+        <div
+          className="login-season-bg pointer-events-none absolute inset-0 -z-10"
+          style={{
+            backgroundImage: `url(${bgUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+          aria-hidden
+        />
+      ) : null}
+      <div
+        className={`pointer-events-none absolute inset-0 -z-10 ${bgUrl ? "bg-black/25" : ""}`}
+        aria-hidden
+      />
+
+      <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+        <button
+          type="button"
+          title={theme === "dark" ? "Chuyển sáng (ảnh ngày)" : "Chuyển tối (ảnh đêm)"}
+          aria-label="Đổi sáng tối"
+          onClick={toggleTheme}
+          className="grid h-10 w-10 place-items-center rounded-full border border-white/80 bg-white/85 text-[#0a2540] shadow-md backdrop-blur"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+
+        <div ref={menuRef} className="relative">
           <button
-            key={t.id}
             type="button"
-            title={t.label}
-            aria-label={t.label}
-            onClick={() => setLoginTheme(t.id)}
-            className={`h-7 w-7 rounded-full border-2 transition ${
-              loginTheme === t.id ? "scale-110 border-white ring-2 ring-[#0a2540]/40" : "border-white/80 hover:scale-105"
-            }`}
-            style={{ background: t.navy }}
+            title={`${skin.label} · Nhấn đúp để đổi mùa`}
+            aria-label={`Theme ${skin.label}. Nhấn đúp để mở menu mùa`}
+            aria-expanded={menuOpen}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              setMenuOpen((v) => !v);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenuOpen((v) => !v);
+            }}
+            className="h-10 w-10 rounded-full border-2 border-white/90 shadow-lg ring-2 ring-black/10 transition hover:scale-105"
+            style={{ background: skin.swatch }}
           />
-        ))}
+
+          {menuOpen && (
+            <div className="absolute right-0 top-12 w-44 overflow-hidden rounded-2xl border border-black/10 bg-white/95 py-1 shadow-xl backdrop-blur">
+              {SEASONS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setLoginTheme(s.id);
+                    setMenuOpen(false);
+                    const url = theme === "dark" ? s.night : s.day;
+                    if (url) {
+                      const img = new Image();
+                      img.src = url;
+                    }
+                  }}
+                  className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[#0a2540] transition hover:bg-black/5 ${
+                    season === s.id ? "font-semibold" : ""
+                  }`}
+                >
+                  <span
+                    className="h-5 w-5 shrink-0 rounded-full border border-black/10"
+                    style={{ background: s.swatch }}
+                  />
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="login-card relative flex w-full max-w-[980px] overflow-hidden">
+      <div className="login-card relative z-20 flex w-full max-w-[980px] overflow-hidden">
         {/* Trái: trắng */}
         <aside className="login-left relative hidden w-[46%] lg:block">
           <div className="login-left-mark" />

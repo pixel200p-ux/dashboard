@@ -218,11 +218,27 @@ html.dark {
     #e8ecef;
 }
 
-.login-stage[data-skin="aurora"] { --login-navy: #0a2540; --login-btn: #c5d4e0; }
-.login-stage[data-skin="midnight"] { --login-navy: #07111c; --login-btn: #d6dee8; }
-.login-stage[data-skin="ember"] { --login-navy: #1c1410; --login-btn: #e8d5c4; }
-.login-stage[data-skin="forest"] { --login-navy: #0c2419; --login-btn: #cfe0d4; }
-.login-stage[data-skin="pixel"] { --login-navy: #132338; --login-btn: #c9d6e4; }
+.login-stage[data-skin="default"] {
+  /* màu lấy từ style inline JS */
+}
+.login-stage[data-skin="spring"],
+.login-stage[data-skin="summer"],
+.login-stage[data-skin="autumn"],
+.login-stage[data-skin="winter"] {
+  background: transparent;
+}
+
+.login-season-bg {
+  transition: opacity 0.35s ease;
+}
+
+.login-stage[data-skin="spring"] .login-card,
+.login-stage[data-skin="summer"] .login-card,
+.login-stage[data-skin="autumn"] .login-card,
+.login-stage[data-skin="winter"] .login-card {
+  background: color-mix(in oklab, #ffffff 92%, transparent);
+  backdrop-filter: blur(8px);
+}
 
 .login-card {
   min-height: 580px;

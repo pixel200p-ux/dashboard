@@ -1303,3 +1303,22 @@
     ]
   }
 }
+### Cơ chế khớp Trade T+ (BẮT BUỘC — thủ công, không tự động)
+
+- Trade T+ KHÔNG chạy khớp tự động.
+- Không dùng Smart Matching / FIFO / auto-assign lot.
+- Khi tạo SELL (hoặc SELL gắn T+), người dùng phải CHỌN THỦ CÔNG:
+  - Lô Buy T+ nào được khớp (theo buyTxId / lot đang OPEN),
+  - Số lượng khớp (cho phép partial: bán một phần lô).
+- Mỗi lệnh BUY có tradeTplus = true tạo một lô OPEN riêng (định danh bằng id lệnh mua).
+- VPS chỉ được khớp với lô VPS; SSI với SSI; Crypto với Crypto.
+- Chỉ phần đã khớp COMPLETED mới tính lãi T+ ròng và mới được trừ vào giá vốn gốc.
+- Phần còn lại của lô vẫn OPEN; card T+ vẫn hiện nếu còn qty OPEN > 0.
+Form Sell khi mã đang có lô T+ OPEN:
+- Hiển thị danh sách lô OPEN (ngày mua, giá mua, qty còn lại).
+- User tick / chọn lô + nhập số lượng khớp.
+- Không có nút “Khớp tự động”.
+- Cho phép không khớp T+ (bán vào vị thế gốc) nếu user không chọn lô T+.
+YÊU CẦU SẢN PHẨM (không đổi):
+T+ không chạy tự động, mà chọn thủ công.
+Mọi mô tả “tự match / smart match” đều trái yêu cầu và phải bỏ.
