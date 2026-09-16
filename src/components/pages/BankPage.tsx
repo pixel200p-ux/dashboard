@@ -2,8 +2,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { formatViDate } from "@/engine/dates";
+import { addTermMonths, formatViDate, todayYmd } from "@/engine/dates";
+import { interestForPeriod, periodRate } from "@/engine/bank";
 import { displayMoney } from "@/lib/display";
+import type { BankDeposit, BankRateUpdate } from "@/engine/types";
 import { confirmBankRate, deleteBank, redeemBank } from "@/lib/api/portfolio";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
@@ -11,6 +13,68 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { NavOriginalCard, PnlCard } from "@/components/NavOriginalCards";
+
+type BankHistKind = "ALL" | "RENEWAL" | "REDEEM";
+
+type BankHistRow = {
+  id: string;
+  kind: "RENEWAL" | "REDEEM";
+  bankName: string;
+  date: string;
+  rate: number;
+  principal: number;
+  interest: number;
+  principalAfter: number | null;
+};
+
+function buildBankHistory(deposits: BankDeposit[], updates: BankRateUpdate[], asOf = todayYmd()): BankHistRow[] {
+  const rows: BankHistRow[] = [];
+  for (const d of deposits) {
+    if (d.deletedAt) continue;
+    let principal = d.principal;
+    let periodStart = d.startDate;
+    let period = 0;
+    const stop = d.status === "REDEEMED" && d.redeemedAt ? d.redeemedAt : asOf;
+
+    while (period < 600) {
+      const maturity = addTermMonths(periodStart, d.termMonths);
+      const { rate } = periodRate(d, period, updates);
+
+      if (d.status === "REDEEMED" && d.redeemedAt && d.redeemedAt <= maturity) {
+        rows.push({
+          id: `${d.id}-redeem`,
+          kind: "REDEEM",
+          bankName: d.bankName,
+          date: d.redeemedAt,
+          rate,
+          principal: d.redeemedPrincipal ?? principal,
+          interest: d.redeemedInterest ?? 0,
+          principalAfter: null,
+        });
+        break;
+      }
+
+      if (asOf < maturity) break;
+      if (!d.autoRollover) break;
+
+      const earned = interestForPeriod(principal, rate, periodStart, maturity);
+      rows.push({
+        id: `${d.id}-r${period}`,
+        kind: "RENEWAL",
+        bankName: d.bankName,
+        date: maturity,
+        rate,
+        principal,
+        interest: earned,
+        principalAfter: principal + earned,
+      });
+      principal += earned;
+      periodStart = maturity;
+      period += 1;
+    }
+  }
+  return rows.sort((a, b) => b.date.localeCompare(a.date) || a.bankName.localeCompare(b.bankName));
+}
 
 export function BankPage() {
   const { data, isPending } = usePortfolio();
@@ -20,9 +84,12 @@ export function BankPage() {
   const redeemMut = usePortfolioMutation((d: Parameters<typeof redeemBank>[0]) => redeemBank(d), "Đã tất toán sổ");
   const delMut = usePortfolioMutation((d: Parameters<typeof deleteBank>[0]) => deleteBank(d), "Đã xóa sổ");
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [histFilter, setHistFilter] = useState<BankHistKind>("ALL");
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const usd = data.state.usdVnd;
+  const histAll = buildBankHistory(data.ledger.banks, data.ledger.bankRates);
+  const histRows = histAll.filter((r) => histFilter === "ALL" || r.kind === histFilter);
 
   return (
     <div className="space-y-5">
@@ -124,33 +191,67 @@ export function BankPage() {
         </Card>
       )}
 
-      <Card>
-        <CardTitle>Lịch sử đáo hạn</CardTitle>
+            <Card>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Lịch sử đáo hạn &amp; tái tục</CardTitle>
+          <div className="flex gap-1">
+            {(
+              [
+                { id: "ALL", label: "Tất cả" },
+                { id: "RENEWAL", label: "Tái tục" },
+                { id: "REDEEM", label: "Tất toán" },
+              ] as const
+            ).map((o) => (
+              <Button
+                key={o.id}
+                size="sm"
+                variant={histFilter === o.id ? "default" : "outline"}
+                onClick={() => setHistFilter(o.id)}
+              >
+                {o.label}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="table-scroll mt-3">
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="px-2 py-2">Ngân hàng</th>
+                <th className="px-2 py-2">Loại</th>
                 <th className="px-2 py-2">Ngày</th>
-                <th className="px-2 py-2 text-right">Gốc thu hồi</th>
-                <th className="px-2 py-2 text-right">Lãi thực nhận</th>
+                <th className="px-2 py-2 text-right">Lãi suất</th>
+                <th className="px-2 py-2 text-right">Gốc</th>
+                <th className="px-2 py-2 text-right">Lãi</th>
+                <th className="px-2 py-2 text-right">Gốc sau</th>
               </tr>
             </thead>
             <tbody>
-              {data.state.redeemedBanks.map((b) => (
-                <tr key={b.id} className="border-b border-border/70">
-                  <td className="px-2 py-2">{b.bankName}</td>
-                  <td className="px-2 py-2">{b.maturityDate ? formatViDate(b.maturityDate) : "—"}</td>
-                  <td className="px-2 py-2 text-right font-mono">
-                    {displayMoney(data.ledger.banks.find((x) => x.id === b.id)?.redeemedPrincipal ?? 0, currency, usd)}
+              {histRows.map((r) => (
+                <tr key={r.id} className="border-b border-border/70">
+                  <td className="px-2 py-2">{r.bankName}</td>
+                  <td className="px-2 py-2">
+                    <Badge tone={r.kind === "REDEEM" ? "navy" : "muted"}>
+                      {r.kind === "REDEEM" ? "Tất toán" : "Tái tục"}
+                    </Badge>
                   </td>
-                  <td className="px-2 py-2 text-right font-mono">{displayMoney(b.accumulatedInterest, currency, usd)}</td>
+                  <td className="px-2 py-2">{formatViDate(r.date)}</td>
+                  <td className="px-2 py-2 text-right font-mono">{r.rate}%</td>
+                  <td className="px-2 py-2 text-right font-mono">{displayMoney(r.principal, currency, usd)}</td>
+                  <td className="px-2 py-2 text-right font-mono">{displayMoney(r.interest, currency, usd)}</td>
+                  <td className="px-2 py-2 text-right font-mono">
+                    {r.principalAfter != null ? displayMoney(r.principalAfter, currency, usd) : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {data.state.redeemedBanks.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">Chưa tất toán sổ nào.</p>
+          {histRows.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              {histAll.length === 0
+                ? "Chưa có lần tái tục hoặc tất toán."
+                : "Không có dòng nào khớp bộ lọc."}
+            </p>
           )}
         </div>
       </Card>

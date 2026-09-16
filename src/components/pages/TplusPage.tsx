@@ -9,6 +9,8 @@ import { usePortfolio } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import type { TplusCard } from "@/engine/types";
 
 function exportHistory(rows: ReturnType<typeof usePortfolio>["data"]) {
   if (!rows) return;
@@ -53,10 +55,56 @@ export function TplusPage() {
   const { data, isPending } = usePortfolio();
   const currency = useUiStore((s) => s.currency);
   const [history, setHistory] = useState(false);
+  const [openStock, setOpenStock] = useState(true);
+  const [openCrypto, setOpenCrypto] = useState(true);
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const usd = data.state.usdVnd;
   const cards = data.state.tplusCards;
+  const stockCards = cards.filter((c) => c.assetType === "STOCK");
+  const cryptoCards = cards.filter((c) => c.assetType === "CRYPTO");
+  const vpsCards = stockCards.filter((c) => c.accountId === "vps");
+  const ssiCards = stockCards.filter((c) => c.accountId === "ssi");
+
+  function Group({
+    title,
+    count,
+    open,
+    onToggle,
+    children,
+  }: {
+    title: string;
+    count: number;
+    open: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+  }) {
+    return (
+      <Card className="space-y-3">
+        <button type="button" className="flex w-full items-center justify-between gap-2 text-left" onClick={onToggle}>
+          <CardTitle>
+            {title}{" "}
+            <span className="text-sm font-normal text-muted-foreground">· {count} mã</span>
+          </CardTitle>
+          <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open ? children : null}
+      </Card>
+    );
+  }
+
+  function CardGrid({ list }: { list: TplusCard[] }) {
+    if (list.length === 0) {
+      return <p className="text-sm text-muted-foreground">Không có lệnh T+ đang mở.</p>;
+    }
+    return (
+      <div className="grid gap-3 lg:grid-cols-2">
+        {list.map((c) => (
+          <TplusOpenCard key={c.assetId} card={c} usdVnd={usd} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -77,19 +125,23 @@ export function TplusPage() {
         </div>
       </div>
 
-      {!history && cards.length === 0 && (
-        <Card>
-          <p className="text-sm text-muted-foreground">
-            Không có lệnh T+ đang mở. Khi Buy, tick Trade T+ để đưa lệnh vào đây.
-          </p>
-        </Card>
-      )}
-
       {!history && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {cards.map((c) => (
-            <TplusOpenCard key={c.assetId} card={c} usdVnd={usd} />
-          ))}
+        <div className="space-y-3">
+          <Group title="Stock" count={stockCards.length} open={openStock} onToggle={() => setOpenStock((v) => !v)}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">VPS</p>
+                <CardGrid list={vpsCards} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">SSI</p>
+                <CardGrid list={ssiCards} />
+              </div>
+            </div>
+          </Group>
+          <Group title="Crypto" count={cryptoCards.length} open={openCrypto} onToggle={() => setOpenCrypto((v) => !v)}>
+            <CardGrid list={cryptoCards} />
+          </Group>
         </div>
       )}
 

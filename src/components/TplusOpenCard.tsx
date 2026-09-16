@@ -6,6 +6,7 @@ import { formatPct, formatQty, signedClass } from "@/engine/money";
 import { displayMoney, displayPrice } from "@/lib/display";
 import { useUiStore } from "@/lib/ui-store";
 import type { TplusCard } from "@/engine/types";
+import { useState } from "react";
 
 export function TplusOpenCard({
   card,
@@ -16,15 +17,20 @@ export function TplusOpenCard({
 }) {
   const currency = useUiStore((s) => s.currency);
   const openTx = useUiStore((s) => s.openTx);
+  const [detail, setDetail] = useState(false);
   const c = card;
   const costLabel =
     c.tplusProfitCompleted > 0
       ? `${displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)} / ${displayPrice(c.originalAvgCost, c.assetType, currency, usdVnd)}`
       : `0 / ${displayPrice(c.originalAvgCost || c.adjustedAvgCost, c.assetType, currency, usdVnd)}`;
 
-  return (
+    return (
     <Card className="space-y-3">
-      <div className="flex items-start justify-between gap-2">
+      <button
+        type="button"
+        className="flex w-full items-start justify-between gap-2 text-left"
+        onClick={() => setDetail((v) => !v)}
+      >
         <div>
           <p className="text-lg font-semibold">
             {c.symbol} <span className="text-sm font-normal text-muted-foreground">{c.accountName}</span>
@@ -34,40 +40,8 @@ export function TplusOpenCard({
         <Badge tone={c.remainingUnrealized >= 0 ? "profit" : "loss"}>
           {c.remainingUnrealized >= 0 ? "Có lãi / gần hòa" : "Đang lỗ"}
         </Badge>
-      </div>
-      <dl className="grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <dt className="text-xs text-muted-foreground">Số lượng Trade</dt>
-          <dd className="font-mono tabular-nums">
-            {formatQty(c.openTplusQty, c.assetType)} / {formatQty(c.coreQty, c.assetType)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Giá Trade</dt>
-          <dd className="font-mono tabular-nums">
-            {displayPrice(c.tradePrice, c.assetType, currency, usdVnd)} /{" "}
-            {displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Giá vốn (mới / gốc)</dt>
-          <dd className="font-mono tabular-nums">{costLabel}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Giá bán đề xuất</dt>
-          <dd className="font-mono tabular-nums">{displayPrice(c.suggestedSell, c.assetType, currency, usdVnd)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Hòa vốn (bán hết gốc + T+)</dt>
-          <dd className="font-mono tabular-nums">{displayPrice(c.breakEvenPrice, c.assetType, currency, usdVnd)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Còn lỗ / lãi</dt>
-          <dd className={`font-mono tabular-nums ${signedClass(c.remainingUnrealized)}`}>
-            {displayMoney(c.remainingUnrealized, currency, usdVnd)}
-          </dd>
-        </div>
-      </dl>
+      </button>
+
       <ul className="space-y-1 text-xs text-muted-foreground">
         {c.openLots.map((l) => (
           <li key={l.buyTxId}>
@@ -87,6 +61,43 @@ export function TplusOpenCard({
           </li>
         ))}
       </ul>
+
+      {detail && (
+        <dl className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <dt className="text-xs text-muted-foreground">Số lượng Trade</dt>
+            <dd className="font-mono tabular-nums">
+              {formatQty(c.openTplusQty, c.assetType)} / {formatQty(c.coreQty, c.assetType)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Giá Trade</dt>
+            <dd className="font-mono tabular-nums">
+              {displayPrice(c.tradePrice, c.assetType, currency, usdVnd)} /{" "}
+              {displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Giá vốn (mới / gốc)</dt>
+            <dd className="font-mono tabular-nums">{costLabel}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Giá bán đề xuất</dt>
+            <dd className="font-mono tabular-nums">{displayPrice(c.suggestedSell, c.assetType, currency, usdVnd)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Hòa vốn (bán hết gốc + T+)</dt>
+            <dd className="font-mono tabular-nums">{displayPrice(c.breakEvenPrice, c.assetType, currency, usdVnd)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Còn lỗ / lãi</dt>
+            <dd className={`font-mono tabular-nums ${signedClass(c.remainingUnrealized)}`}>
+              {displayMoney(c.remainingUnrealized, currency, usdVnd)}
+            </dd>
+          </div>
+        </dl>
+      )}
+
       <div className="flex gap-2">
         <Button
           className="flex-1"
