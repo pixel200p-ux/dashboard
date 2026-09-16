@@ -10,7 +10,6 @@ import { usePortfolioMutation } from "@/lib/use-portfolio";
 import { parseBrokerPrice, parseDecimal } from "@/engine/money";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 
 export function HoldingsTable({
   rows,
@@ -126,7 +125,7 @@ export function HoldingsTable({
                 <div className="text-xs">{formatPct(h.costBasis ? (h.unrealizedPnl / h.costBasis) * 100 : 0)}</div>
               </td>
               <td className="px-2 py-2">
-                <div className="flex justify-end gap-1">
+                                <div className="flex justify-end gap-1">
                   <Button
                     size="sm"
                     variant="outline"
@@ -152,25 +151,11 @@ export function HoldingsTable({
                         name: h.name,
                         assetType: h.assetType,
                         txType: "SELL",
-                        tplusSell: Boolean(
-                          (h.assetType === "STOCK" || h.assetType === "CRYPTO") && sellTplus[h.assetId],
-                        ),
                       })
                     }
                   >
                     Sell
                   </Button>
-                  {(h.assetType === "STOCK" || h.assetType === "CRYPTO") && (
-                    <label className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-                      <Checkbox
-                        checked={Boolean(sellTplus[h.assetId])}
-                        onCheckedChange={(v) =>
-                          setSellTplus((m) => ({ ...m, [h.assetId]: v === true }))
-                        }
-                      />
-                      T+
-                    </label>
-                  )}
                 </div>
               </td>
             </tr>

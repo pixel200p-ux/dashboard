@@ -179,8 +179,8 @@ export function ProfilePage() {
       const sells = txs.filter((t) => t.txType === "SELL" && (!year || yearOf(t.txDate) === year));
       let open = 0;
       for (const b of buys) if (isBuyOpen(b)) open += 1;
-      const bankOpen = banks.filter((b) => activeIds.has(b.id) && (!year || yearOf(b.openedAt ?? null) === year)).length;
-      const bankClosed = banks.filter((b) => !activeIds.has(b.id) && (!year || yearOf(b.openedAt ?? null) === year)).length;
+      const bankOpen = banks.filter((b) => activeIds.has(b.id) && (!year || yearOf(b.startDate) === year)).length;
+      const bankClosed = banks.filter((b) => !activeIds.has(b.id) && (!year || yearOf(b.startDate) === year)).length;
       return {
         open,
         closed: Math.max(0, buys.length - open),
@@ -197,7 +197,7 @@ export function ProfilePage() {
       if (y) years.add(y);
     }
     for (const b of banks) {
-      const y = yearOf(b.openedAt);
+      const y = yearOf(b.startDate);
       if (y) years.add(y);
     }
 

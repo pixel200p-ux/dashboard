@@ -48,12 +48,12 @@ function sellRates(fees: FeeSetting[], kind: string): { feePct: number; taxPct: 
 
 function adjustedAvg(p: Pos): number {
   if (p.coreQty <= 0) return 0;
-  return (p.coreCostTotal - p.tplusReduction) / p.coreQty;
+  return Math.max(0, p.coreCostTotal - p.tplusReduction) / p.coreQty;
 }
 
 function originalAvg(p: Pos): number {
   if (p.coreQty <= 0) return 0;
-  return p.coreCostTotal / p.coreQty;
+  return Math.max(0, p.coreCostTotal) / p.coreQty;
 }
 
 function openQty(p: Pos): number {
@@ -165,7 +165,11 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     const tax = num(tx.tax);
 
     if (tx.txType === "BUY") {
-      if (tx.tradeTplus && (asset.assetType === "STOCK" || asset.assetType === "CRYPTO")) {
+      const allowTplus =
+        tx.tradeTplus &&
+        (asset.assetType === "STOCK" || asset.assetType === "CRYPTO") &&
+        p.coreQty > 1e-12;
+      if (allowTplus) {
         p.openLots.push({
           buyTxId: tx.id,
           buyDate: tx.txDate,
@@ -183,7 +187,15 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     }
 
     if (tx.txType === "CASH_DIVIDEND") {
-      p.cashDividend += num(tx.amount) - tax;
+      const net = Math.max(0, num(tx.amount) - tax);
+      p.cashDividend += net;
+      if (net >= p.coreCostTotal) {
+        const excess = net - p.coreCostTotal;
+        p.coreCostTotal = 0;
+        if (excess > 0) p.realizedTradePnl += excess;
+      } else {
+        p.coreCostTotal -= net;
+      }
       continue;
     }
 
@@ -271,7 +283,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     const isCrypto = p.asset.assetType === "CRYPTO";
     const fx = ledger.usdVnd;
     const mv = isCrypto ? totalQty * price * fx : totalQty * price;
-    const coreBasis = p.coreCostTotal - p.tplusReduction;
+    const coreBasis = Math.max(0, p.coreCostTotal - p.tplusReduction);
     const tplusBasis = isCrypto
       ? p.openLots.reduce((s, l) => {
           const fxBuy = l.fxRate ?? fx;

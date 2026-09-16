@@ -34,8 +34,8 @@ export type TxPrefill = {
   notes?: string | null;
   matches?: { buyTxId: string; quantity: number }[];
   matchAllOpen?: boolean;
+  tplusSell?: boolean;
 };
-
 type UiState = {
   theme: ThemeMode;
   loginTheme: LoginThemeId;

@@ -145,7 +145,7 @@ export function DashboardPage() {
         <Card>
           <CardTitle>Vốn gốc</CardTitle>
           <CardDesc className="mb-2">Nạp / Rút · Sửa số tiền, ngày, danh mục, ghi chú</CardDesc>
-          <ul className="mt-3 max-h-[22.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
+          <ul className="mt-3 max-h-[13.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {ledger.capital.length === 0 && (
               <li className="text-muted-foreground">Chưa nạp vốn. Bấm Nạp vốn gốc.</li>
             )}

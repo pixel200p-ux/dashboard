@@ -199,8 +199,14 @@ export function TxDialog() {
 
 
 
-  const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY";
+  const thisBuyQty =
+    editing && prefill?.txType === "BUY" && !prefill.tradeTplus ? (prefill.quantity ?? 0) : 0;
+  const coreExcludingThis = Math.max(0, (holding?.coreQty ?? 0) - thisBuyQty);
+  const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY" && coreExcludingThis > 1e-12;
   const canOfferTplusSell = (kind === "STOCK" || kind === "CRYPTO") && txType === "SELL";
+  const sellHoldings = (data?.state.holdings ?? []).filter(
+    (h) => h.assetType === assetType && h.accountId === acc.id && h.quantity > 1e-12,
+  );
   const canMatch =
     canOfferTplusSell &&
     matchTplus &&
@@ -393,7 +399,28 @@ export function TxDialog() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Mã</Label>
-                  <Input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder={kind === "CRYPTO" ? "BTC" : kind === "DCDS" ? "DCDS" : kind === "ETF" ? "ETF" : "MBB"} required={!isBank} />
+                  {txType === "SELL" || txType === "CASH_DIVIDEND" || txType === "STOCK_DIVIDEND" ? (
+                    <Select
+                      value={symbol}
+                      onValueChange={(v) => {
+                        setSymbol(v);
+                        const h = sellHoldings.find((x) => x.symbol === v);
+                        if (h) setName(h.name);
+                      }}
+                      placeholder="Chọn mã đang giữ"
+                      options={sellHoldings.map((h) => ({
+                        value: h.symbol,
+                        label: `${h.symbol} · ${formatQty(h.quantity, assetType)}`,
+                      }))}
+                    />
+                  ) : (
+                    <Input
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value)}
+                      placeholder={kind === "CRYPTO" ? "BTC" : kind === "DCDS" ? "DCDS" : kind === "ETF" ? "ETF" : "MBB"}
+                      required={!isBank}
+                    />
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Tên</Label>
@@ -405,6 +432,9 @@ export function TxDialog() {
                 <div className="space-y-1">
                   <Label>Tổng tiền thực nhận (VND)</Label>
                   <Input value={divTotal} onChange={setGrouped(setDivTotal)} placeholder="1,000,000" />
+                  <p className="text-xs text-muted-foreground">
+                    Trừ khỏi vốn của mã (tử số). Original Capital không đổi. Nếu cổ tức lớn hơn vốn còn lại, giá vốn = 0, phần dư là lãi.
+                  </p>
                 </div>
               )}
 
@@ -412,7 +442,9 @@ export function TxDialog() {
                 <div className="space-y-1">
                   <Label>Số lượng CP thưởng thực nhận</Label>
                   <Input value={stockDivQty} onChange={setGrouped(setStockDivQty)} />
-                  <p className="text-xs text-muted-foreground">Tăng holdings, pha loãng giá vốn trung bình.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Cộng vào mẫu số (số CP). Vốn không tăng → giá vốn / CP giảm.
+                  </p>
                 </div>
               )}
 
@@ -457,7 +489,7 @@ export function TxDialog() {
                           placeholder=""
                           required
                         />
-                        {canMatch && (
+                        {txType === "SELL" && (
                           <p className="text-xs text-muted-foreground">
                             tối đa {formatQty(maxSellQty, assetType)}
                           </p>
@@ -477,10 +509,30 @@ export function TxDialog() {
                     </div>
                   )}
 
+                  {(kind === "STOCK" || kind === "CRYPTO") && txType === "BUY" && !canTplus && (
+                    <p className="text-xs text-muted-foreground">
+                      Lần mua đầu của mã này là vị thế gốc — không dùng Trade T+.
+                    </p>
+                  )}
                   {canTplus && (
                     <label className="flex items-center gap-2 text-sm">
                       <Checkbox checked={tplus} onCheckedChange={(v) => setTplus(v === true)} />
                       Trade T+ — lệnh này vào phân tích T+, không cộng vào giá vốn gốc
+                    </label>
+                  )}
+                  {canOfferTplusSell && openLots.length > 0 && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={matchTplus} onCheckedChange={(v) => setMatchTplus(v === true)} />
+                      T+ — chọn lệnh BUY T+ đang OPEN để khớp
+                    </label>
+                  )}
+                  {canOfferTplusSell && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={matchTplus}
+                        onCheckedChange={(v) => setMatchTplus(v === true)}
+                      />
+                      T+ — chọn lệnh BUY T+ đang OPEN để khớp
                     </label>
                   )}
 
