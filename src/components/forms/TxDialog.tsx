@@ -57,6 +57,7 @@ export function TxDialog() {
   const [price, setPrice] = useState("");
   const [amount, setAmount] = useState("");
   const [tplus, setTplus] = useState(false);
+  const [matchTplus, setMatchTplus] = useState(false);
   const [fx, setFx] = useState("");
   const [divTotal, setDivTotal] = useState("");
   const [stockDivQty, setStockDivQty] = useState("");
@@ -87,6 +88,7 @@ export function TxDialog() {
     );setSymbol(prefill.symbol ?? "");
     setName(prefill.name ?? "");
     setTplus(prefill.tradeTplus ?? false);
+    setMatchTplus(Boolean(prefill.tplusSell || prefill.matchAllOpen));
     setDate(prefill.txDate ?? todayYmd());
     setFx(formatThousandsInput(prefill.fxRate != null ? String(prefill.fxRate) : data?.state.usdVnd ? String(data.state.usdVnd) : "25000"));
     setFeeOverride(prefill.id && prefill.fee != null ? formatThousandsInput(String(prefill.fee)) : "");
@@ -198,12 +200,11 @@ export function TxDialog() {
 
 
   const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY";
-    const wantTplusSell = Boolean(prefill?.tplusSell || prefill?.matchAllOpen);
-    const canMatch =
-    (kind === "STOCK" || kind === "CRYPTO") &&
-    txType === "SELL" &&
-    (openLots.length > 0 || (editing && (prefill?.matches?.length ?? 0) > 0)) &&
-    (wantTplusSell || (editing && (prefill?.matches?.length ?? 0) > 0));
+  const canOfferTplusSell = (kind === "STOCK" || kind === "CRYPTO") && txType === "SELL";
+  const canMatch =
+    canOfferTplusSell &&
+    matchTplus &&
+    (openLots.length > 0 || (editing && (prefill?.matches?.length ?? 0) > 0));
 
   function submit(e: React.FormEvent) {
     e.preventDefault();

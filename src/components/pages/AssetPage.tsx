@@ -32,7 +32,6 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   const setStockFilter = useUiStore((s) => s.setStockFilter);
   const openTx = useUiStore((s) => s.openTx);
   const del = usePortfolioMutation((d: Parameters<typeof deleteTransaction>[0]) => deleteTransaction(d), "Đã xóa lệnh");
-  const [sellTplus, setSellTplus] = useState(false);
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const { state, ledger } = data;
@@ -201,24 +200,17 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
             Buy
           </Button>
               <Button
-      variant="outline"
-      onClick={() =>
-        openTx({
-          assetType,
-          accountId: assetType === "STOCK" ? (stockFilter === "ssi" ? "ssi" : "vps") : undefined,
-          txType: "SELL",
-          tplusSell: (assetType === "STOCK" || assetType === "CRYPTO") && sellTplus,
-        })
-      }
-    >
-      Sell
-    </Button>
-    {(assetType === "STOCK" || assetType === "CRYPTO") && (
-      <label className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 text-sm">
-        <Checkbox checked={sellTplus} onCheckedChange={(v) => setSellTplus(v === true)} />
-        T+
-      </label>
-    )}
+          variant="outline"
+          onClick={() =>
+            openTx({
+              assetType,
+              accountId: assetType === "STOCK" ? (stockFilter === "ssi" ? "ssi" : "vps") : undefined,
+              txType: "SELL",
+            })
+          }
+        >
+          Sell
+        </Button>
         </div>
       </div>
       <div className={kpiGrid}>

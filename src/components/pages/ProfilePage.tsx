@@ -100,7 +100,7 @@ export function ProfilePage() {
       // Tăng hệ số 0.0025 → 0.005 = lăn ít hơn đã full màn
       // Muốn nhạy hơn nữa: 0.006 hoặc 0.007
       // Muốn chậm hơn: 0.003
-      const step = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY) * 10, 0.6);
+      const step = Math.sign(e.deltaY) * 0.08;
       const next = Math.max(0, Math.min(1, cur + step));
       setDecor(next);
     }
@@ -179,8 +179,8 @@ export function ProfilePage() {
       const sells = txs.filter((t) => t.txType === "SELL" && (!year || yearOf(t.txDate) === year));
       let open = 0;
       for (const b of buys) if (isBuyOpen(b)) open += 1;
-      const bankOpen = banks.filter((b) => activeIds.has(b.id) && (!year || yearOf(b.openedAt) === year)).length;
-      const bankClosed = banks.filter((b) => !activeIds.has(b.id) && (!year || yearOf(b.openedAt) === year)).length;
+      const bankOpen = banks.filter((b) => activeIds.has(b.id) && (!year || yearOf(b.openedAt ?? null) === year)).length;
+      const bankClosed = banks.filter((b) => !activeIds.has(b.id) && (!year || yearOf(b.openedAt ?? null) === year)).length;
       return {
         open,
         closed: Math.max(0, buys.length - open),
@@ -382,10 +382,10 @@ export function ProfilePage() {
         <div 
           className="mt-4 flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-transform"
           style={{
-  opacity: "calc(1 - var(--p) * 2.5)",
-  transform: "translate3d(0, calc(var(--p) * 60px), 0)",
-  pointerEvents: "auto", // sẽ tắt bằng JS nếu cần, hoặc giữ nguyên auto
-}}
+            opacity: "calc(1 - var(--p) * 2.5)",
+            transform: "translate3d(0, calc(var(--p) * 60px), 0)",
+            pointerEvents: target > 0.3 ? "none" : "auto",
+          }}
         >
           {/* Card 1: Thống kê */}
           <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5">

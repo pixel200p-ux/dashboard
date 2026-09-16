@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { NavOriginalCard, PnlCard } from "@/components/NavOriginalCards";
+import { FilterMenu } from "@/components/FilterMenu";
 
 type BankHistKind = "ALL" | "RENEWAL" | "REDEEM";
 
@@ -171,14 +172,35 @@ export function BankPage() {
                 </Button>
               </form>
             )}
-                        <div className="flex flex-wrap items-center gap-2">
-              <Button size="icon" variant="outline" className="h-8 w-8 min-h-8 p-0" title="Sửa" aria-label="Sửa" onClick={() => openBank(b.id)}>
-                <Pencil />
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => redeemMut.mutate({ data: { id: b.id } })}>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!window.confirm(`Tất toán sổ ${b.bankName}?`)) return;
+                  redeemMut.mutate({ data: { id: b.id } });
+                }}
+              >
                 Tất toán
               </Button>
-              <Button size="icon" variant="ghost" className="h-8 w-8 min-h-8 p-0" title="Xóa" aria-label="Xóa" onClick={() => delMut.mutate({ data: { id: b.id } })}>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8 min-h-8 p-0"
+                title="Sửa"
+                aria-label="Sửa"
+                onClick={() => openBank(b.id)}
+              >
+                <Pencil />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 min-h-8 p-0"
+                title="Xóa"
+                aria-label="Xóa"
+                onClick={() => delMut.mutate({ data: { id: b.id } })}
+              >
                 <Trash2 />
               </Button>
             </div>
@@ -193,25 +215,16 @@ export function BankPage() {
 
             <Card>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>Lịch sử đáo hạn &amp; tái tục</CardTitle>
-          <div className="flex gap-1">
-            {(
-              [
-                { id: "ALL", label: "Tất cả" },
-                { id: "RENEWAL", label: "Tái tục" },
-                { id: "REDEEM", label: "Tất toán" },
-              ] as const
-            ).map((o) => (
-              <Button
-                key={o.id}
-                size="sm"
-                variant={histFilter === o.id ? "default" : "outline"}
-                onClick={() => setHistFilter(o.id)}
-              >
-                {o.label}
-              </Button>
-            ))}
-          </div>
+          <CardTitle>Lịch sử giao dịch</CardTitle>
+          <FilterMenu
+            value={histFilter}
+            onChange={setHistFilter}
+            options={[
+              { id: "ALL", label: "Tất cả" },
+              { id: "RENEWAL", label: "Tái tục" },
+              { id: "REDEEM", label: "Tất toán" },
+            ]}
+          />
         </div>
         <div className="table-scroll mt-3">
           <table className="w-full text-left text-sm">

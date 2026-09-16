@@ -23,7 +23,6 @@ export function HoldingsTable({
   const openTx = useUiStore((s) => s.openTx);
   const [editId, setEditId] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
-  const [sellTplus, setSellTplus] = useState<Record<string, boolean>>({});
   const mut = usePortfolioMutation((d: Parameters<typeof setAssetPrice>[0]) => setAssetPrice(d), "Đã cập nhật giá");
 
   if (rows.length === 0) {
