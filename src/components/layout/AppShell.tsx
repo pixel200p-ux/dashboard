@@ -322,7 +322,9 @@ export function AppShell() {
             "min-w-0",
             pathname.startsWith("/profile")
               ? "h-dvh max-h-dvh overflow-hidden p-0"
-              : "overflow-x-hidden p-3 pb-4 md:p-6",
+              : pathname.startsWith("/calendar")
+                ? "overflow-x-hidden p-3 pb-4 lg:flex lg:h-[calc(100dvh-3.5rem)] lg:max-h-[calc(100dvh-3.5rem)] lg:overflow-hidden lg:p-6"
+                : "overflow-x-hidden p-3 pb-4 md:p-6",
           )}
         >
           <Outlet />

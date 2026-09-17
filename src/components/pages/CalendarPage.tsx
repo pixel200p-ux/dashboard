@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
+  alertMessage,
   nextOccurrence,
   occursOn,
   prevOccurrence,
@@ -23,7 +24,7 @@ import { deleteCalendarEvent, saveCalendarEvent } from "@/lib/api/calendar";
 import { useCalendar, useCalendarMutation } from "@/lib/use-calendar";
 import { cn } from "@/lib/utils";
 import { addDays, addMonths, format, getDay, startOfMonth, subMonths } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, History, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 const WEEK = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -43,10 +44,12 @@ export function CalendarPage() {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(today);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [collapsedYears, setCollapsedYears] = useState<Record<string, boolean>>({});
 
   const [jumpOpen, setJumpOpen] = useState(false);
   const [jumpText, setJumpText] = useState("");
   const [eventDateText, setEventDateText] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   function goToDate(iso: string) {
     setSelected(iso);
@@ -156,6 +159,16 @@ export function CalendarPage() {
       );
   }, [events, today]);
 
+  const upcomingGroups = useMemo(() => {
+    const map = new Map<string, { date: string; items: { ev: CalendarEvent; occur: string; days: number }[] }>();
+    for (const item of upcoming) {
+      const current = map.get(item.occur) ?? { date: item.occur, items: [] };
+      current.items.push(item);
+      map.set(item.occur, current);
+    }
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [upcoming]);
+
   const past = useMemo(() => {
     return events
       .map((ev) => {
@@ -164,8 +177,47 @@ export function CalendarPage() {
       })
       .filter((x): x is { ev: CalendarEvent; occur: string } => Boolean(x))
       .sort((a, b) => b.occur.localeCompare(a.occur))
-      .slice(0, 12);
+      .slice(0, 10);
   }, [events, today]);
+
+  const pastGroups = useMemo(() => {
+    const map = new Map<string, { date: string; items: { ev: CalendarEvent; occur: string }[] }>();
+    for (const item of past) {
+      const current = map.get(item.occur) ?? { date: item.occur, items: [] };
+      current.items.push(item);
+      map.set(item.occur, current);
+    }
+    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }, [past]);
+
+  const historyYears = useMemo(() => {
+    const rows: { ev: CalendarEvent; occur: string }[] = [];
+    const endY = Number(today.slice(0, 4));
+    for (const ev of events) {
+      if (!ev.yearly) {
+        if (ev.eventDate <= today) rows.push({ ev, occur: ev.eventDate });
+        continue;
+      }
+      const startY = Number(ev.eventDate.slice(0, 4));
+      const mmdd = ev.eventDate.slice(5);
+      for (let y = endY; y >= startY; y--) {
+        const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+        const occur = mmdd === "02-29" && !leap ? `${y}-02-28` : `${y}-${mmdd}`;
+        if (occur <= today) rows.push({ ev, occur });
+      }
+    }
+    rows.sort((a, b) => b.occur.localeCompare(a.occur) || a.ev.title.localeCompare(b.ev.title));
+    const groups: { year: string; items: typeof rows }[] = [];
+    for (const row of rows) {
+      const year = row.occur.slice(0, 4);
+      const last = groups[groups.length - 1];
+      if (last && last.year === year) last.items.push(row);
+      else groups.push({ year, items: [row] });
+    }
+    return groups;
+  }, [events, today]);
+
+  const sideCardRows = "minmax(0, auto) minmax(0, 1fr)";
 
   function openNew(date = selected) {
     setDraft({ title: "", eventDate: date, yearly: false, notes: "" });
@@ -220,9 +272,9 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="min-h-full space-y-5 pb-6 dark:bg-[#0F172A]">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-5 overflow-hidden">
       {/* ── Header ─────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white px-4 py-5 shadow-sm dark:border-[#334155] dark:bg-[#354969] sm:px-6">
+      <div className="relative shrink-0 overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white px-4 py-5 shadow-sm dark:border-[#334155] dark:bg-[#162238] sm:px-6">
         <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[#0F172A]/5 blur-3xl dark:bg-[#0F172A]/40" />
         <div className="pointer-events-none absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-[#0F172A]/5 blur-3xl dark:bg-[#0F172A]/30" />
 
@@ -240,16 +292,13 @@ export function CalendarPage() {
             <h1 className="text-3xl font-semibold tracking-tight text-[#0F172A] sm:text-4xl dark:text-white">
               Calendar
             </h1>
-            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#64748B] dark:text-[#94A3B8]">
-              Nhập mốc · banner hiện từ 3 ngày trước đến đúng ngày, trên mọi trang
-            </p>
           </div>
 
-          <div className="shrink-0">
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-40">
             {jumpOpen ? (
               <Input
                 autoFocus
-                className="h-10 w-full rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm focus-visible:border-[#0F172A] focus-visible:ring-1 focus-visible:ring-[#0F172A]/20 dark:border-[#334155] dark:bg-[#0F172A] dark:text-white sm:w-40"
+                className="h-8 w-full rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm focus-visible:border-[#0F172A] focus-visible:ring-1 focus-visible:ring-[#0F172A]/20 dark:border-[#334155] dark:bg-[#0F172A] dark:text-white sm:w-40"
                 placeholder="dd/mm/yyyy"
                 value={jumpText}
                 onChange={(e) => setJumpText(e.target.value)}
@@ -266,26 +315,35 @@ export function CalendarPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl border-[#0F172A] bg-[#0F172A] px-4 text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+                className="h-8 gap-2 rounded-xl border-[#0F172A] bg-[#0F172A] px-3 text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#354969] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
                 onClick={() => setJumpOpen(true)}
               >
                 <CalendarDays className="h-4 w-4" />
                 Đến ngày
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-full gap-2 rounded-xl border-[#0F172A] bg-[#0F172A] px-3 text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#354969] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="h-4 w-4" />
+              Lịch sử sự kiện
+            </Button>
           </div>
         </div>
       </div>
 
       {/* ── Main ───────────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+      <div className="grid h-full min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] lg:overflow-hidden">
         {/* Calendar */}
-        <Card className="overflow-hidden border border-[#E2E8F0] bg-white p-3 text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969] sm:p-4">
+        <Card className="min-h-0 overflow-hidden border border-[#E2E8F0] bg-white p-3 text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#162238] sm:p-4">
           {/* Month navigation */}
           <div className="mb-4 flex items-center gap-2">
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] active:scale-95 dark:border-[#334155] dark:bg-[#354969] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               onClick={() => setCursor((d) => startOfMonth(subMonths(d, 1)))}
               aria-label="Tháng trước"
             >
@@ -293,7 +351,7 @@ export function CalendarPage() {
             </button>
 
             <p
-              className="flex min-h-10 min-w-0 flex-1 cursor-default items-center justify-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] px-3 text-sm font-semibold tabular-nums text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#162238] dark:text-white"
+              className="flex min-h-10 min-w-0 flex-1 cursor-default items-center justify-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] px-3 text-sm font-semibold tabular-nums text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969] dark:text-white"
               title="Nhấp đúp để về hôm nay"
               onDoubleClick={() => goToDate(today)}
             >
@@ -303,7 +361,7 @@ export function CalendarPage() {
 
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] active:scale-95 dark:border-[#334155] dark:bg-[#354969] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               onClick={() => setCursor((d) => startOfMonth(addMonths(d, 1)))}
               aria-label="Tháng sau"
             >
@@ -329,7 +387,7 @@ export function CalendarPage() {
           </div>
 
           {/* Cells */}
-          <div className="mt-5 grid grid-cols-7 gap-x-1.5 gap-y-1">
+          <div className="mt-3 grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-x-1.5 gap-y-1">
             {cells.map((iso) => {
               const inMonth = iso.slice(0, 7) === cursorYm;
               const marks = marksByDate.get(iso) ?? [];
@@ -344,22 +402,22 @@ export function CalendarPage() {
                   onClick={() => setSelected(iso)}
                   onDoubleClick={() => openNew(iso)}
                   className={cn(
-                    "group relative flex min-h-14 flex-col items-center rounded-xl border px-1 py-1 text-sm transition-all duration-150 sm:min-h-15",
+                    "group relative flex h-full min-h-0 flex-col items-center rounded-xl border px-1 py-1 text-sm transition-all duration-150",
                     inMonth
-                      ? "border-transparent bg-white text-[#0F172A] dark:border-[#334155] dark:bg-transparent dark:text-white"
-                      : "border-transparent bg-transparent text-[#94A3B8] dark:border-[#334155] dark:text-[#64748B]",
+                      ? "border-transparent bg-white text-[#0F172A] dark:border-transparent dark:bg-transparent dark:text-white"
+                      : "border-transparent bg-transparent text-[#94A3B8] dark:border-transparent dark:text-[#64748B]",
                     // Selected
                     isSel &&
                       "border-[#0F172A] bg-[#0F172A] text-white shadow-sm ring-1 ring-[#0F172A] dark:border-white dark:bg-[#334155] dark:text-white dark:ring-white",
                     // Today
                     !isSel &&
                       isToday &&
-                      "border-[#CADCFC] bg-[#CADCFC] dark:border-[#94A3B8] dark:bg-[#162238]",
+                      "border-[#CADCFC] bg-[#CADCFC] dark:border-[#94A3B8] dark:bg-[#354969]",
                     // Hover
                     !isSel &&
                       !isToday &&
                       inMonth &&
-                      "hover:border-[#E2E8F0] hover:bg-[#F8FAFC] dark:hover:border-[#94A3B8] dark:hover:bg-[#162238]",
+                      "hover:border-[#E2E8F0] hover:bg-[#F8FAFC] dark:hover:border-[#94A3B8] dark:hover:bg-[#354969]",
                   )}
                 >
 
@@ -409,7 +467,7 @@ export function CalendarPage() {
           </div>
 
           {/* Selected day panel */}
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[#94A3B8] bg-[#CDD5DF] p-3.5 sm:p-4 dark:border-[#334155] dark:bg-[#162238]">
+          <div className="mt-4 overflow-hidden rounded-2xl border border-[#94A3B8] bg-[#CDD5DF] p-3.5 sm:p-4 dark:border-[#334155] dark:bg-[#354969]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0F172A] dark:text-[#94A3B8]">
@@ -438,30 +496,20 @@ export function CalendarPage() {
                 Nhấp đúp ô ngày để thêm mốc
               </button>
             ) : (
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
                 {onSelected.map((ev) => (
                   <li
                     key={ev.id}
-                    className="group flex items-start justify-between gap-2 rounded-xl border border-[#E2E8F0] bg-white px-3 py-2.5 shadow-sm transition hover:border-[#0F172A]/30 dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#94A3B8]"
+                    className="flex items-center gap-2 rounded-lg px-1 py-1 text-[#0F172A] transition dark:text-white"
                   >
-                    <div className="min-w-0 pt-0.5">
-                      <p className="truncate text-sm font-medium text-[#0F172A] dark:text-white">
-                        {ev.title}
-                      </p>
-                      {ev.yearly && (
-                        <Badge
-                          tone="navy"
-                          className="mt-1.5 rounded-md px-1.5 py-0.5 text-[10px]"
-                        >
-                          Lặp hàng năm
-                        </Badge>
-                      )}
-                    </div>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#0F172A] dark:text-white">
+                      {ev.title}
+                    </span>
                     <div className="flex shrink-0 gap-1">
                       <Button
                         size="icon"
                         variant="outline"
-                        className="h-8 w-8 min-h-8 rounded-lg border-[#E2E8F0] bg-white p-0 text-[#0F172A] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-white dark:hover:bg-[#162238] dark:hover:text-white"
+                        className="h-8 w-8 min-h-8 rounded-lg border-[#E2E8F0] bg-white p-0 text-[#0F172A] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-white dark:hover:bg-[#354969] dark:hover:text-white"
                         title="Sửa"
                         aria-label="Sửa"
                         onClick={() => openEdit(ev)}
@@ -487,10 +535,15 @@ export function CalendarPage() {
         </Card>
 
         {/* ── Side panels ───────────────────────────────── */}
-        <div className="space-y-4">
+        <div
+          className="grid min-h-0 flex-1 gap-4 lg:h-full lg:overflow-hidden"
+          style={{ gridTemplateRows: sideCardRows }}
+        >
           {/* Upcoming */}
-          <Card className="border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]">
-            <div className="flex items-start justify-between gap-3">
+          <Card
+            className="flex min-h-0 flex-col overflow-hidden border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3">
               <div className="min-w-0">
                 <CardTitle className="text-[#0F172A] dark:text-white">Sắp tới</CardTitle>
                 <CardDesc className="mb-0 mt-1 text-[#64748B] dark:text-[#94A3B8]">
@@ -498,78 +551,89 @@ export function CalendarPage() {
                 </CardDesc>
               </div>
               {upcoming.length > 0 && (
-                <div className="grid h-8 min-w-8 shrink-0 place-items-center rounded-lg bg-[#0F172A] px-2 text-xs font-semibold text-white dark:border dark:border-[#334155] dark:bg-[#162238] dark:text-white">
+                <div className="grid h-8 min-w-8 shrink-0 place-items-center rounded-lg bg-[#0F172A] px-2 text-xs font-semibold text-white dark:border dark:border-[#334155] dark:bg-[#354969] dark:text-white">
                   {upcoming.length}
                 </div>
               )}
             </div>
 
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {upcoming.length === 0 && (
                 <li className="rounded-xl border border-dashed border-[#94A3B8] bg-[#CDD5DF] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
                   Chưa có mốc phía trước.
                 </li>
               )}
 
-              {upcoming.map(({ ev, occur, days }) => (
-                <li key={ev.id}>
-                  <button
-                    type="button"
-                    onClick={() => goToDate(occur)}
-                    className="group flex w-full items-center gap-3 rounded-xl border border-[#94A3B8] bg-[#CDD5DF] px-3 py-2.5 text-left transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#94A3B8] dark:hover:bg-[#162238]"
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 shrink-0 rounded-full",
-                        days <= 3
-                          ? "bg-[#0F172A] shadow-[0_0_0_3px] shadow-[#0F172A]/10 dark:bg-white dark:shadow-white/25"
-                          : "bg-[#64748B] dark:bg-[#94A3B8]",
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[#0F172A] group-hover:text-[#0F172A] dark:text-white dark:group-hover:text-white">
-                        {ev.title}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                        {formatViDate(occur)}
-                        {ev.yearly ? " · hàng năm" : ""}
-                      </p>
+              {upcomingGroups.map((group) => {
+                const first = group.items[0];
+                const isTodayOccur = group.date === today;
+                return (
+                  <li key={group.date} className="relative pb-3 pl-6">
+                    <span className="absolute left-0 top-2 h-2.5 w-2.5 rounded-full bg-[#64748B] dark:bg-[#94A3B8]" />
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={cn(
+                          "mt-0.5 inline-flex min-w-[5.2rem] justify-center rounded-md border px-2 py-1 text-[10px] font-semibold tabular-nums",
+                          isTodayOccur
+                            ? "border-[#F59E0B] bg-[#FFF7ED] text-[#B45309] dark:border-[#F59E0B] dark:bg-[#3B2A13] dark:text-[#FBBF24]"
+                            : "border-[#CBD5E1] bg-[#F8FAFC] text-[#475569] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]",
+                        )}
+                      >
+                        {formatViDate(group.date)}
+                      </span>
+                      <div className="min-w-0 flex-1 border-l border-[#CBD5E1] pl-3 dark:border-[#334155]">
+                        <div>
+                          {group.items.map(({ ev, days }) => (
+                            <div key={`${group.date}-${ev.id}`} className="relative pb-3 pl-3.5">
+                              <span className="absolute left-0 top-[0.8rem] h-1 w-1 rounded-full bg-[#64748B] dark:bg-[#94A3B8]" />
+                              <p className="text-xs leading-5 text-[#0F172A] dark:text-white">
+                                {alertMessage(ev.title, days)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <Badge
-                      tone={days === 0 ? "warn" : days <= 3 ? "navy" : "muted"}
-                      className="shrink-0 rounded-lg px-2 py-1 text-[10px]"
-                    >
-                      {days === 0 ? "Hôm nay" : `Còn ${days} ngày`}
-                    </Badge>
-                  </button>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </Card>
 
           {/* Past */}
-          <Card className="border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]">
-            <div>
+          <Card
+            className="flex min-h-0 flex-col overflow-hidden border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]"
+          >
+            <div className="shrink-0">
               <CardTitle className="text-[#0F172A] dark:text-white">Đã qua</CardTitle>
               <CardDesc className="mb-0 mt-1 text-[#64748B] dark:text-[#94A3B8]">
-                12 mốc gần nhất
+                10 mốc gần nhất
               </CardDesc>
             </div>
-            <ul className="mt-4 space-y-1.5">
+            <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {past.length === 0 && (
                 <li className="rounded-xl border border-dashed border-[#94A3B8] bg-[#CDD5DF] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
                   Chưa có mốc đã qua.
                 </li>
               )}
-              {past.map(({ ev, occur }) => (
-                <li
-                  key={`${ev.id}:${occur}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-[#94A3B8] bg-[#CDD5DF] px-3 py-2 text-[#0F172A] transition hover:border-[#0F172A]/40 hover:bg-[#B8C4D0] hover:text-[#0F172A] dark:border-transparent dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-[#334155] dark:hover:bg-[#162238]"
-                >
-                  <span className="min-w-0 truncate text-xs font-medium">{ev.title}</span>
-                  <span className="shrink-0 text-[11px] tabular-nums text-[#64748B] dark:text-[#94A3B8]">
-                    {formatViDate(occur)}
-                  </span>
+              {pastGroups.map((group) => (
+                <li key={group.date} className="relative pb-3 pl-6">
+                  <span className="absolute left-0 top-2 h-2.5 w-2.5 rounded-full bg-[#64748B] dark:bg-[#94A3B8]" />
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex min-w-[5.2rem] justify-center rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-2 py-1 text-[10px] font-semibold tabular-nums text-[#475569] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
+                      {formatViDate(group.date)}
+                    </span>
+                    <div className="min-w-0 flex-1 border-l border-[#CBD5E1] pl-3 dark:border-[#334155]">
+                      <div>
+                        {group.items.map(({ ev, occur }) => (
+                          <div key={`${group.date}-${ev.id}:${occur}`} className="relative pb-3 pl-3.5">
+                            <span className="absolute left-0 top-[0.8rem] h-1 w-1 rounded-full bg-[#64748B] dark:bg-[#94A3B8]" />
+                            <p className="text-xs leading-5 text-[#0F172A] dark:text-white">{ev.title}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -581,7 +645,7 @@ export function CalendarPage() {
       <Dialog open={!!draft} onOpenChange={(open) => { if (!open) closeDraft(); }}>
         <DialogContent
           title={draft?.id ? "Sửa mốc" : "Thêm mốc"}
-          className="bg-white border-[#E2E8F0] dark:border-[#334155] dark:bg-[#354969]"
+          className="bg-white border-[#E2E8F0] dark:border-[#334155] dark:bg-[#162238]"
         >
           {draft && (
             <form className="space-y-4" onSubmit={submit}>
@@ -636,7 +700,7 @@ export function CalendarPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-10 shrink-0 rounded-xl border-[#E2E8F0] bg-[#F8FAFC] px-3 text-[#0F172A] hover:bg-[#E2E8F0] dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+                    className="h-10 shrink-0 rounded-xl border-[#E2E8F0] bg-[#F8FAFC] px-3 text-[#0F172A] hover:bg-[#E2E8F0] dark:border-[#334155] dark:bg-[#354969] dark:text-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
                     onClick={() => {
                       setEventDateText(formatViDate(selected));
                       setDraft((c) => (c ? { ...c, eventDate: selected } : c));
@@ -684,6 +748,85 @@ export function CalendarPage() {
                 {saveMut.isPending ? "Đang lưu..." : "Lưu mốc"}
               </Button>
             </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent
+          title="Lịch sử sự kiện"
+          className="max-w-xl bg-white border-[#E2E8F0] dark:border-[#334155] dark:bg-[#354969]"
+        >
+          {historyYears.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-[#94A3B8] bg-[#CDD5DF] px-3 py-6 text-center text-sm text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
+              Chưa có sự kiện trước giờ.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {historyYears.map((group) => {
+                const byDate = group.items.reduce<Record<string, typeof group.items>>((acc, item) => {
+                  acc[item.occur] ??= [];
+                  acc[item.occur].push(item);
+                  return acc;
+                }, {});
+                const isCollapsed = !!collapsedYears[group.year];
+
+                return (
+                  <section key={group.year} className="relative last:mb-0">
+                    <div className="relative flex items-center gap-2 pl-1">
+                      <div className="absolute left-0 top-1/2 h-px w-5 -translate-y-1/2 bg-[#CBD5E1] dark:bg-[#334155]" />
+                      <div className="absolute left-[calc(100%-0.2rem)] top-1/2 h-px w-4 -translate-y-1/2 bg-[#CBD5E1] dark:bg-[#334155]" />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCollapsedYears((prev) => ({
+                            ...prev,
+                            [group.year]: !prev[group.year],
+                          }))
+                        }
+                        className="relative z-10 flex items-center rounded-xl border border-[#0F172A] bg-[#0F172A] px-3 py-2 text-left shadow-sm transition hover:bg-[#1E293B] dark:border-[#94A3B8] dark:bg-[#354969] dark:hover:bg-[#475569]"
+                      >
+                        <span className="text-[11px] font-bold tabular-nums tracking-[0.14em] text-white dark:text-white">
+                          {group.year}
+                        </span>
+                      </button>
+                    </div>
+
+                    {!isCollapsed && (
+                      <div className="relative mt-2 ml-4 border-l border-[#CBD5E1] pl-3 dark:border-[#334155]">
+                        {Object.entries(byDate).map(([date, items]) => (
+                          <div key={date} className="pb-6 last:pb-0">
+                            <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums tracking-[0.08em] text-[#475569] dark:text-[#94A3B8]">
+                              <span className="inline-block h-2 w-2 rounded-full bg-[#94A3B8] dark:bg-[#64748B]" />
+                              <span>{date.slice(5).replace("-", "/")}</span>
+                            </div>
+
+                            <div className="mt-1 ml-4 border-l border-[#E2E8F0] pl-3 dark:border-[#334155]">
+                              {items.map(({ ev, occur }) => (
+                                <button
+                                  key={`${ev.id}:${occur}`}
+                                  type="button"
+                                  onClick={() => {
+                                    goToDate(occur);
+                                    setHistoryOpen(false);
+                                  }}
+                                  className="group block w-full py-1 text-left transition hover:text-[#0F172A] dark:hover:text-white"
+                                >
+                                  <span className="block text-xs leading-5 text-[#0F172A] transition group-hover:text-[#0F172A] dark:text-white dark:group-hover:text-white">
+                                    {ev.title}
+                                    {ev.yearly ? " · hàng năm" : ""}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
           )}
         </DialogContent>
       </Dialog>
