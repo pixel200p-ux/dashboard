@@ -25,7 +25,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <TooltipProvider>
         <ThemeSync />
         {children}
-        <Toaster position="top-right" offset={80} richColors closeButton />
+        <Toaster position="top-center" offset={88} richColors closeButton toastOptions={{ className: "mx-auto" }} />
       </TooltipProvider>
     </QueryClientProvider>
   );

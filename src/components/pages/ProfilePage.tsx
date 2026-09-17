@@ -97,10 +97,8 @@ export function ProfilePage() {
       if (cur >= 1 && e.deltaY > 0) return;
 
       e.preventDefault();
-      // Tăng hệ số 0.0025 → 0.005 = lăn ít hơn đã full màn
-      // Muốn nhạy hơn nữa: 0.006 hoặc 0.007
-      // Muốn chậm hơn: 0.003
-      const step = Math.sign(e.deltaY) * 0.08;
+      // Trở lại cảm giác cũ: chỉ nhích nhỏ là ảnh đã full gần hết
+      const step = Math.sign(e.deltaY) * 0.45;
       const next = Math.max(0, Math.min(1, cur + step));
       setDecor(next);
     }
@@ -119,7 +117,7 @@ export function ProfilePage() {
       if (cur <= 0 && dy <= 0) return;
 
       e.preventDefault();
-      const next = Math.max(0, Math.min(1, cur + dy / 100));
+      const next = Math.max(0, Math.min(1, cur + dy / 20));
       setDecor(next);
     }
 

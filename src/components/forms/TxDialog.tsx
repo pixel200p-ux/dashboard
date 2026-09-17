@@ -56,8 +56,18 @@ export function TxDialog() {
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
   const [amount, setAmount] = useState("");
+
+  function clampSellQty(next: string) {
+    const raw = parseDecimal(next);
+    if ((txType === "SELL" || prefill?.txType === "SELL") && (kind === "STOCK" || kind === "CRYPTO") && raw > maxSellQty) {
+      setQty(formatThousandsInput(String(maxSellQty)));
+      return;
+    }
+    setQty(formatThousandsInput(next));
+  }
   const [tplus, setTplus] = useState(false);
   const [matchTplus, setMatchTplus] = useState(false);
+  const autoTplusSellMatch = Boolean(prefill?.tplusSell || prefill?.matchAllOpen);
   const [fx, setFx] = useState("");
   const [divTotal, setDivTotal] = useState("");
   const [stockDivQty, setStockDivQty] = useState("");
@@ -68,8 +78,8 @@ export function TxDialog() {
   const [bankName, setBankName] = useState("VietinBank");
   const [bankCustom, setBankCustom] = useState("");
   const [bankPrincipal, setBankPrincipal] = useState("");
-  const [bankTerm, setBankTerm] = useState("6");
-  const [bankRate, setBankRate] = useState("5.5");
+  const [bankTerm, setBankTerm] = useState("");
+  const [bankRate, setBankRate] = useState("");
   const [bankRollover, setBankRollover] = useState(true);
 
     const editing = Boolean(prefill?.id);
@@ -79,6 +89,7 @@ export function TxDialog() {
 
   useEffect(() => {
     if (!prefill) return;
+    const shouldAutoMatchTplus = Boolean(prefill.tplusSell || prefill.matchAllOpen);
     setKind(prefill.assetType ?? "STOCK");
     setStockAccount(prefill.accountId === "ssi" ? "ssi" : "vps");
     setTxType(prefill.txType ?? "BUY");
@@ -88,7 +99,7 @@ export function TxDialog() {
     );setSymbol(prefill.symbol ?? "");
     setName(prefill.name ?? "");
     setTplus(prefill.tradeTplus ?? false);
-    setMatchTplus(Boolean(prefill.tplusSell || prefill.matchAllOpen));
+    setMatchTplus(shouldAutoMatchTplus);
     setDate(prefill.txDate ?? todayYmd());
     setFx(formatThousandsInput(prefill.fxRate != null ? String(prefill.fxRate) : data?.state.usdVnd ? String(data.state.usdVnd) : "25000"));
     setFeeOverride(prefill.id && prefill.fee != null ? formatThousandsInput(String(prefill.fee)) : "");
@@ -202,15 +213,20 @@ export function TxDialog() {
   const thisBuyQty =
     editing && prefill?.txType === "BUY" && !prefill.tradeTplus ? (prefill.quantity ?? 0) : 0;
   const coreExcludingThis = Math.max(0, (holding?.coreQty ?? 0) - thisBuyQty);
-  const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY" && coreExcludingThis > 1e-12;
+    const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY" && coreExcludingThis > 1e-12;
   const canOfferTplusSell = (kind === "STOCK" || kind === "CRYPTO") && txType === "SELL";
   const sellHoldings = (data?.state.holdings ?? []).filter(
     (h) => h.assetType === assetType && h.accountId === acc.id && h.quantity > 1e-12,
   );
+  const showTplusMatchPrompt = canOfferTplusSell && openLots.length > 0 && !autoTplusSellMatch;
   const canMatch =
     canOfferTplusSell &&
-    matchTplus &&
+    ((autoTplusSellMatch && openLots.length > 0) || (showTplusMatchPrompt && matchTplus)) &&
     (openLots.length > 0 || (editing && (prefill?.matches?.length ?? 0) > 0));
+
+  useEffect(() => {
+    if (autoTplusSellMatch) setMatchTplus(true);
+  }, [autoTplusSellMatch]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -347,7 +363,7 @@ export function TxDialog() {
               </div>
               <div className="space-y-1">
                 <Label>Số tiền gửi (VND)</Label>
-                <Input value={bankPrincipal} onChange={setGrouped(setBankPrincipal)} placeholder="100,000,000" required />
+                <Input value={bankPrincipal} onChange={setGrouped(setBankPrincipal)} placeholder="..." required />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -356,12 +372,12 @@ export function TxDialog() {
                 </div>
                 <div className="space-y-1">
                   <Label>Kỳ hạn (tháng)</Label>
-                  <Input value={bankTerm} onChange={(e) => setBankTerm(e.target.value)} />
+                  <Input value={bankTerm} onChange={(e) => setBankTerm(e.target.value)} placeholder="..." />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label>Lãi suất (%/năm)</Label>
-                <Input value={bankRate} onChange={(e) => setBankRate(e.target.value)} />
+                <Input value={bankRate} onChange={(e) => setBankRate(e.target.value)} placeholder="..." />
               </div>
               <div className="flex items-center justify-between gap-3">
                 <Label>Tự động tái tục</Label>
@@ -410,7 +426,7 @@ export function TxDialog() {
                       placeholder="Chọn mã đang giữ"
                       options={sellHoldings.map((h) => ({
                         value: h.symbol,
-                        label: `${h.symbol} · ${formatQty(h.quantity, assetType)}`,
+                        label: h.symbol,
                       }))}
                     />
                   ) : (
@@ -423,7 +439,7 @@ export function TxDialog() {
                   )}
                 </div>
                 <div className="space-y-1">
-                  <Label>Tên</Label>
+                  <Label>Chú thích</Label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tùy chọn" />
                 </div>
               </div>
@@ -457,7 +473,7 @@ export function TxDialog() {
                         <Input
                           value={amount}
                           onChange={setGrouped(setAmount)}
-                          placeholder={isCryptoBuy ? "1000" : "10000000"}
+                          placeholder="..."
                           required
                         />
                       </div>
@@ -466,7 +482,7 @@ export function TxDialog() {
                         <Input
                           value={price}
                           onChange={setGrouped(setPrice)}
-                          placeholder={isCryptoBuy ? "65000" : "15000"}
+                          placeholder="..."
                           required
                         />
                       </div>
@@ -485,8 +501,8 @@ export function TxDialog() {
                         <Label>Khối lượng</Label>
                         <Input
                           value={qty}
-                          onChange={setGrouped(setQty)}
-                          placeholder=""
+                          onChange={(e) => clampSellQty(e.target.value)}
+                          placeholder="..."
                           required
                         />
                         {txType === "SELL" && (
@@ -497,7 +513,7 @@ export function TxDialog() {
                       </div>
                       <div className="space-y-1">
                         <Label>Giá {kind === "CRYPTO" ? "(USD)" : kind === "DCDS" ? "(VND)" : "(13.5 = 13.500 ₫)"}</Label>
-                        <Input value={price} onChange={setGrouped(setPrice)} placeholder={kind === "CRYPTO" ? "65,000" : "13.5"} required />
+                        <Input value={price} onChange={setGrouped(setPrice)} placeholder="..." required />
                       </div>
                     </div>
                   )}
@@ -520,13 +536,7 @@ export function TxDialog() {
                       Trade T+ — lệnh này vào phân tích T+, không cộng vào giá vốn gốc
                     </label>
                   )}
-                  {canOfferTplusSell && openLots.length > 0 && (
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox checked={matchTplus} onCheckedChange={(v) => setMatchTplus(v === true)} />
-                      T+ — chọn lệnh BUY T+ đang OPEN để khớp
-                    </label>
-                  )}
-                  {canOfferTplusSell && (
+                  {showTplusMatchPrompt && (
                     <label className="flex items-center gap-2 text-sm">
                       <Checkbox
                         checked={matchTplus}
@@ -536,7 +546,7 @@ export function TxDialog() {
                     </label>
                   )}
 
-                                    {canMatch && (
+                  {canMatch && (
                     <div className="space-y-2 rounded-lg border border-border p-3">
                       <p className="text-sm font-medium">Chọn lệnh BUY T+ đang OPEN để khớp</p>
                       <p className="text-xs text-muted-foreground">
@@ -549,6 +559,9 @@ export function TxDialog() {
                       {openLots.map((l) => {
                         const checked = selectedLotIds.includes(l.buyTxId);
                         const locked = parsedQty <= 0 || (!checked && tplusCovered);
+                        const marketPrice = holding?.currentPrice ?? 0;
+                        const pnl = (marketPrice - l.buyPrice) * l.qtyRemaining;
+                        const pct = l.buyPrice > 0 ? ((marketPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
                         return (
                           <label
                             key={l.buyTxId}
@@ -559,27 +572,13 @@ export function TxDialog() {
                               disabled={locked}
                               onCheckedChange={() => toggleLot(l.buyTxId)}
                             />
-                                                      <span className="min-w-0 truncate">
-                            {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, assetType)}/{formatQty(l.qtyOriginal, assetType)} @{" "}
-                            {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
-                            {holding?.currentPrice ? (
-                              <>
-                                {" · "}
-                                {displayMoney(
-                                  (holding.currentPrice - l.buyPrice) * l.qtyRemaining,
-                                  currency,
-                                  usdVnd,
-                                )}{" "}
-                                <span className={signedClass(holding.currentPrice - l.buyPrice)}>
-                                  {formatPct(
-                                    l.buyPrice > 0
-                                      ? ((holding.currentPrice - l.buyPrice) / l.buyPrice) * 100
-                                      : 0,
-                                  )}
-                                </span>
-                              </>
-                            ) : null}
-                          </span>
+                            <span className="min-w-0 truncate">
+                              {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, assetType)}/{formatQty(l.qtyOriginal, assetType)} @{" "}
+                              {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
+                              {" · "}
+                              {displayMoney(pnl, currency, usdVnd)}{" "}
+                              <span className={signedClass(pct)}>{formatPct(pct)}</span>
+                            </span>
                           </label>
                         );
                       })}

@@ -7,6 +7,7 @@ import type {
   BankDeposit,
   BankRateUpdate,
   BankStatus,
+  CapitalBucket,
   CapitalKind,
   CapitalMovement,
   FeeProfile,

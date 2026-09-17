@@ -38,63 +38,63 @@ export function TplusOpenCard({
         </button>
 
         <ul className="space-y-1 text-xs text-muted-foreground">
-          {c.openLots.map((l) => (
-            <li key={l.buyTxId}>
-              OPEN {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, c.assetType)} @{" "}
-              {displayPrice(l.buyPrice, c.assetType, currency, usdVnd)}
-              {(() => {
-                const pnl = (c.currentPrice - l.buyPrice) * l.qtyRemaining;
-                const pct = l.buyPrice > 0 ? ((c.currentPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
-                return (
-                  <>
-                    {" · "}
-                    {displayMoney(pnl, currency, usdVnd)}{" "}
-                    <span className={signedClass(pct)}>{formatPct(pct)}</span>
-                  </>
-                );
-              })()}
-            </li>
-          ))}
+          {c.openLots.map((l) => {
+            const marketPrice = c.currentPrice ?? 0;
+            const pnl = (marketPrice - l.buyPrice) * l.qtyRemaining;
+            const pct = l.buyPrice > 0 ? ((marketPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
+            return (
+              <li key={l.buyTxId}>
+                OPEN {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, c.assetType)} @{" "}
+                {displayPrice(l.buyPrice, c.assetType, currency, usdVnd)}
+                {" · "}
+                {displayMoney(pnl, currency, usdVnd)}{" "}
+                <span className={signedClass(pct)}>{formatPct(pct)}</span>
+              </li>
+            );
+          })}
         </ul>
 
         {detail && (
-          <dl className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <dt className="text-xs text-muted-foreground">Số lượng Trade</dt>
-              <dd className="font-mono tabular-nums">
-                {formatQty(c.openTplusQty, c.assetType)} / {formatQty(c.coreQty, c.assetType)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Giá Trade</dt>
-              <dd className="font-mono tabular-nums">
-                {displayPrice(c.tradePrice, c.assetType, currency, usdVnd)} /{" "}
-                {displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Giá vốn (mới / gốc)</dt>
-              <dd className="font-mono tabular-nums">{costLabel}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Giá bán đề xuất</dt>
-              <dd className="font-mono tabular-nums">
-                {displayPrice(c.suggestedSell, c.assetType, currency, usdVnd)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Hòa vốn (bán hết gốc + T+)</dt>
-              <dd className="font-mono tabular-nums">
-                {displayPrice(c.breakEvenPrice, c.assetType, currency, usdVnd)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Còn lỗ / lãi</dt>
-              <dd className={`font-mono tabular-nums ${signedClass(c.remainingUnrealized)}`}>
-                {displayMoney(c.remainingUnrealized, currency, usdVnd)}
-              </dd>
-            </div>
-          </dl>
+          <>
+            <div className="my-1 h-px w-16 bg-border/80" />
+            <dl className="grid grid-cols-2 gap-2 rounded-md border border-border/70 bg-muted/30 p-2 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Số lượng Trade</dt>
+                <dd className="font-mono tabular-nums">
+                  {formatQty(c.openTplusQty, c.assetType)} / {formatQty(c.coreQty, c.assetType)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Giá Trade</dt>
+                <dd className="font-mono tabular-nums">
+                  {displayPrice(c.tradePrice, c.assetType, currency, usdVnd)} /{" "}
+                  {displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Giá vốn (mới / gốc)</dt>
+                <dd className="font-mono tabular-nums">{costLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Giá bán đề xuất</dt>
+                <dd className="font-mono tabular-nums">
+                  {displayPrice(c.suggestedSell, c.assetType, currency, usdVnd)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Hòa vốn (bán hết gốc + T+)</dt>
+                <dd className="font-mono tabular-nums">
+                  {displayPrice(c.breakEvenPrice, c.assetType, currency, usdVnd)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Còn lỗ / lãi</dt>
+                <dd className={`font-mono tabular-nums ${signedClass(c.remainingUnrealized)}`}>
+                  {displayMoney(c.remainingUnrealized, currency, usdVnd)}
+                </dd>
+              </div>
+            </dl>
+          </>
         )}
       </div>
 

@@ -21,8 +21,8 @@ export function BankDialog() {
   const [custom, setCustom] = useState("");
   const [principal, setPrincipal] = useState("");
   const [startDate, setStartDate] = useState(todayYmd());
-  const [term, setTerm] = useState("6");
-  const [rate, setRate] = useState("5.5");
+  const [term, setTerm] = useState("");
+  const [rate, setRate] = useState("");
   const [rollover, setRollover] = useState(true);
     useEffect(() => {
     if (!open) return;
@@ -43,8 +43,8 @@ export function BankDialog() {
     setCustom("");
     setPrincipal("");
     setStartDate(todayYmd());
-    setTerm("6");
-    setRate("5.5");
+    setTerm("");
+    setRate("");
     setRollover(true);
   }, [open, editId, data]);
   const mut = usePortfolioMutation((d: Parameters<typeof saveBank>[0]) => saveBank(d), "Đã mở sổ tiết kiệm");
@@ -106,7 +106,7 @@ export function BankDialog() {
             <Input
               value={principal}
               onChange={(e) => setPrincipal(formatThousandsInput(e.target.value))}
-              placeholder="100,000,000"
+              placeholder="..."
               required
             />
           </div>
@@ -117,12 +117,12 @@ export function BankDialog() {
             </div>
             <div className="space-y-1">
               <Label>Kỳ hạn (tháng)</Label>
-              <Input value={term} onChange={(e) => setTerm(e.target.value)} />
+              <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="..." />
             </div>
           </div>
           <div className="space-y-1">
             <Label>Lãi suất (%/năm)</Label>
-            <Input value={rate} onChange={(e) => setRate(e.target.value)} />
+            <Input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="..." />
           </div>
           <div className="flex items-center justify-between gap-3">
             <Label>Tự động tái tục</Label>
