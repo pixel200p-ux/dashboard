@@ -220,28 +220,27 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="min-h-full space-y-5 pb-6">
+    <div className="min-h-full space-y-5 pb-6 bg-[#F8FAFC] dark:bg-[#0F172A]">
       {/* ── Header ─────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl border border-primary/25 bg-linear-to-br from-primary/12 via-card to-background px-4 py-5 shadow-(--shadow-card) backdrop-blur-sm dark:border-white/15 dark:from-white/[0.06] dark:via-card dark:to-background sm:px-6">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/15 blur-3xl dark:bg-white/8" />
-        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-primary/10 blur-3xl dark:bg-white/5" />
+      <div className="relative overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white px-4 py-5 shadow-sm dark:border-[#334155] dark:bg-[#354969] sm:px-6">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[#0F172A]/5 blur-3xl dark:bg-[#0F172A]/40" />
+        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-[#0F172A]/5 blur-3xl dark:bg-[#0F172A]/30" />
 
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="mb-2 flex items-center gap-2">
-              {/* Icon badge: light navy đặc, dark đảo trắng */}
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25 dark:bg-white dark:text-slate-900 dark:shadow-none">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0F172A] text-white shadow-md shadow-[#0F172A]/10 dark:bg-[#0F172A] dark:shadow-none">
                 <CalendarDays className="h-4 w-4" />
               </div>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary dark:text-white">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0F172A] dark:text-[#94A3B8]">
                 Personal Calendar
               </span>
             </div>
 
-            <h1 className="text-3xl font-semibold tracking-tight text-primary sm:text-4xl dark:text-foreground">
+            <h1 className="text-3xl font-semibold tracking-tight text-[#0F172A] sm:text-4xl dark:text-white">
               Calendar
             </h1>
-            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-primary/80 dark:text-white/65">
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#64748B] dark:text-[#94A3B8]">
               Nhập mốc · banner hiện từ 3 ngày trước đến đúng ngày, trên mọi trang
             </p>
           </div>
@@ -250,7 +249,7 @@ export function CalendarPage() {
             {jumpOpen ? (
               <Input
                 autoFocus
-                className="h-10 w-full rounded-xl border-primary/45 bg-background/80 shadow-sm dark:border-white/25 dark:bg-white/8 sm:w-40"
+                className="h-10 w-full rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm focus-visible:border-[#0F172A] focus-visible:ring-1 focus-visible:ring-[#0F172A]/20 dark:border-[#334155] dark:bg-[#0F172A] dark:text-white sm:w-40"
                 placeholder="dd/mm/yyyy"
                 value={jumpText}
                 onChange={(e) => setJumpText(e.target.value)}
@@ -267,7 +266,7 @@ export function CalendarPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl border-primary/30 bg-background/80 px-4 text-primary shadow-sm transition-all hover:border-primary/50 hover:bg-primary/10 dark:border-white/20 dark:bg-white/8 dark:text-white dark:hover:border-white/35 dark:hover:bg-white/15"
+                className="h-10 gap-2 rounded-xl border-[#E2E8F0] bg-white px-4 text-[#0F172A] shadow-sm transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
                 onClick={() => setJumpOpen(true)}
               >
                 <CalendarDays className="h-4 w-4" />
@@ -281,12 +280,12 @@ export function CalendarPage() {
       {/* ── Main ───────────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(330px,1fr)]">
         {/* Calendar */}
-        <Card className="overflow-hidden border border-primary/25 bg-linear-to-br from-[#dce5ef] via-[#d7e1ec] to-[#cfdbe8] p-3 text-[#0a2540] shadow-[0_4px_14px_rgb(10_37_64_/_0.12)] backdrop-blur-sm dark:border-white/12 dark:from-card dark:via-background dark:to-white/[0.03] sm:p-4">
+        <Card className="overflow-hidden border border-[#E2E8F0] bg-white p-3 text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969] sm:p-4">
           {/* Month navigation */}
           <div className="mb-4 flex items-center gap-2">
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-background/80 text-primary transition-all hover:border-primary/50 hover:bg-primary/10 active:scale-95 dark:border-white/20 dark:bg-white/8 dark:text-white dark:hover:border-white/35 dark:hover:bg-white/15"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#E2E8F0] bg-white text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               onClick={() => setCursor((d) => startOfMonth(subMonths(d, 1)))}
               aria-label="Tháng trước"
             >
@@ -294,17 +293,17 @@ export function CalendarPage() {
             </button>
 
             <p
-              className="flex min-h-10 min-w-0 flex-1 cursor-default items-center justify-center rounded-xl border border-primary/25 bg-primary/8 px-3 text-sm font-semibold tabular-nums text-foreground shadow-sm dark:border-white/15 dark:bg-white/8"
+              className="flex min-h-10 min-w-0 flex-1 cursor-default items-center justify-center rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3 text-sm font-semibold tabular-nums text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#162238] dark:text-white"
               title="Nhấp đúp để về hôm nay"
               onDoubleClick={() => goToDate(today)}
             >
-              <span className="text-primary/70 dark:text-white/60">Tháng&nbsp;</span>
-              <span className="text-primary dark:text-white">{monthLabel}</span>
+              <span className="text-[#64748B] dark:text-[#94A3B8]">Tháng&nbsp;</span>
+              <span className="text-[#0F172A] dark:text-white">{monthLabel}</span>
             </p>
 
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-background/80 text-primary transition-all hover:border-primary/50 hover:bg-primary/10 active:scale-95 dark:border-white/20 dark:bg-white/8 dark:text-white dark:hover:border-white/35 dark:hover:bg-white/15"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#E2E8F0] bg-white text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               onClick={() => setCursor((d) => startOfMonth(addMonths(d, 1)))}
               aria-label="Tháng sau"
             >
@@ -320,8 +319,8 @@ export function CalendarPage() {
                 className={cn(
                   "rounded-lg py-2 text-[10px] font-bold uppercase tracking-[0.12em]",
                   index === 6
-                    ? "text-primary dark:text-white/85"
-                    : "text-primary/70 dark:text-white/55",
+                    ? "text-[#0F172A] dark:text-[#94A3B8]"
+                    : "text-[#64748B] dark:text-[#94A3B8]",
                 )}
               >
                 {d}
@@ -347,31 +346,31 @@ export function CalendarPage() {
                   className={cn(
                     "group relative flex min-h-16 flex-col items-center rounded-xl border px-1 py-1.5 text-sm transition-all duration-150 sm:min-h-17",
                     inMonth
-                      ? "border-transparent bg-background/60 text-primary dark:bg-white/[0.04] dark:text-foreground"
-                      : "border-transparent bg-transparent text-primary/35 dark:text-white/25",
-                    // Selected: navy đậm
+                      ? "border-transparent bg-white text-[#0F172A] dark:border-[#334155] dark:bg-transparent dark:text-white"
+                      : "border-transparent bg-transparent text-[#94A3B8] dark:border-[#334155] dark:text-[#64748B]",
+                    // Selected
                     isSel &&
-                      "border-primary/55 bg-primary/15 shadow-sm ring-1 ring-primary/30 dark:border-white/45 dark:bg-white/15 dark:ring-white/30",
-                    // Today: navy vừa
+                      "border-[#0F172A] bg-[#0F172A] text-white shadow-sm ring-1 ring-[#0F172A] dark:border-white dark:bg-[#334155] dark:text-white dark:ring-white",
+                    // Today
                     !isSel &&
                       isToday &&
-                      "border-primary/45 bg-primary/10 dark:border-white/35 dark:bg-white/10",
+                      "border-[#E2E8F0] bg-[#F1F5F9] dark:border-[#94A3B8] dark:bg-[#162238]",
                     // Hover
                     !isSel &&
                       !isToday &&
                       inMonth &&
-                      "hover:border-primary/30 hover:bg-primary/8 dark:hover:border-white/25 dark:hover:bg-white/8",
+                      "hover:border-[#E2E8F0] hover:bg-[#F8FAFC] dark:hover:border-[#94A3B8] dark:hover:bg-[#162238]",
                   )}
                 >
                   {isToday && (
-                    <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_0_3px] shadow-primary/20 dark:bg-white dark:shadow-white/20" />
+                    <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#0F172A] shadow-[0_0_0_3px] shadow-[#0F172A]/10 dark:bg-white dark:shadow-white/20" />
                   )}
 
                   <span
                     className={cn(
                       "mt-0.5 font-medium tabular-nums",
-                      isToday && "font-bold text-primary dark:text-white",
-                      isSel && "font-semibold text-primary dark:text-white",
+                      isToday && !isSel && "font-bold text-[#0F172A] dark:text-white",
+                      isSel && "font-semibold text-white dark:text-white",
                     )}
                   >
                     {Number(iso.slice(8))}
@@ -385,8 +384,12 @@ export function CalendarPage() {
                           className={cn(
                             "h-1.5 w-1.5 rounded-full",
                             hot
-                              ? "bg-primary shadow-[0_0_0_2px] shadow-primary/25 dark:bg-white dark:shadow-white/30"
-                              : "bg-primary/75 dark:bg-white/75",
+                              ? isSel
+                                ? "bg-white shadow-[0_0_0_2px] shadow-white/30 dark:bg-white"
+                                : "bg-[#0F172A] shadow-[0_0_0_2px] shadow-[#0F172A]/20 dark:bg-white dark:shadow-white/30"
+                              : isSel
+                                ? "bg-white/70 dark:bg-[#94A3B8]"
+                                : "bg-[#64748B] dark:bg-[#94A3B8]",
                           )}
                         />
                       ))}
@@ -398,24 +401,24 @@ export function CalendarPage() {
           </div>
 
           {/* Hint */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-primary/15 pt-3 dark:border-white/12">
-            <p className="text-[11px] text-primary/80 dark:text-white/55">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#E2E8F0] pt-3 dark:border-[#334155]">
+            <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
               Chọn ngày · nhấn đúp để thêm mốc
             </p>
-            <div className="flex items-center gap-1.5 text-[11px] text-primary/80 dark:text-white/55">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary dark:bg-white" />
+            <div className="flex items-center gap-1.5 text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#0F172A] dark:bg-white" />
               Trong 3 ngày tới
             </div>
           </div>
 
-          {/* Selected day panel — navy tint rõ hơn */}
-          <div className="mt-4 overflow-hidden rounded-2xl border border-primary/30 bg-linear-to-br from-primary/15 via-primary/8 to-background p-3.5 sm:p-4 dark:border-white/18 dark:from-white/10 dark:via-white/5 dark:to-background">
+          {/* Selected day panel */}
+          <div className="mt-4 overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 sm:p-4 dark:border-[#334155] dark:bg-[#162238]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary dark:text-white/85">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0F172A] dark:text-[#94A3B8]">
                   Ngày đã chọn
                 </p>
-                <p className="mt-1 text-sm font-semibold text-primary dark:text-foreground">
+                <p className="mt-1 text-sm font-semibold text-[#0F172A] dark:text-white">
                   {formatViDate(selected)}
                 </p>
               </div>
@@ -433,7 +436,7 @@ export function CalendarPage() {
               <button
                 type="button"
                 onClick={() => openNew(selected)}
-                className="mt-3 flex w-full items-center justify-center rounded-xl border border-dashed border-primary/35 bg-background/40 px-3 py-3 text-xs text-primary/80 transition hover:border-primary/55 hover:bg-primary/8 hover:text-primary dark:border-white/20 dark:text-white/60 dark:hover:border-white/35 dark:hover:bg-white/8 dark:hover:text-white"
+                className="mt-3 flex w-full items-center justify-center rounded-xl border border-dashed border-[#E2E8F0] bg-white px-3 py-3 text-xs text-[#64748B] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] hover:text-[#0F172A] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               >
                 Nhấp đúp ô ngày để thêm mốc
               </button>
@@ -442,10 +445,10 @@ export function CalendarPage() {
                 {onSelected.map((ev) => (
                   <li
                     key={ev.id}
-                    className="group flex items-start justify-between gap-2 rounded-xl border border-primary/15 bg-background/75 px-3 py-2.5 shadow-sm transition hover:border-primary/35 dark:border-white/12 dark:bg-white/[0.05] dark:hover:border-white/25"
+                    className="group flex items-start justify-between gap-2 rounded-xl border border-[#E2E8F0] bg-white px-3 py-2.5 shadow-sm transition hover:border-[#0F172A]/30 dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#94A3B8]"
                   >
                     <div className="min-w-0 pt-0.5">
-                      <p className="truncate text-sm font-medium text-primary dark:text-foreground">
+                      <p className="truncate text-sm font-medium text-[#0F172A] dark:text-white">
                         {ev.title}
                       </p>
                       {ev.yearly && (
@@ -461,7 +464,7 @@ export function CalendarPage() {
                       <Button
                         size="icon"
                         variant="outline"
-                        className="h-8 w-8 min-h-8 rounded-lg border-primary/25 p-0 text-primary transition hover:border-primary/50 hover:bg-primary/10 dark:border-white/20 dark:text-white dark:hover:border-white/35 dark:hover:bg-white/15"
+                        className="h-8 w-8 min-h-8 rounded-lg border-[#E2E8F0] bg-white p-0 text-[#0F172A] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-white dark:hover:bg-[#162238] dark:hover:text-white"
                         title="Sửa"
                         aria-label="Sửa"
                         onClick={() => openEdit(ev)}
@@ -471,7 +474,7 @@ export function CalendarPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 min-h-8 rounded-lg p-0 text-primary/70 transition hover:bg-destructive/10 hover:text-destructive dark:text-white/55 dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                        className="h-8 w-8 min-h-8 rounded-lg p-0 text-[#64748B] transition hover:bg-red-500/10 hover:text-red-600 dark:text-[#94A3B8] dark:hover:bg-red-500/20 dark:hover:text-red-400"
                         title="Xóa"
                         aria-label="Xóa"
                         onClick={() => delMut.mutate({ data: { id: ev.id } })}
@@ -489,16 +492,16 @@ export function CalendarPage() {
         {/* ── Side panels ───────────────────────────────── */}
         <div className="space-y-4">
           {/* Upcoming */}
-          <Card className="border border-primary/25 bg-linear-to-br from-[#dce5ef] via-[#d7e1ec] to-[#cfdbe8] text-[#0a2540] shadow-[0_4px_14px_rgb(10_37_64_/_0.12)] backdrop-blur-sm dark:border-white/12 dark:from-card dark:via-background dark:to-white/[0.03]">
+          <Card className="border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <CardTitle className="text-primary dark:text-foreground">Sắp tới</CardTitle>
-                <CardDesc className="mb-0 mt-1 text-primary/70 dark:text-white/60">
+                <CardTitle className="text-[#0F172A] dark:text-white">Sắp tới</CardTitle>
+                <CardDesc className="mb-0 mt-1 text-[#64748B] dark:text-[#94A3B8]">
                   Kể cả mốc lặp năm sau
                 </CardDesc>
               </div>
               {upcoming.length > 0 && (
-                <div className="grid h-8 min-w-8 shrink-0 place-items-center rounded-lg bg-primary/15 px-2 text-xs font-semibold text-primary dark:bg-white/15 dark:text-white">
+                <div className="grid h-8 min-w-8 shrink-0 place-items-center rounded-lg bg-[#0F172A] px-2 text-xs font-semibold text-white dark:border dark:border-[#334155] dark:bg-[#162238] dark:text-white">
                   {upcoming.length}
                 </div>
               )}
@@ -506,7 +509,7 @@ export function CalendarPage() {
 
             <ul className="mt-4 space-y-2">
               {upcoming.length === 0 && (
-                <li className="rounded-xl border border-dashed border-primary/25 bg-background/40 px-3 py-4 text-center text-xs text-primary/80 dark:border-white/15 dark:bg-white/[0.03] dark:text-white/55">
+                <li className="rounded-xl border border-dashed border-[#E2E8F0] bg-[#F8FAFC] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
                   Chưa có mốc phía trước.
                 </li>
               )}
@@ -516,21 +519,21 @@ export function CalendarPage() {
                   <button
                     type="button"
                     onClick={() => goToDate(occur)}
-                    className="group flex w-full items-center gap-3 rounded-xl border border-primary/12 bg-background/65 px-3 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/8 dark:border-white/12 dark:bg-white/[0.04] dark:hover:border-white/30 dark:hover:bg-white/10"
+                    className="group flex w-full items-center gap-3 rounded-xl border border-[#E2E8F0] bg-white px-3 py-2.5 text-left transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#94A3B8] dark:hover:bg-[#162238]"
                   >
                     <span
                       className={cn(
                         "h-2 w-2 shrink-0 rounded-full",
                         days <= 3
-                          ? "bg-primary shadow-[0_0_0_3px] shadow-primary/20 dark:bg-white dark:shadow-white/25"
-                          : "bg-primary/50 dark:bg-white/60",
+                          ? "bg-[#0F172A] shadow-[0_0_0_3px] shadow-[#0F172A]/10 dark:bg-white dark:shadow-white/25"
+                          : "bg-[#64748B] dark:bg-[#94A3B8]",
                       )}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-primary group-hover:text-primary dark:text-foreground dark:group-hover:text-white">
+                      <p className="truncate text-sm font-medium text-[#0F172A] group-hover:text-[#0F172A] dark:text-white dark:group-hover:text-white">
                         {ev.title}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-primary/70 dark:text-white/60">
+                      <p className="mt-0.5 text-[11px] text-[#64748B] dark:text-[#94A3B8]">
                         {formatViDate(occur)}
                         {ev.yearly ? " · hàng năm" : ""}
                       </p>
@@ -548,26 +551,26 @@ export function CalendarPage() {
           </Card>
 
           {/* Past */}
-          <Card className="border border-primary/25 bg-linear-to-br from-[#dce5ef] via-[#d7e1ec] to-[#cfdbe8] text-[#0a2540] shadow-[0_4px_14px_rgb(10_37_64_/_0.12)] backdrop-blur-sm dark:border-white/12 dark:from-card dark:via-background dark:to-white/[0.03]">
+          <Card className="border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]">
             <div>
-              <CardTitle className="text-primary dark:text-foreground">Đã qua</CardTitle>
-              <CardDesc className="mb-0 mt-1 text-primary/70 dark:text-white/60">
+              <CardTitle className="text-[#0F172A] dark:text-white">Đã qua</CardTitle>
+              <CardDesc className="mb-0 mt-1 text-[#64748B] dark:text-[#94A3B8]">
                 12 mốc gần nhất
               </CardDesc>
             </div>
             <ul className="mt-4 space-y-1.5">
               {past.length === 0 && (
-                <li className="rounded-xl border border-dashed border-primary/25 bg-background/40 px-3 py-4 text-center text-xs text-primary/80 dark:border-white/15 dark:bg-white/[0.03] dark:text-white/55">
+                <li className="rounded-xl border border-dashed border-[#E2E8F0] bg-[#F8FAFC] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
                   Chưa có mốc đã qua.
                 </li>
               )}
               {past.map(({ ev, occur }) => (
                 <li
                   key={`${ev.id}:${occur}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-2 text-primary/80 transition hover:border-primary/25 hover:bg-primary/8 dark:text-white/60 dark:hover:border-white/20 dark:hover:bg-white/8"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-2 text-[#64748B] transition hover:border-[#E2E8F0] hover:bg-[#F8FAFC] hover:text-[#0F172A] dark:text-[#94A3B8] dark:hover:border-[#334155] dark:hover:bg-[#162238]"
                 >
-                  <span className="min-w-0 truncate text-xs">{ev.title}</span>
-                  <span className="shrink-0 text-[11px] tabular-nums text-primary/60 dark:text-white/45">
+                  <span className="min-w-0 truncate text-xs font-medium">{ev.title}</span>
+                  <span className="shrink-0 text-[11px] tabular-nums text-[#64748B] dark:text-[#94A3B8]">
                     {formatViDate(occur)}
                   </span>
                 </li>
@@ -581,22 +584,22 @@ export function CalendarPage() {
       <Dialog open={!!draft} onOpenChange={(open) => { if (!open) closeDraft(); }}>
         <DialogContent
           title={draft?.id ? "Sửa mốc" : "Thêm mốc"}
-          className="dark:border-white/15"
+          className="bg-white border-[#E2E8F0] dark:border-[#334155] dark:bg-[#354969]"
         >
           {draft && (
             <form className="space-y-4" onSubmit={submit}>
-              <div className="rounded-xl border border-primary/25 bg-primary/8 px-3.5 py-3 dark:border-white/15 dark:bg-white/8">
-                <p className="text-xs leading-5 text-primary/80 dark:text-white/70">
+              <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-3 dark:border-[#334155] dark:bg-[#0F172A]">
+                <p className="text-xs leading-5 text-[#64748B] dark:text-[#94A3B8]">
                   Tiêu đề sẽ vào câu thông báo: «Hôm nay là …» / «Còn 3 ngày nữa đến …»
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-primary dark:text-white/85">
+                <Label className="text-xs font-semibold text-[#0F172A] dark:text-[#94A3B8]">
                   Tiêu đề
                 </Label>
                 <Input
-                  className="h-10 rounded-xl border-primary/25 bg-background/70 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 dark:border-white/15 dark:bg-white/5 dark:focus-visible:border-white/35 dark:focus-visible:ring-white/10"
+                  className="h-10 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] focus-visible:border-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0F172A]/10 dark:border-[#334155] dark:bg-[#0F172A] dark:text-white dark:focus-visible:border-[#94A3B8] dark:focus-visible:ring-[#334155]"
                   value={draft.title}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                   placeholder="ngày họp FED"
@@ -605,12 +608,12 @@ export function CalendarPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-primary dark:text-white/85">
+                <Label className="text-xs font-semibold text-[#0F172A] dark:text-[#94A3B8]">
                   Ngày
                 </Label>
                 <div className="flex gap-2">
                   <Input
-                    className="h-10 flex-1 rounded-xl border-primary/25 bg-background/70 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 dark:border-white/15 dark:bg-white/5 dark:focus-visible:border-white/35 dark:focus-visible:ring-white/10"
+                    className="h-10 flex-1 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] focus-visible:border-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0F172A]/10 dark:border-[#334155] dark:bg-[#0F172A] dark:text-white dark:focus-visible:border-[#94A3B8] dark:focus-visible:ring-[#334155]"
                     placeholder="dd/mm/yyyy"
                     value={eventDateText}
                     onChange={(e) => {
@@ -636,7 +639,7 @@ export function CalendarPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-10 shrink-0 rounded-xl border-primary/35 bg-primary/10 px-3 text-primary hover:bg-primary/20 dark:border-white/25 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                    className="h-10 shrink-0 rounded-xl border-[#E2E8F0] bg-[#F8FAFC] px-3 text-[#0F172A] hover:bg-[#E2E8F0] dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
                     onClick={() => {
                       setEventDateText(formatViDate(selected));
                       setDraft((c) => (c ? { ...c, eventDate: selected } : c));
@@ -646,15 +649,15 @@ export function CalendarPage() {
                     <CalendarDays className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-[11px] text-primary/80 dark:text-white/55">
+                <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
                   Nhập dd/mm/yyyy hoặc dd-mm-yyyy
                 </p>
               </div>
 
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-3 dark:border-white/15 dark:bg-white/[0.05]">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-3 dark:border-[#334155] dark:bg-[#0F172A]">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-primary dark:text-foreground">Lặp hàng năm</p>
-                  <p className="mt-0.5 text-xs leading-5 text-primary/70 dark:text-white/60">
+                  <p className="text-sm font-medium text-[#0F172A] dark:text-white">Lặp hàng năm</p>
+                  <p className="mt-0.5 text-xs leading-5 text-[#64748B] dark:text-[#94A3B8]">
                     Cùng ngày mỗi năm (vd. đáo hạn phái sinh)
                   </p>
                 </div>
@@ -665,20 +668,20 @@ export function CalendarPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-primary dark:text-white/85">
+                <Label className="text-xs font-semibold text-[#0F172A] dark:text-[#94A3B8]">
                   Ghi chú (tùy chọn)
                 </Label>
                 <Input
-                  className="h-10 rounded-xl border-primary/25 bg-background/70 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 dark:border-white/15 dark:bg-white/5 dark:focus-visible:border-white/35 dark:focus-visible:ring-white/10"
+                  className="h-10 rounded-xl border-[#E2E8F0] bg-white text-[#0F172A] focus-visible:border-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0F172A]/10 dark:border-[#334155] dark:bg-[#0F172A] dark:text-white dark:focus-visible:border-[#94A3B8] dark:focus-visible:ring-[#334155]"
                   value={draft.notes}
                   onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
                 />
               </div>
 
-              {/* Submit: light gradient navy, dark đảo trắng */}
+              {/* Submit Button */}
               <Button
                 type="submit"
-                className="h-10 w-full rounded-xl bg-gradient-to-r from-primary to-primary/85 font-medium text-primary-foreground shadow-md shadow-primary/25 transition hover:from-primary/90 hover:to-primary/75 dark:bg-white dark:bg-none dark:text-slate-900 dark:shadow-none dark:hover:bg-white/90"
+                className="h-10 w-full rounded-xl bg-[#0F172A] font-medium text-white shadow-sm transition hover:bg-[#354969] dark:bg-white dark:text-[#0F172A] dark:shadow-none dark:hover:bg-[#E2E8F0]"
                 disabled={saveMut.isPending}
               >
                 {saveMut.isPending ? "Đang lưu..." : "Lưu mốc"}

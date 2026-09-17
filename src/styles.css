@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
   --font-display: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
