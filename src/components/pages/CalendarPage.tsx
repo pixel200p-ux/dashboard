@@ -220,7 +220,7 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="min-h-full space-y-5 pb-6 bg-[#F8FAFC] dark:bg-[#0F172A]">
+    <div className="min-h-full space-y-5 pb-6 dark:bg-[#0F172A]">
       {/* ── Header ─────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white px-4 py-5 shadow-sm dark:border-[#334155] dark:bg-[#354969] sm:px-6">
         <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[#0F172A]/5 blur-3xl dark:bg-[#0F172A]/40" />
@@ -266,7 +266,7 @@ export function CalendarPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl border-[#E2E8F0] bg-white px-4 text-[#0F172A] shadow-sm transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+                className="h-10 gap-2 rounded-xl border-[#0F172A] bg-[#0F172A] px-4 text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
                 onClick={() => setJumpOpen(true)}
               >
                 <CalendarDays className="h-4 w-4" />
@@ -278,14 +278,14 @@ export function CalendarPage() {
       </div>
 
       {/* ── Main ───────────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(330px,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
         {/* Calendar */}
         <Card className="overflow-hidden border border-[#E2E8F0] bg-white p-3 text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969] sm:p-4">
           {/* Month navigation */}
           <div className="mb-4 flex items-center gap-2">
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#E2E8F0] bg-white text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               onClick={() => setCursor((d) => startOfMonth(subMonths(d, 1)))}
               aria-label="Tháng trước"
             >
@@ -293,7 +293,7 @@ export function CalendarPage() {
             </button>
 
             <p
-              className="flex min-h-10 min-w-0 flex-1 cursor-default items-center justify-center rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-3 text-sm font-semibold tabular-nums text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#162238] dark:text-white"
+              className="flex min-h-10 min-w-0 flex-1 cursor-default items-center justify-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] px-3 text-sm font-semibold tabular-nums text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#162238] dark:text-white"
               title="Nhấp đúp để về hôm nay"
               onDoubleClick={() => goToDate(today)}
             >
@@ -303,7 +303,7 @@ export function CalendarPage() {
 
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#E2E8F0] bg-white text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#94A3B8] bg-[#CDD5DF] text-[#0F172A] transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] active:scale-95 dark:border-[#334155] dark:bg-[#162238] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               onClick={() => setCursor((d) => startOfMonth(addMonths(d, 1)))}
               aria-label="Tháng sau"
             >
@@ -317,10 +317,10 @@ export function CalendarPage() {
               <div
                 key={d}
                 className={cn(
-                  "rounded-lg py-2 text-[10px] font-bold uppercase tracking-[0.12em]",
+                  "flex items-center justify-center rounded-xl py-2 text-base font-bold uppercase tracking-[0.12em]",
                   index === 6
-                    ? "text-[#0F172A] dark:text-[#94A3B8]"
-                    : "text-[#64748B] dark:text-[#94A3B8]",
+                    ? "bg-[#CADCFC] text-[#0F172A] dark:bg-transparent dark:text-[#94A3B8]"
+                    : "bg-[#0F172A] text-white dark:bg-transparent dark:text-[#94A3B8]",
                 )}
               >
                 {d}
@@ -329,7 +329,7 @@ export function CalendarPage() {
           </div>
 
           {/* Cells */}
-          <div className="mt-1 grid grid-cols-7 gap-1.5">
+          <div className="mt-5 grid grid-cols-7 gap-x-1.5 gap-y-1">
             {cells.map((iso) => {
               const inMonth = iso.slice(0, 7) === cursorYm;
               const marks = marksByDate.get(iso) ?? [];
@@ -344,7 +344,7 @@ export function CalendarPage() {
                   onClick={() => setSelected(iso)}
                   onDoubleClick={() => openNew(iso)}
                   className={cn(
-                    "group relative flex min-h-16 flex-col items-center rounded-xl border px-1 py-1.5 text-sm transition-all duration-150 sm:min-h-17",
+                    "group relative flex min-h-14 flex-col items-center rounded-xl border px-1 py-1 text-sm transition-all duration-150 sm:min-h-15",
                     inMonth
                       ? "border-transparent bg-white text-[#0F172A] dark:border-[#334155] dark:bg-transparent dark:text-white"
                       : "border-transparent bg-transparent text-[#94A3B8] dark:border-[#334155] dark:text-[#64748B]",
@@ -354,7 +354,7 @@ export function CalendarPage() {
                     // Today
                     !isSel &&
                       isToday &&
-                      "border-[#E2E8F0] bg-[#F1F5F9] dark:border-[#94A3B8] dark:bg-[#162238]",
+                      "border-[#CADCFC] bg-[#CADCFC] dark:border-[#94A3B8] dark:bg-[#162238]",
                     // Hover
                     !isSel &&
                       !isToday &&
@@ -362,9 +362,6 @@ export function CalendarPage() {
                       "hover:border-[#E2E8F0] hover:bg-[#F8FAFC] dark:hover:border-[#94A3B8] dark:hover:bg-[#162238]",
                   )}
                 >
-                  {isToday && (
-                    <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#0F172A] shadow-[0_0_0_3px] shadow-[#0F172A]/10 dark:bg-white dark:shadow-white/20" />
-                  )}
 
                   <span
                     className={cn(
@@ -377,7 +374,7 @@ export function CalendarPage() {
                   </span>
 
                   {marks.length > 0 && (
-                    <span className="mt-1.5 flex min-h-2 items-center gap-1">
+                    <span className="mt-0.5 flex min-h-1.5 items-center gap-1">
                       {marks.slice(0, 3).map((ev) => (
                         <span
                           key={ev.id}
@@ -412,7 +409,7 @@ export function CalendarPage() {
           </div>
 
           {/* Selected day panel */}
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 sm:p-4 dark:border-[#334155] dark:bg-[#162238]">
+          <div className="mt-4 overflow-hidden rounded-2xl border border-[#94A3B8] bg-[#CDD5DF] p-3.5 sm:p-4 dark:border-[#334155] dark:bg-[#162238]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0F172A] dark:text-[#94A3B8]">
@@ -509,7 +506,7 @@ export function CalendarPage() {
 
             <ul className="mt-4 space-y-2">
               {upcoming.length === 0 && (
-                <li className="rounded-xl border border-dashed border-[#E2E8F0] bg-[#F8FAFC] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
+                <li className="rounded-xl border border-dashed border-[#94A3B8] bg-[#CDD5DF] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
                   Chưa có mốc phía trước.
                 </li>
               )}
@@ -519,7 +516,7 @@ export function CalendarPage() {
                   <button
                     type="button"
                     onClick={() => goToDate(occur)}
-                    className="group flex w-full items-center gap-3 rounded-xl border border-[#E2E8F0] bg-white px-3 py-2.5 text-left transition-all hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#94A3B8] dark:hover:bg-[#162238]"
+                    className="group flex w-full items-center gap-3 rounded-xl border border-[#94A3B8] bg-[#CDD5DF] px-3 py-2.5 text-left transition-all hover:border-[#0F172A]/30 hover:bg-[#B8C4D0] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#94A3B8] dark:hover:bg-[#162238]"
                   >
                     <span
                       className={cn(
@@ -560,14 +557,14 @@ export function CalendarPage() {
             </div>
             <ul className="mt-4 space-y-1.5">
               {past.length === 0 && (
-                <li className="rounded-xl border border-dashed border-[#E2E8F0] bg-[#F8FAFC] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
+                <li className="rounded-xl border border-dashed border-[#94A3B8] bg-[#CDD5DF] px-3 py-4 text-center text-xs text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
                   Chưa có mốc đã qua.
                 </li>
               )}
               {past.map(({ ev, occur }) => (
                 <li
                   key={`${ev.id}:${occur}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-2 text-[#64748B] transition hover:border-[#E2E8F0] hover:bg-[#F8FAFC] hover:text-[#0F172A] dark:text-[#94A3B8] dark:hover:border-[#334155] dark:hover:bg-[#162238]"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[#94A3B8] bg-[#CDD5DF] px-3 py-2 text-[#0F172A] transition hover:border-[#0F172A]/40 hover:bg-[#B8C4D0] hover:text-[#0F172A] dark:border-transparent dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-[#334155] dark:hover:bg-[#162238]"
                 >
                   <span className="min-w-0 truncate text-xs font-medium">{ev.title}</span>
                   <span className="shrink-0 text-[11px] tabular-nums text-[#64748B] dark:text-[#94A3B8]">
