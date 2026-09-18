@@ -315,20 +315,20 @@ export function CalendarPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-8 gap-2 rounded-xl border-[#0F172A] bg-[#0F172A] px-3 text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#354969] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+                className="h-7 gap-1.5 rounded-xl border-[#0F172A] bg-[#0F172A] px-2.5 text-xs text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#354969] dark:text-white dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
                 onClick={() => setJumpOpen(true)}
               >
-                <CalendarDays className="h-4 w-4" />
+                <CalendarDays className="h-3.5 w-3.5" />
                 Đến ngày
               </Button>
             )}
             <Button
               type="button"
               variant="outline"
-              className="h-8 w-full gap-2 rounded-xl border-[#0F172A] bg-[#0F172A] px-3 text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#354969] dark:text-[#94A3B8] dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
+              className="h-7 w-full gap-1.5 rounded-xl border-[#0F172A] bg-[#0F172A] px-2.5 text-xs text-white shadow-sm transition-all hover:border-[#354969] hover:bg-[#354969] dark:border-[#334155] dark:bg-[#354969] dark:text-white dark:hover:border-[#94A3B8] dark:hover:bg-[#0F172A] dark:hover:text-white"
               onClick={() => setHistoryOpen(true)}
             >
-              <History className="h-4 w-4" />
+              <History className="h-3.5 w-3.5" />
               Lịch sử sự kiện
             </Button>
           </div>
@@ -336,7 +336,7 @@ export function CalendarPage() {
       </div>
 
       {/* ── Main ───────────────────────────────────────── */}
-      <div className="grid h-full min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] lg:overflow-hidden">
+      <div className="grid h-full min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,5.6fr)_minmax(0,3fr)] lg:overflow-hidden">
         {/* Calendar */}
         <Card className="min-h-0 overflow-hidden border border-[#E2E8F0] bg-white p-3 text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#162238] sm:p-4">
           {/* Month navigation */}
@@ -387,7 +387,10 @@ export function CalendarPage() {
           </div>
 
           {/* Cells */}
-          <div className="mt-3 grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-x-1.5 gap-y-1">
+          <div
+            className="mt-3 grid min-h-0 flex-1 grid-cols-7 gap-x-1.5 gap-y-1"
+            style={{ gridTemplateRows: "repeat(6, minmax(0, 1.2fr))" }}
+          >
             {cells.map((iso) => {
               const inMonth = iso.slice(0, 7) === cursorYm;
               const marks = marksByDate.get(iso) ?? [];
@@ -455,38 +458,8 @@ export function CalendarPage() {
             })}
           </div>
 
-          {/* Hint */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#E2E8F0] pt-3 dark:border-[#334155]">
-            <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-              Chọn ngày · nhấn đúp để thêm mốc
-            </p>
-            <div className="flex items-center gap-1.5 text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0F172A] dark:bg-white" />
-              Trong 3 ngày tới
-            </div>
-          </div>
-
           {/* Selected day panel */}
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[#94A3B8] bg-[#CDD5DF] p-3.5 sm:p-4 dark:border-[#334155] dark:bg-[#354969]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0F172A] dark:text-[#94A3B8]">
-                  Ngày đã chọn
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[#0F172A] dark:text-white">
-                  {formatViDate(selected)}
-                </p>
-              </div>
-              {onSelected.length > 0 && (
-                <Badge
-                  tone="navy"
-                  className="shrink-0 rounded-lg px-2 py-1 text-[10px]"
-                >
-                  {onSelected.length} mốc
-                </Badge>
-              )}
-            </div>
-
+          <div className="mt-4 border-t border-[#E2E8F0] pt-4 dark:border-[#334155]">
             {onSelected.length === 0 ? (
               <button
                 type="button"
@@ -496,35 +469,35 @@ export function CalendarPage() {
                 Nhấp đúp ô ngày để thêm mốc
               </button>
             ) : (
-              <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
+              <ul className="mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
                 {onSelected.map((ev) => (
                   <li
                     key={ev.id}
-                    className="flex items-center gap-2 rounded-lg px-1 py-1 text-[#0F172A] transition dark:text-white"
+                    className="flex items-center gap-1.5 rounded-lg px-1 py-0.5 text-[#0F172A] transition dark:text-white"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#0F172A] dark:text-white">
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-[#0F172A] dark:text-white">
                       {ev.title}
                     </span>
                     <div className="flex shrink-0 gap-1">
                       <Button
                         size="icon"
                         variant="outline"
-                        className="h-8 w-8 min-h-8 rounded-lg border-[#E2E8F0] bg-white p-0 text-[#0F172A] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-white dark:hover:bg-[#354969] dark:hover:text-white"
+                        className="h-6 w-6 min-h-6 rounded-md border-[#E2E8F0] bg-white p-0 text-[#0F172A] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-white dark:hover:bg-[#354969] dark:hover:text-white"
                         title="Sửa"
                         aria-label="Sửa"
                         onClick={() => openEdit(ev)}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-3 w-3" />
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 min-h-8 rounded-lg p-0 text-[#64748B] transition hover:bg-red-500/10 hover:text-red-600 dark:text-[#94A3B8] dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                        className="h-6 w-6 min-h-6 rounded-md p-0 text-[#64748B] transition hover:bg-red-500/10 hover:text-red-600 dark:text-[#94A3B8] dark:hover:bg-red-500/20 dark:hover:text-red-400"
                         title="Xóa"
                         aria-label="Xóa"
                         onClick={() => delMut.mutate({ data: { id: ev.id } })}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </li>
