@@ -14,6 +14,9 @@ import { todayYmd, formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
 import type { AssetType, FeeProfile, TxType } from "@/engine/types";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { validateTplusSellSelection } from "@/lib/tx-validation.js";
+import { defaultSymbolForKind } from "@/lib/tx-defaults.js";
 
 type FormKind = AssetType | "BANK";
 
@@ -93,10 +96,7 @@ export function TxDialog() {
     setKind(prefill.assetType ?? "STOCK");
     setStockAccount(prefill.accountId === "ssi" ? "ssi" : "vps");
     setTxType(prefill.txType ?? "BUY");
-        setSymbol(
-      prefill.symbol ??
-        (prefill.assetType === "DCDS" ? "DCDS" : prefill.assetType === "ETF" ? "ETF" : ""),
-    );setSymbol(prefill.symbol ?? "");
+    setSymbol(defaultSymbolForKind(prefill.assetType ?? "STOCK", prefill.symbol ?? ""));
     setName(prefill.name ?? "");
     setTplus(prefill.tradeTplus ?? false);
     setMatchTplus(shouldAutoMatchTplus);
@@ -256,6 +256,19 @@ export function TxDialog() {
       return;
     }
 
+    const validation = validateTplusSellSelection({
+      txType,
+      matchTplus,
+      selectedLotIds,
+      openLots,
+      parsedQty,
+    });
+
+    if (!validation.ok) {
+      toast.error(validation.message ?? "Bạn phải chọn lô T+ trước khi lưu giao dịch Sell.");
+      return;
+    }
+
     const sym = symbol.trim().toUpperCase();
     if (!sym) return;
     let left = computedQty;
@@ -327,8 +340,7 @@ export function TxDialog() {
                   setKind(t.value);
                   if (t.value !== "STOCK" && (txType === "CASH_DIVIDEND" || txType === "STOCK_DIVIDEND")) setTxType("BUY");
                   if (t.value !== "STOCK" && t.value !== "CRYPTO") setTplus(false);
-                  if (t.value === "DCDS") setSymbol("DCDS");
-                  else if (t.value === "ETF") setSymbol("ETF");
+                  setSymbol(defaultSymbolForKind(t.value, ""));
                 }}
                 className={`min-h-10 rounded-full border px-3 text-xs font-medium ${kind === t.value ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
               >

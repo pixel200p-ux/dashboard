@@ -274,7 +274,7 @@ export function CalendarPage() {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-5 overflow-hidden">
       {/* ── Header ─────────────────────────────────────── */}
-      <div className="relative shrink-0 overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white px-4 py-5 shadow-sm dark:border-[#334155] dark:bg-[#162238] sm:px-6">
+      <div className="relative shrink-0 overflow-hidden rounded-2xl border border-border bg-card px-4 py-5 shadow-(--shadow-card) dark:border-[#334155] dark:bg-[#162238] sm:px-6">
         <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[#0F172A]/5 blur-3xl dark:bg-[#0F172A]/40" />
         <div className="pointer-events-none absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-[#0F172A]/5 blur-3xl dark:bg-[#0F172A]/30" />
 
@@ -338,7 +338,7 @@ export function CalendarPage() {
       {/* ── Main ───────────────────────────────────────── */}
       <div className="grid h-full min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,5.6fr)_minmax(0,3fr)] lg:overflow-hidden">
         {/* Calendar */}
-        <Card className="min-h-0 overflow-hidden border border-[#E2E8F0] bg-white p-3 text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#162238] sm:p-4">
+        <Card className="min-h-0 overflow-hidden border border-border bg-card p-3 text-[#0F172A] shadow-(--shadow-card) dark:border-[#334155] dark:bg-[#162238] sm:p-4">
           {/* Month navigation */}
           <div className="mb-4 flex items-center gap-2">
             <button
@@ -407,7 +407,7 @@ export function CalendarPage() {
                   className={cn(
                     "group relative flex h-full min-h-0 flex-col items-center rounded-xl border px-1 py-1 text-sm transition-all duration-150",
                     inMonth
-                      ? "border-transparent bg-white text-[#0F172A] dark:border-transparent dark:bg-transparent dark:text-white"
+                      ? "border-transparent bg-card text-[#0F172A] dark:border-transparent dark:bg-[#162238] dark:text-white"
                       : "border-transparent bg-transparent text-[#94A3B8] dark:border-transparent dark:text-[#64748B]",
                     // Selected
                     isSel &&
@@ -420,7 +420,7 @@ export function CalendarPage() {
                     !isSel &&
                       !isToday &&
                       inMonth &&
-                      "hover:border-[#E2E8F0] hover:bg-[#F8FAFC] dark:hover:border-[#94A3B8] dark:hover:bg-[#354969]",
+                      "hover:border-[#94A3B8] hover:bg-[#CDD5DF] dark:hover:border-[#94A3B8] dark:hover:bg-[#354969]",
                   )}
                 >
 
@@ -514,7 +514,7 @@ export function CalendarPage() {
         >
           {/* Upcoming */}
           <Card
-            className="flex min-h-0 flex-col overflow-hidden border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]"
+            className="flex min-h-0 flex-col overflow-hidden border border-border bg-card text-[#0F172A] shadow-(--shadow-card) dark:border-[#334155] dark:bg-[#162238]"
           >
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div className="min-w-0">
@@ -524,7 +524,7 @@ export function CalendarPage() {
                 </CardDesc>
               </div>
               {upcoming.length > 0 && (
-                <div className="grid h-8 min-w-8 shrink-0 place-items-center rounded-lg bg-[#0F172A] px-2 text-xs font-semibold text-white dark:border dark:border-[#334155] dark:bg-[#354969] dark:text-white">
+                <div className="grid h-8 min-w-8 shrink-0 place-items-center rounded-lg bg-[#0F172A] px-2 text-xs font-semibold text-white dark:border dark:border-[#334155] dark:bg-[#162238] dark:text-white">
                   {upcoming.length}
                 </div>
               )}
@@ -575,7 +575,7 @@ export function CalendarPage() {
 
           {/* Past */}
           <Card
-            className="flex min-h-0 flex-col overflow-hidden border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#334155] dark:bg-[#354969]"
+            className="flex min-h-0 flex-col overflow-hidden border border-border bg-card text-[#0F172A] shadow-(--shadow-card) dark:border-[#334155] dark:bg-[#162238]"
           >
             <div className="shrink-0">
               <CardTitle className="text-[#0F172A] dark:text-white">Đã qua</CardTitle>

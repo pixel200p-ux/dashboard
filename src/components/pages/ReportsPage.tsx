@@ -90,7 +90,7 @@ export function ReportsPage() {
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            {rows.length} dòng
+            {rows.length} lệnh giao dịch
             {sumIn !== 0 || sumOut !== 0
               ? ` · Nạp ${displayMoney(sumIn, currency, usd)} · Rút ${displayMoney(sumOut, currency, usd)}`
               : ""}
@@ -114,6 +114,7 @@ export function ReportsPage() {
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
+                <th className="w-12 px-2 py-2">STT</th>
                 <th className="px-2 py-2">Ngày</th>
                 <th className="px-2 py-2">Danh mục</th>
                 <th className="px-2 py-2">Mã</th>
@@ -125,8 +126,9 @@ export function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {rows.map((r, idx) => (
                 <tr key={r.id} className="border-b border-border/70">
+                  <td className="px-2 py-2 text-center font-mono tabular-nums">{idx + 1}</td>
                   <td className="whitespace-nowrap px-2 py-2">{formatViDate(r.date)}</td>
                   <td className="px-2 py-2">{r.bucket === "CRYPTO" ? "Crypto" : r.bucket}</td>
                   <td className="px-2 py-2 font-medium">
@@ -157,7 +159,7 @@ export function ReportsPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-2 py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-2 py-8 text-center text-muted-foreground">
                     Không có dòng nào khớp bộ lọc
                   </td>
                 </tr>

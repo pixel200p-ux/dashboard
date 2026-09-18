@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle, CollapsibleCard } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { addTermMonths, formatViDate, todayYmd } from "@/engine/dates";
 import { interestForPeriod, periodRate } from "@/engine/bank";
@@ -213,9 +213,10 @@ export function BankPage() {
         </Card>
       )}
 
-            <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>Lịch sử giao dịch</CardTitle>
+            <CollapsibleCard
+        title="Lịch sử giao dịch"
+        defaultOpen
+        headerAction={
           <FilterMenu
             value={histFilter}
             onChange={setHistFilter}
@@ -225,8 +226,9 @@ export function BankPage() {
               { id: "REDEEM", label: "Tất toán" },
             ]}
           />
-        </div>
-        <div className="table-scroll mt-3">
+        }
+      >
+        <div className="table-scroll">
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
@@ -267,7 +269,7 @@ export function BankPage() {
             </p>
           )}
         </div>
-      </Card>
+      </CollapsibleCard>
     </div>
   );
 }

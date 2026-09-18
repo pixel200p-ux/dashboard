@@ -3,7 +3,7 @@ import { HoldingsTable } from "@/components/HoldingsTable";
 import { NavCapitalChart } from "@/components/NavCapitalChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDesc, CardTitle } from "@/components/ui/card";
+import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card";
 import { formatViDate } from "@/engine/dates";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { signedClass } from "@/engine/money";
@@ -104,30 +104,31 @@ export function DashboardPage() {
       </div>
             {/* Hàng biểu đồ: Phân bổ (cột ngang) + NAV/Vốn gốc 6 tháng */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-4">
-          <CardTitle>Phân bổ danh mục</CardTitle>
-          <CardDesc className="mb-3">DCDS → ETF → Stock → Crypto → Bank · hiển thị % và giá trị</CardDesc>
+        <CollapsibleCard
+          title="Phân bổ danh mục"
+          description="DCDS → ETF → Stock → Crypto → Bank · hiển thị % và giá trị"
+          defaultOpen
+        >
           <AllocChart data={alloc} usdVnd={usd} />
-        </Card>
+        </CollapsibleCard>
 
-        <Card className="p-4">
-          <CardTitle>NAV &amp; Original Capital</CardTitle>
-          <CardDesc className="mb-3">
-            6 tháng gần nhất · chỉ các mốc có thay đổi (nạp/rút hoặc giao dịch)
-          </CardDesc>
+        <CollapsibleCard
+          title="NAV & Original Capital"
+          description="6 tháng gần nhất · chỉ các mốc có thay đổi (nạp/rút hoặc giao dịch)"
+          defaultOpen
+        >
           <NavCapitalChart ledger={ledger} usdVnd={usd} />
-        </Card>
+        </CollapsibleCard>
       </div>
 
       {/* Bảng Holdings full chiều ngang */}
-      <Card className="p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <CardTitle>Holdings</CardTitle>
-            <CardDesc>VPS / SSI độc lập · T+ OPEN cộng vào SL</CardDesc>
-          </div>
+      <CollapsibleCard
+        title="Holdings"
+        description="VPS / SSI độc lập · T+ OPEN cộng vào SL"
+        defaultOpen
+        headerAction={
           <div className="flex gap-1">
-              <FilterMenu
+            <FilterMenu
               value={stockFilter}
               onChange={setStockFilter}
               options={[
@@ -137,15 +138,18 @@ export function DashboardPage() {
               ]}
             />
           </div>
-        </div>
+        }
+      >
         <HoldingsTable rows={holdings} usdVnd={usd} />
-      </Card>
+      </CollapsibleCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>Vốn gốc</CardTitle>
-          <CardDesc className="mb-2">Nạp / Rút · Sửa số tiền, ngày, danh mục, ghi chú</CardDesc>
-          <ul className="mt-3 max-h-[13.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
+        <CollapsibleCard
+          title="Vốn gốc"
+          description="Nạp / Rút · Sửa số tiền, ngày, danh mục, ghi chú"
+          defaultOpen
+        >
+          <ul className="max-h-[13.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {ledger.capital.length === 0 && (
               <li className="text-muted-foreground">Chưa nạp vốn. Bấm Nạp vốn gốc.</li>
             )}
@@ -202,26 +206,25 @@ export function DashboardPage() {
                 </li>
               ))}
           </ul>
-        </Card>
-        <Card>
-          <CardTitle>Giao dịch gần đây</CardTitle>
-          <ul className="mt-3 max-h-[13.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
+        </CollapsibleCard>
+        <CollapsibleCard title="Giao dịch gần đây" defaultOpen>
+          <ul className="max-h-[13.5rem] space-y-2 overflow-y-auto pr-2 text-sm">
             {recent.length === 0 && <li className="text-muted-foreground">Chưa có lệnh. Sổ cái đang trống.</li>}
             {recent.map((t) => {
               const asset = ledger.assets.find((a) => a.id === t.assetId);
               return (
-                <li key={t.id} className="flex justify-between gap-2">
-                  <span className="min-w-0 truncate">
+                <li key={t.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate pr-1">
                     {formatViDate(t.txDate)} · {t.txType} {asset?.symbol ?? ""} {t.tradeTplus ? <Badge tone="navy">T+</Badge> : null}
                   </span>
-                  <span className={`shrink-0 font-mono tabular-nums ${signedClass(t.txType === "SELL" ? 1 : -1)}`}>
+                  <span className={`shrink-0 min-w-[3.75rem] text-right font-mono tabular-nums ${signedClass(t.txType === "SELL" ? 1 : -1)}`}>
                     {t.quantity ?? ""}
                   </span>
                 </li>
               );
             })}
           </ul>
-        </Card>
+        </CollapsibleCard>
       </div>
     </div>
   );

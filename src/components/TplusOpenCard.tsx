@@ -25,7 +25,7 @@ export function TplusOpenCard({
       : `0 / ${displayPrice(c.originalAvgCost || c.adjustedAvgCost, c.assetType, currency, usdVnd)}`;
 
       return (
-    <Card className="flex gap-3">
+    <Card className="flex gap-3 bg-card dark:bg-[#2b3d5b]">
       <div className="min-w-0 flex-1 space-y-2">
         <button type="button" className="w-full text-left" onClick={() => setDetail((v) => !v)}>
           <p className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight">

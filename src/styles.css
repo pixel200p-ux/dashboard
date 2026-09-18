@@ -51,7 +51,7 @@
 :root {
   --app-bg: #cdd5df;
   --app-surface: #e2e8ef;
-    --app-sidebar: #0c1a2b;
+  --app-sidebar: #162238;
   --app-sidebar-fg: #e8eef4;
   --app-navy: #0a2540;
   --app-navy-deep: #061525;
@@ -62,6 +62,9 @@
   --app-secondary: #d9e1ea;
   --app-accent: #163e6f;
   --app-border: color-mix(in oklab, #0c1929 18%, transparent);
+  --app-scrollbar-track: color-mix(in oklab, var(--app-surface) 82%, transparent);
+  --app-scrollbar-thumb: color-mix(in oklab, var(--app-navy) 32%, #9aa8b5);
+  --app-scrollbar-thumb-hover: color-mix(in oklab, var(--app-navy) 46%, #8b9bb0);
   --app-profit: #0f7b5a;
   --app-loss: #c2413b;
   --app-warn: #b45309;
@@ -77,8 +80,8 @@
 html.dark {
   color-scheme: dark;
   --app-bg: #07111c;
-  --app-surface: #0c1a2b;
-  --app-sidebar: #0c1a2b;
+  --app-surface: #162238;
+  --app-sidebar: #162238;
   --app-sidebar-fg: #e8eef4;
   --app-navy: #7aa2d4;
   --app-navy-deep: #0a2540;
@@ -89,6 +92,9 @@ html.dark {
   --app-secondary: #122033;
   --app-accent: #7aa2d4;
   --app-border: color-mix(in oklab, #e8eef4 12%, transparent);
+  --app-scrollbar-track: color-mix(in oklab, var(--app-surface) 82%, transparent);
+  --app-scrollbar-thumb: color-mix(in oklab, var(--app-navy) 56%, #8ca5cc);
+  --app-scrollbar-thumb-hover: color-mix(in oklab, var(--app-navy) 72%, #a8bddc);
   --app-profit: #34d399;
   --app-loss: #f87171;
   --app-warn: #fbbf24;
@@ -121,7 +127,37 @@ html.dark {
   }
   * {
     border-color: var(--app-border);
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
   }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--app-scrollbar-track);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--app-scrollbar-thumb);
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--app-scrollbar-thumb-hover);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   input, textarea, select {
     font: inherit;
   }

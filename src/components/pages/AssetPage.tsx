@@ -3,7 +3,7 @@ import { BrokerPieChart } from "@/components/BrokerPieChart";
 import { HoldingsTable } from "@/components/HoldingsTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDesc, CardTitle } from "@/components/ui/card";
+import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card";
 import { formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
 import { formatQty } from "@/engine/money";
@@ -145,21 +145,26 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
     return true;
   });
 
-  const pie = holdings.map((h) => ({
-    key: h.assetId,
-        label: h.symbol,
-    value: h.marketValue,
-    pct: holdings.reduce((s, x) => s + x.marketValue, 0) > 0 ? (h.marketValue / holdings.reduce((s, x) => s + x.marketValue, 0)) * 100 : 0,
-  }));
+  const totalMarketValue = holdings.reduce((s, x) => s + x.marketValue, 0);
+  const pie = [...holdings]
+    .sort((a, b) => b.marketValue - a.marketValue)
+    .map((h) => ({
+      key: h.assetId,
+      label: h.symbol,
+      value: h.marketValue,
+      pct: totalMarketValue > 0 ? (h.marketValue / totalMarketValue) * 100 : 0,
+    }));
 
-  const vpsPie = holdings
+  const vpsPie = [...holdings]
     .filter((h) => h.accountId === "vps")
+    .sort((a, b) => b.marketValue - a.marketValue)
     .map((h) => {
       const tot = holdings.filter((x) => x.accountId === "vps").reduce((s, x) => s + x.marketValue, 0);
       return { key: h.assetId, label: h.symbol, value: h.marketValue, pct: tot ? (h.marketValue / tot) * 100 : 0 };
     });
-  const ssiPie = holdings
+  const ssiPie = [...holdings]
     .filter((h) => h.accountId === "ssi")
+    .sort((a, b) => b.marketValue - a.marketValue)
     .map((h) => {
       const tot = holdings.filter((x) => x.accountId === "ssi").reduce((s, x) => s + x.marketValue, 0);
       return { key: h.assetId, label: h.symbol, value: h.marketValue, pct: tot ? (h.marketValue / tot) * 100 : 0 };
@@ -257,8 +262,7 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
       )}
 
       {assetType === "CRYPTO" && (
-        <Card>
-          <CardTitle>Phân bổ mã</CardTitle>
+        <CollapsibleCard title="Phân bổ mã" defaultOpen>
           <AllocChart
             usdVnd={usd}
             data={pie.map((p) => ({
@@ -266,38 +270,78 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
               key: "CRYPTO",
             }))}
           />
-        </Card>
+        </CollapsibleCard>
       )}
 
-      <Card>
-        <CardTitle>Vị thế</CardTitle>
-        <CardDesc className="mb-3">Giá vốn đã gồm hạ vốn T+ đã COMPLETED</CardDesc>
+      <CollapsibleCard
+        title="Vị thế"
+        description="Giá vốn đã gồm hạ vốn T+ đã COMPLETED"
+        defaultOpen
+      >
         <HoldingsTable rows={holdings} usdVnd={usd} />
-      </Card>
+      </CollapsibleCard>
 
-      {assetType === "STOCK" && (
-        <Card>
-          <CardTitle>Cổ tức lũy kế</CardTitle>
-          <ul className="mt-3 space-y-1 text-sm">
-            {holdings.map((h) => (
-              <li key={h.assetId} className="flex justify-between gap-2">
-                <span>
-                  {h.symbol} · {h.accountName}
-                </span>
-                <span>
-                  Tiền mặt {displayMoney(h.cashDividend, currency, usd)}
-                  {h.stockDividendQty > 0 ? ` · CP thưởng ${formatQty(h.stockDividendQty, "STOCK")}` : ""}
-                </span>
-              </li>
-            ))}
-            {holdings.length === 0 && <li className="text-muted-foreground">Chưa có cổ tức.</li>}
-          </ul>
-        </Card>
-      )}
+      {assetType === "STOCK" && (() => {
+        const dividendRows = holdings
+          .filter((h) => Math.abs(h.cashDividend) > 0 || h.stockDividendQty > 0)
+          .sort((a, b) => {
+            const aTotal = Math.abs(a.cashDividend) + a.stockDividendQty * 1000;
+            const bTotal = Math.abs(b.cashDividend) + b.stockDividendQty * 1000;
+            return bTotal - aTotal;
+          });
 
-      <Card>
-        <CardTitle>Lịch sử giao dịch</CardTitle>
-        <div className="table-scroll mt-3">
+        const groups = [
+          { key: "vps", label: "VPS", rows: dividendRows.filter((h) => h.accountId === "vps") },
+          { key: "ssi", label: "SSI", rows: dividendRows.filter((h) => h.accountId === "ssi") },
+        ].filter((group) => group.rows.length > 0);
+
+        if (groups.length === 0) {
+          return (
+            <CollapsibleCard title="Cổ tức lũy kế" defaultOpen>
+              <p className="text-sm text-muted-foreground">Chưa có cổ tức.</p>
+            </CollapsibleCard>
+          );
+        }
+
+        return (
+          <CollapsibleCard title="Cổ tức lũy kế" defaultOpen>
+            <div className="space-y-5">
+              {groups.map((group) => (
+                <div key={group.key} className="space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0F172A] dark:text-white">{group.label}</div>
+                  <div className="table-scroll">
+                    <table className="w-full text-left text-xs">
+                      <thead className="text-[10px] uppercase text-muted-foreground">
+                        <tr className="border-b border-border">
+                          <th className="px-2 py-2 font-medium">Mã</th>
+                          <th className="px-2 py-2 text-right font-medium">Tiền mặt</th>
+                          <th className="px-2 py-2 text-right font-medium">CP thưởng</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((h) => (
+                          <tr key={`${group.key}-${h.assetId}`} className="border-b border-border/70">
+                            <td className="px-2 py-2 font-medium">{h.symbol}</td>
+                            <td className="px-2 py-2 text-right font-mono tabular-nums">
+                              {h.cashDividend > 0 ? displayMoney(h.cashDividend, currency, usd) : "—"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono tabular-nums">
+                              {h.stockDividendQty > 0 ? formatQty(h.stockDividendQty, "STOCK") : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CollapsibleCard>
+        );
+      })()}
+
+      <CollapsibleCard title="Lịch sử giao dịch" defaultOpen>
+        <div className="table-scroll">
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
@@ -343,7 +387,7 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
           </table>
           {txs.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Chưa có giao dịch.</p>}
         </div>
-      </Card>
+      </CollapsibleCard>
     </div>
   );
 }

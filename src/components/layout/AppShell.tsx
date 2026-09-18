@@ -120,7 +120,7 @@ export function AppShell() {
     }
   }
 
-  function renderItems(items: typeof NAV_HOME | typeof NAV_ASSETS | typeof NAV_TOOLS | typeof NAV_SETTINGS) {
+  function renderItems(items: typeof NAV_HOME | typeof NAV_ASSETS | typeof NAV_TOOLS | typeof NAV_SETTINGS, variant: "default" | "soft" = "default") {
     return items.map((item) => {
       const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
       const Icon = item.icon;
@@ -131,9 +131,13 @@ export function AppShell() {
           onClick={() => setMobile(false)}
           className={cn(
             "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
-            active
-              ? "bg-white/12 text-white"
-              : "text-sidebar-foreground/75 hover:bg-white/8 hover:text-white"
+            variant === "soft"
+              ? active
+                ? "bg-[#3b5a7d] text-white shadow-sm"
+                : "text-sidebar-foreground/75 hover:bg-[#2d4667]/80 hover:text-white"
+              : active
+                ? "bg-white/12 text-white"
+                : "text-sidebar-foreground/75 hover:bg-white/8 hover:text-white"
           )}
         >
           <Icon className="h-4 w-4 shrink-0" />
@@ -235,8 +239,8 @@ export function AppShell() {
         <nav className="flex flex-1 flex-col p-3">
           <div className="flex flex-1 flex-col gap-1">
             {renderItems(NAV_HOME)}
-            <div className="my-1 rounded-xl bg-white/[0.06] p-1 ring-1 ring-inset ring-white/10">
-              {renderItems(NAV_ASSETS)}
+            <div className="my-1 rounded-xl bg-[#0F172A]/95 p-1 ring-1 ring-inset ring-white/8">
+              {renderItems(NAV_ASSETS, "soft")}
             </div>
             <div className="mx-3 my-1.5 h-px bg-white/10" aria-hidden />
             {renderItems(NAV_TOOLS)}
