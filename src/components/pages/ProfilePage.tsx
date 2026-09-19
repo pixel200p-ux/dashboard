@@ -62,7 +62,7 @@ export function ProfilePage() {
     targetRef.current = target;
   }, [target]);
 
-  // Optimal Smooth Springs Loop (Damped Spring System)
+  // Loop mượt với hệ thống lò xo Damped Spring
   useEffect(() => {
     let raf = 0;
     const k = 0.28;
@@ -221,7 +221,7 @@ export function ProfilePage() {
     };
   }, [setDecor]);
 
-  type TxStat = { open: number; closed: number; buys: number; sells: number; bankOpen: number; bankClosed: number; };
+  type TxStat = { open: number; closed: number; buys: number; sells: number; bankOpen: number; bankClosed: number };
   const emptyStat: TxStat = { open: 0, closed: 0, buys: 0, sells: 0, bankOpen: 0, bankClosed: 0 };
   const [openYear, setOpenYear] = useState<string | null>(null);
 
@@ -240,7 +240,9 @@ export function ProfilePage() {
     const banks = portfolio.ledger.banks.filter((b) => !b.deletedAt);
     const activeIds = new Set(portfolio.state.banks.filter((b) => b.status === "ACTIVE").map((b) => b.id));
 
-    function yearOf(iso?: string | null) { return iso && iso.length >= 4 ? iso.slice(0, 4) : null; }
+    function yearOf(iso?: string | null) {
+      return iso && iso.length >= 4 ? iso.slice(0, 4) : null;
+    }
     function isBuyOpen(b: (typeof txs)[number]) {
       if (b.tradeTplus) return (tplusLeft.get(b.id) ?? 0) > 0;
       return Boolean(b.assetId && coreOpen.has(b.assetId));
@@ -257,8 +259,14 @@ export function ProfilePage() {
     }
 
     const years = new Set<string>();
-    for (const t of txs) { const y = yearOf(t.txDate); if (y) years.add(y); }
-    for (const b of banks) { const y = yearOf(b.startDate); if (y) years.add(y); }
+    for (const t of txs) {
+      const y = yearOf(t.txDate);
+      if (y) years.add(y);
+    }
+    for (const b of banks) {
+      const y = yearOf(b.startDate);
+      if (y) years.add(y);
+    }
 
     return {
       txStats: count(),
@@ -275,7 +283,10 @@ export function ProfilePage() {
     const order: string[] = [];
     const map = new Map<string, typeof list>();
     for (const m of list) {
-      if (!map.has(m.date)) { map.set(m.date, []); order.push(m.date); }
+      if (!map.has(m.date)) {
+        map.set(m.date, []);
+        order.push(m.date);
+      }
       map.get(m.date)!.push(m);
     }
     return order.map((date) => ({ date, items: map.get(date)! }));
@@ -290,23 +301,24 @@ export function ProfilePage() {
     if (next !== profile.displayName) {
       save.mutate({ data: { displayName: next } }, { onSuccess: () => { setNameDraft(null); setEditingName(false); } });
     } else {
-      setNameDraft(null); setEditingName(false);
+      setNameDraft(null);
+      setEditingName(false);
     }
   };
 
   return (
     <div
       ref={containerRef}
-      className="relative min-h-dvh w-full flex flex-col bg-background text-foreground select-none overflow-x-hidden touch-pan-x"
+      className="relative min-h-dvh w-full flex flex-col bg-background select-none overflow-x-hidden touch-pan-x"
       style={{
         "--p": 0,
         "--cover-clip": "calc((1 - var(--p)) * 67vh)",
       } as React.CSSProperties}
     >
-      {/* 1. LAYER COVER (Sử dụng bg-background để đồng bộ tuyệt đối khi chưa có ảnh) */}
+      {/* 1. LAYER COVER CỐ ĐỊNH Ở DƯỚI CÙNG */}
       <div
         data-profile-gesture
-        className="fixed inset-0 w-full h-full bg-background z-10 touch-none will-change-[clip-path]"
+        className="fixed inset-0 w-full h-full bg-[#4a5d4e] z-10 touch-none will-change-[clip-path]"
         style={{ clipPath: "inset(0 0 var(--cover-clip) 0)" }}
         onDoubleClick={() => coverRef.current?.click()}
       >
@@ -320,76 +332,79 @@ export function ProfilePage() {
             className="h-full w-full object-cover object-center pointer-events-none select-none [transform:translateZ(0)]"
           />
         ) : (
-          <div className="grid h-full place-items-center text-sm text-muted-foreground">
-            Nhấp đúp chọn ảnh nền
-          </div>
+          <div className="grid h-full place-items-center text-sm text-white/80">Nhấp đúp chọn ảnh</div>
         )}
       </div>
+
+      {/* PC: Nền trắng phủ cột sidebar khi Cover bung full */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed bottom-0 left-0 z-[25] hidden w-60 bg-background md:block will-change-transform"
+        style={{
+          transform: "translate3d(0, calc(var(--p) * 50vh), 0)",
+          top: "33vh",
+        }}
+      />
 
       <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const coverData = await readImage(f, 1920); save.mutate({ data: { coverData } }); }} />
       <input ref={avaRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const avatarData = await readImage(f, 512); save.mutate({ data: { avatarData } }); }} />
 
-      {/* 2. KHU VỰC CHỨA NỀN ĐỒNG BỘ MÀU THEO THEME VÀ CÁC CARD NỘI DUNG */}
+      {/* 2. KHU VỰC CHỨA CÁC CARD VÀ NỀN TRẮNG CHUYỂN ĐỘNG */}
       <div className="relative z-20 w-full flex-1 flex flex-col pointer-events-none">
         
-        {/* Khoảng trống để lộ Cover (33vh) ở trạng thái ban đầu */}
+        {/* Khoảng trống ban đầu hiển thị Cover (33vh) */}
         <div className="h-[33vh] w-full shrink-0" />
 
-        {/* --- KHỐI NỀN ĐỒNG BỘ THEME (bg-background) --- */}
+        {/* --- KHỐI NỀN TRẮNG ĐỒNG BỘ CHUYỂN ĐỘNG --- */}
         <div
           data-profile-gesture
-          className="relative flex-1 w-full bg-background border-t border-border/40 pointer-events-auto will-change-transform flex flex-col"
+          className="relative flex-1 w-full bg-background pointer-events-auto will-change-transform flex flex-col"
           style={{
             transform: "translate3d(0, calc(var(--p) * 50vh), 0)",
           }}
         >
-          {/* Nối dài màu nền bg-background xuống dưới để chống hụt khi cuộn */}
-          <div className="absolute top-full left-0 right-0 h-[100vh] bg-background pointer-events-none" />
+          {/* Mảng phụ nối dài màu TRẮNG xuống dưới chống hở viền khi cuộn mạnh */}
+          <div className="absolute top-full left-0 right-0 h-[200vh] bg-background pointer-events-none -z-10" />
 
-          {/* AVATAR VÀ TÊN */}
-<div 
-  className="relative z-10 px-4 md:px-8 flex items-end gap-4 -mt-10 md:-mt-12 pointer-events-none origin-bottom-left will-change-transform"
-  style={{
-    transform: "scale(calc(1 + var(--p) * 0.5))",
-  }}
->
-  <button
-    type="button"
-    className="pointer-events-auto relative h-20 w-20 md:h-24 md:w-24 rounded-full border-4 border-background bg-muted overflow-hidden shrink-0 shadow-md transition-transform active:scale-95"
-    onClick={() => avaRef.current?.click()}
-  >
-    {profile.avatarData ? (
-      <img src={profile.avatarData} alt="Avatar" className="h-full w-full object-cover" />
-    ) : (
-      <div className="grid h-full w-full place-items-center">
-        <UserRound className="h-8 w-8 text-muted-foreground" />
-      </div>
-    )}
-  </button>
+          {/* NHÓM AVATAR VÀ TÊN */}
+          <div className="relative z-10 px-4 md:px-8 flex items-end gap-4 -mt-8 md:-mt-10 pointer-events-none">
+            <button
+              type="button"
+              className="pointer-events-auto relative h-16 w-16 md:h-20 md:w-20 rounded-full border-2 border-background bg-muted overflow-hidden shrink-0 shadow-md transition-transform active:scale-95"
+              onClick={() => avaRef.current?.click()}
+            >
+              {profile.avatarData ? (
+                <img src={profile.avatarData} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center">
+                  <UserRound className="h-7 w-7 text-muted-foreground" />
+                </div>
+              )}
+            </button>
 
-  <div className="pointer-events-auto mb-1 md:mb-2 min-w-0 flex-1">
-    {editingName ? (
-      <form onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}>
-        <Input
-          autoFocus
-          value={name}
-          onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={handleSaveName}
-          className="max-w-sm text-lg md:text-xl font-bold tracking-tight bg-background h-8 md:h-10"
-        />
-      </form>
-    ) : (
-      <h1
-        className="cursor-text text-xl md:text-2xl font-bold tracking-tight select-none text-foreground truncate drop-shadow-sm"
-        onDoubleClick={() => setEditingName(true)}
-      >
-        {profile.displayName}
-      </h1>
-    )}
-  </div>
-</div>
+            <div className="pointer-events-auto min-w-0 flex-1 mb-1">
+              {editingName ? (
+                <form onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}>
+                  <Input
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onBlur={handleSaveName}
+                    className="max-w-sm text-lg md:text-xl font-bold tracking-tight bg-background h-8 md:h-10"
+                  />
+                </form>
+              ) : (
+                <h1
+                  className="cursor-text text-xl md:text-2xl font-bold tracking-tight select-none text-foreground truncate drop-shadow-sm"
+                  onDoubleClick={() => setEditingName(true)}
+                >
+                  {profile.displayName}
+                </h1>
+              )}
+            </div>
+          </div>
 
-          {/* 3 CARD NỘI DUNG ĐÈ TRÊN MẢNG NỀN */}
+          {/* CÁC CARD NỘI DUNG */}
           <div
             className="relative z-10 flex-1 px-4 md:px-8 mt-6 pb-6 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-opacity"
             style={{
@@ -397,18 +412,18 @@ export function ProfilePage() {
             }}
           >
             {/* Card 1: Thống kê */}
-            <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5 shadow-sm bg-card border-border">
+            <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5 shadow-sm bg-background border border-border">
               <div className="shrink-0">
                 <CardTitle>Thống kê lệnh</CardTitle>
                 <CardDesc className="mb-3">Tổng · không tính lệnh đã xóa</CardDesc>
               </div>
               <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 space-y-3 overscroll-contain">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-muted/60 px-3 py-2">
+                  <div className="rounded-lg bg-muted/50 px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">Đang mở</p>
                     <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.open}</p>
                   </div>
-                  <div className="rounded-lg bg-muted/60 px-3 py-2">
+                  <div className="rounded-lg bg-muted/50 px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">Đã chốt</p>
                     <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.closed}</p>
                   </div>
@@ -419,17 +434,17 @@ export function ProfilePage() {
                 {yearStats.map(({ year, stats }) => (
                   <div key={year} className="space-y-2 pt-1">
                     <button type="button" className="flex w-full items-center gap-3 text-left hover:opacity-80 transition-opacity" onClick={() => setOpenYear((cur) => (cur === year ? null : year))}>
-                      <span className="rounded-xl border border-border bg-muted/40 px-3 py-1.5 text-sm font-semibold tabular-nums">{year}</span>
+                      <span className="rounded-xl border border-border bg-muted/30 px-3 py-1.5 text-sm font-semibold tabular-nums">{year}</span>
                       <span className="h-px min-w-0 flex-1 bg-border" />
                     </button>
                     {openYear === year && (
                       <div className="space-y-2 pl-1 animate-in fade-in-50 duration-200">
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-lg bg-muted/60 px-3 py-2">
+                          <div className="rounded-lg bg-muted/50 px-3 py-2">
                             <p className="text-[11px] text-muted-foreground">Đang mở</p>
                             <p className="font-mono text-2xl font-semibold tabular-nums">{stats.open}</p>
                           </div>
-                          <div className="rounded-lg bg-muted/60 px-3 py-2">
+                          <div className="rounded-lg bg-muted/50 px-3 py-2">
                             <p className="text-[11px] text-muted-foreground">Đã chốt</p>
                             <p className="font-mono text-2xl font-semibold tabular-nums">{stats.closed}</p>
                           </div>
@@ -443,13 +458,13 @@ export function ProfilePage() {
             </Card>
 
             {/* Card 2: Trống */}
-            <Card className="flex flex-col h-full min-h-0 overflow-hidden border-dashed p-5 shadow-sm bg-card border-border">
+            <Card className="flex flex-col h-full min-h-0 overflow-hidden border-dashed p-5 shadow-sm bg-background">
               <CardTitle className="text-muted-foreground shrink-0">Trống</CardTitle>
               <CardDesc>Sẽ bổ sung sau</CardDesc>
             </Card>
 
             {/* Card 3: Performance History */}
-            <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5 shadow-sm bg-card border-border">
+            <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5 shadow-sm bg-background border border-border">
               <div className="shrink-0 mb-2">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle>Performance history</CardTitle>
@@ -476,7 +491,7 @@ export function ProfilePage() {
                       <p className="text-xs font-semibold tracking-wide text-muted-foreground">{formatViDate(g.date)}</p>
                       <ul className="mt-2 space-y-1.5">
                         {g.items.map((m) => (
-                          <li key={m.id} className="rounded-md bg-muted/40 px-2.5 py-1.5 border border-border/50">
+                          <li key={m.id} className="rounded-md bg-muted/30 px-2.5 py-1.5 border border-border/50">
                             <p className="text-sm font-medium leading-snug">{m.label}</p>
                             <p className="font-mono text-[11px] tabular-nums text-muted-foreground">{displayMoney(m.value, "VND", usd)}</p>
                           </li>
