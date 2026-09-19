@@ -309,10 +309,10 @@ export function ProfilePage() {
   return (
     <div
       ref={containerRef}
-      className="relative min-h-dvh w-full flex flex-col bg-background select-none overflow-x-hidden touch-pan-x"
+            className="relative h-dvh max-h-dvh w-full flex flex-col bg-background text-foreground select-none overflow-hidden touch-pan-x"
       style={{
         "--p": 0,
-        "--cover-clip": "calc((1 - var(--p)) * 67vh)",
+        "--cover-clip": "calc(67vh - var(--p) * 52vh)",
       } as React.CSSProperties}
     >
       {/* 1. LAYER COVER CỐ ĐỊNH Ở DƯỚI CÙNG */}
@@ -356,15 +356,13 @@ export function ProfilePage() {
         <div className="h-[33vh] w-full shrink-0" />
 
         {/* --- KHỐI NỀN TRẮNG ĐỒNG BỘ CHUYỂN ĐỘNG --- */}
-        <div
+                <div
           data-profile-gesture
-          className="relative flex-1 w-full bg-background pointer-events-auto will-change-transform flex flex-col"
+          className="relative flex-1 w-full bg-background border-t border-border/40 pointer-events-auto will-change-transform flex flex-col"
           style={{
-            transform: "translate3d(0, calc(var(--p) * 50vh), 0)",
+            transform: "translate3d(0, calc(var(--p) * 52vh), 0)",
           }}
         >
-          {/* Mảng phụ nối dài màu TRẮNG xuống dưới chống hở viền khi cuộn mạnh */}
-          <div className="absolute top-full left-0 right-0 h-[200vh] bg-background pointer-events-none -z-10" />
 
           {/* NHÓM AVATAR VÀ TÊN */}
           <div className="relative z-10 px-4 md:px-8 flex items-end gap-4 -mt-8 md:-mt-10 pointer-events-none">
