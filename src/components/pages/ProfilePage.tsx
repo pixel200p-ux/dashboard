@@ -124,7 +124,7 @@ export function ProfilePage() {
       if ((el as HTMLElement | null)?.closest?.("input, textarea, select, button")) return false;
       if (isInsideHeroGesture(el)) return true;
       if (pRef.current > 0.08) return true;
-      const coverH = window.innerHeight * (0.33 + pRef.current * 0.67);
+      const coverH = window.innerHeight * (0.33 + pRef.current * 0.52);
       return clientY <= coverH;
     }
 
@@ -359,8 +359,14 @@ export function ProfilePage() {
           }}
         >
 
-          {/* NHÓM AVATAR VÀ TÊN */}
-          <div className="relative z-10 px-4 md:px-8 flex items-end gap-4 -mt-8 md:-mt-10 pointer-events-none">
+        {/* NHÓM AVATAR VÀ TÊN — full: x1.5, neo góc trái; thanh trắng bên phải giữ nguyên */}
+          <div
+            className="relative z-10 flex w-max max-w-[calc(100%-1rem)] items-end gap-3 px-4 pb-2 md:gap-4 md:px-8 md:pb-3 -mt-8 md:-mt-10 pointer-events-none will-change-transform"
+            style={{
+              transform: "scale(calc(1 + var(--p) * 0.5))",
+              transformOrigin: "left bottom",
+            }}
+          >
             <button
               type="button"
               className="pointer-events-auto relative h-16 w-16 md:h-20 md:w-20 rounded-full border-2 border-background bg-muted overflow-hidden shrink-0 shadow-md transition-transform active:scale-95"
@@ -375,7 +381,7 @@ export function ProfilePage() {
               )}
             </button>
 
-            <div className="pointer-events-auto min-w-0 flex-1 mb-1">
+            <div className="pointer-events-auto mb-1 min-w-0 max-w-[min(16rem,50vw)] shrink-0">
               {editingName ? (
                 <form onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}>
                   <Input
