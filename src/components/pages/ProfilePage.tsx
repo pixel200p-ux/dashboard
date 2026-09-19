@@ -70,53 +70,36 @@ export function ProfilePage() {
     };
   }, []);
 
-const target = Math.max(0, Math.min(1, Number(decor) || 0));
+  const target = Math.max(0, Math.min(1, Number(decor) || 0));
   const pRef = useRef(0);
-  const velocityRef = useRef(0); // Lưu vận tốc lướt hiện tại
+  const gestureRef = useRef(false);
 
-  // 1. ENGINE (SMOOTH INERTIA & LERP)
   useEffect(() => {
     let raf = 0;
-    const friction = 0.92; // Hệ số giảm đà lướt (0.9 -> 0.95 cho độ lướt mượt)
-    const k = 0.12;        // Hệ số lực hút về target (nhẹ hơn để tạo cảm giác êm)
+    const k = 0.2;
 
     function tick() {
-      let cur = pRef.current;
-      let v = velocityRef.current;
-
-      // Áp dụng lực lướt đà
-      if (Math.abs(v) > 0.0001) {
-        cur += v;
-        v *= friction;
-        velocityRef.current = v;
-      } else {
-        velocityRef.current = 0;
-        // Tiến dần về target khi đà lướt gần hết
-        const diff = target - cur;
-        cur += diff * k;
-      }
-
-      // Giới hạn trong khoảng [0, 1]
-      const clamped = Math.max(0, Math.min(1, cur));
-      if (clamped !== cur) {
-        velocityRef.current = 0; // Đụng biên thì dập tắt vận tốc
-        cur = clamped;
-      }
-
-      pRef.current = cur;
-      containerRef.current?.style.setProperty("--p", cur.toFixed(4));
-
-      // Tiếp tục loop nếu chưa ổn định hoàn toàn
-      if (Math.abs(target - cur) > 0.0005 || Math.abs(velocityRef.current) > 0.0001) {
+      if (gestureRef.current) {
         raf = requestAnimationFrame(tick);
+        return;
       }
+      const cur = pRef.current;
+      const diff = target - cur;
+      if (Math.abs(diff) < 0.001) {
+        pRef.current = target;
+        containerRef.current?.style.setProperty("--p", target.toFixed(4));
+        return;
+      }
+      const next = cur + diff * k;
+      pRef.current = next;
+      containerRef.current?.style.setProperty("--p", next.toFixed(4));
+      raf = requestAnimationFrame(tick);
     }
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [target]);
 
-  // 2. GESTURE (MOMENTUM & SMOOTH TOUCH/WHEEL)
   useEffect(() => {
     function isInsideCardScroll(el: EventTarget | null): boolean {
       if (!(el instanceof Element)) return false;
@@ -128,109 +111,93 @@ const target = Math.max(0, Math.min(1, Number(decor) || 0));
       return Boolean(el.closest("[data-profile-gesture]"));
     }
 
+    function writeP(next: number) {
+      const v = Math.max(0, Math.min(1, next));
+      pRef.current = v;
+      containerRef.current?.style.setProperty("--p", v.toFixed(4));
+      return v;
+    }
+
+    // Đi ≥ 20% quãng đường rồi buông → snap theo hướng đó; chưa đủ 20% → về chỗ cũ
+    function snapFrom(origin: number, cur: number) {
+      if (origin < 0.5) return cur - origin >= 0.2 ? 1 : 0;
+      return origin - cur >= 0.2 ? 0 : 1;
+    }
+
+    function canStart(target: EventTarget | null, clientY: number) {
+      if (isInsideCardScroll(target)) return false;
+      if ((target as HTMLElement | null)?.closest?.("input, textarea, select")) return false;
+      if (isInsideHeroGesture(target)) return true;
+      if (pRef.current > 0.08) return true;
+      const coverH = window.innerHeight * (0.33 + pRef.current * 0.55);
+      return clientY <= coverH;
+    }
+
     let wheelTimer: ReturnType<typeof setTimeout> | null = null;
+    let wheelOrigin: number | null = null;
 
     function onWheel(e: WheelEvent) {
-      if (!isInsideHeroGesture(e.target) || isInsideCardScroll(e.target)) return;
-
+      if (!canStart(e.target, e.clientY)) return;
       const cur = pRef.current;
       if (cur <= 0 && e.deltaY > 0) return;
       if (cur >= 1 && e.deltaY < 0) return;
 
       e.preventDefault();
-
-      // Bơm vận tốc theo nhịp lăn chuột
-      const wheelDelta = -e.deltaY * 0.0015;
-      velocityRef.current += wheelDelta;
+      gestureRef.current = true;
+      if (wheelOrigin == null) wheelOrigin = cur;
+      writeP(cur + -e.deltaY * 0.002);
 
       if (wheelTimer) clearTimeout(wheelTimer);
       wheelTimer = setTimeout(() => {
-        // Snap nhẹ về mốc gần nhất sau khi ngừng lăn chuột
-        const snapped = pRef.current >= 0.4 ? 1 : 0;
-        setDecor(snapped);
-      }, 150);
+        const origin = wheelOrigin ?? 0;
+        wheelOrigin = null;
+        gestureRef.current = false;
+        setDecor(snapFrom(origin, pRef.current));
+      }, 120);
     }
 
     let startY = 0;
-    let lastY = 0;
-    let lastTime = 0;
-    let activeGesture = false;
+    let startP = 0;
+    let active = false;
+    let pointerId = -1;
 
-    function onTouchStart(e: TouchEvent) {
-      if (isInsideCardScroll(e.target)) {
-        activeGesture = false;
-        return;
-      }
-
-      const cur = pRef.current;
-      if (!isInsideHeroGesture(e.target) && cur < 0.1) {
-        activeGesture = false;
-        return;
-      }
-
-      activeGesture = true;
-      startY = e.touches[0]?.clientY ?? 0;
-      lastY = startY;
-      lastTime = performance.now();
-      velocityRef.current = 0; // Triệt tiêu đà cũ khi ngón tay chạm vào
+    function onPointerDown(e: PointerEvent) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (!canStart(e.target, e.clientY)) return;
+      active = true;
+      pointerId = e.pointerId;
+      startY = e.clientY;
+      startP = pRef.current;
+      gestureRef.current = true;
     }
 
-    function onTouchMove(e: TouchEvent) {
-      if (!activeGesture || isInsideCardScroll(e.target)) return;
-
-      const y = e.touches[0]?.clientY ?? 0;
-      const now = performance.now();
-      const dt = Math.max(16, now - lastTime);
-      const dy = y - lastY;
-
-      // Độ nhạy quãng đường kéo (px) để đi hết biến --p từ 0 -> 1
-      const sensitivity = 320; 
-      const deltaP = dy / sensitivity;
-
-      pRef.current = Math.max(0, Math.min(1, pRef.current + deltaP));
-      containerRef.current?.style.setProperty("--p", pRef.current.toFixed(4));
-
-      // Tính vận tốc tức thời (px/ms) quy ra tỷ lệ --p
-      velocityRef.current = (deltaP / dt) * 16; 
-
-      lastY = y;
-      lastTime = now;
-
+    function onPointerMove(e: PointerEvent) {
+      if (!active || e.pointerId !== pointerId) return;
+      writeP(startP + (e.clientY - startY) / 320);
       if (e.cancelable) e.preventDefault();
     }
 
-    function onTouchEnd() {
-      if (!activeGesture) return;
-      activeGesture = false;
-
-      const v = velocityRef.current;
-      const cur = pRef.current;
-
-      // Snap dựa trên HƯỚNG VUỐT NHANH (Velocity) hoặc VỊ TRÍ (Position)
-      let snapped = cur >= 0.4 ? 1 : 0;
-      if (v > 0.005) {
-        snapped = 1; // Vuốt nhanh xuống -> Bung full cover
-      } else if (v < -0.005) {
-        snapped = 0; // Vuốt nhanh lên -> Thu gọn cover
-      }
-
-      setDecor(snapped);
+    function onPointerUp(e: PointerEvent) {
+      if (!active || e.pointerId !== pointerId) return;
+      active = false;
+      pointerId = -1;
+      gestureRef.current = false;
+      setDecor(snapFrom(startP, pRef.current));
     }
 
     const opts = { passive: false, capture: true } as const;
     window.addEventListener("wheel", onWheel, opts);
-    window.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
-    window.addEventListener("touchmove", onTouchMove, opts);
-    window.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
-    window.addEventListener("touchcancel", onTouchEnd, { passive: true, capture: true });
-
+    window.addEventListener("pointerdown", onPointerDown, opts);
+    window.addEventListener("pointermove", onPointerMove, opts);
+    window.addEventListener("pointerup", onPointerUp, opts);
+    window.addEventListener("pointercancel", onPointerUp, opts);
     return () => {
       if (wheelTimer) clearTimeout(wheelTimer);
       window.removeEventListener("wheel", onWheel, opts);
-      window.removeEventListener("touchstart", onTouchStart, true);
-      window.removeEventListener("touchmove", onTouchMove, opts);
-      window.removeEventListener("touchend", onTouchEnd, true);
-      window.removeEventListener("touchcancel", onTouchEnd, true);
+      window.removeEventListener("pointerdown", onPointerDown, opts);
+      window.removeEventListener("pointermove", onPointerMove, opts);
+      window.removeEventListener("pointerup", onPointerUp, opts);
+      window.removeEventListener("pointercancel", onPointerUp, opts);
     };
   }, [setDecor]);
 
