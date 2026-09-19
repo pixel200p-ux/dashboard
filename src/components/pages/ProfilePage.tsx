@@ -49,7 +49,7 @@ export function ProfilePage() {
   const decor = useUiStore((s) => s.profileDecor);
   const setDecor = useUiStore((s) => s.setProfileDecor);
 
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.innerWidth < 640 : false);
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 640 : false));
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [kindFilter, setKindFilter] = useState("ALL");
@@ -57,48 +57,53 @@ export function ProfilePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const mediaQuery = window.matchMedia("(max-width: 640px)");
-    const update = () => setIsMobile(mediaQuery.matches);
+    const update = () => setIsMobile(window.innerWidth < 640);
+    const matchMedia = window.matchMedia("(max-width: 640px)");
 
-    update();
-    mediaQuery.addEventListener("change", update);
+    matchMedia.addEventListener("change", update);
     window.addEventListener("resize", update);
 
     return () => {
-      mediaQuery.removeEventListener("change", update);
+      matchMedia.removeEventListener("change", update);
       window.removeEventListener("resize", update);
     };
   }, []);
 
   const target = Math.max(0, Math.min(1, Number(decor) || 0));
   const pRef = useRef(0);
+  const targetRef = useRef(target);
   const gestureRef = useRef(false);
 
   useEffect(() => {
+    targetRef.current = target;
+  }, [target]);
+
+  // Optimal Smooth Springs Loop (Damped Spring System)
+  useEffect(() => {
     let raf = 0;
-    const k = 0.2;
+    const k = 0.28;
 
     function tick() {
-      if (gestureRef.current) {
-        raf = requestAnimationFrame(tick);
-        return;
+      if (!gestureRef.current) {
+        const tgt = targetRef.current;
+        const cur = pRef.current;
+        const diff = tgt - cur;
+
+        if (Math.abs(diff) >= 0.0002) {
+          const next = cur + diff * k;
+          pRef.current = next;
+          containerRef.current?.style.setProperty("--p", next.toFixed(4));
+        } else if (cur !== tgt) {
+          pRef.current = tgt;
+          containerRef.current?.style.setProperty("--p", tgt.toString());
+        }
       }
-      const cur = pRef.current;
-      const diff = target - cur;
-      if (Math.abs(diff) < 0.001) {
-        pRef.current = target;
-        containerRef.current?.style.setProperty("--p", target.toFixed(4));
-        return;
-      }
-      const next = cur + diff * k;
-      pRef.current = next;
-      containerRef.current?.style.setProperty("--p", next.toFixed(4));
       raf = requestAnimationFrame(tick);
     }
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [target]);
+  }, []);
 
   useEffect(() => {
     function isInsideCardScroll(el: EventTarget | null): boolean {
@@ -118,23 +123,31 @@ export function ProfilePage() {
       return v;
     }
 
-    // Đi ≥ 20% quãng đường rồi buông → snap theo hướng đó; chưa đủ 20% → về chỗ cũ
     function snapFrom(origin: number, cur: number) {
-      if (origin < 0.5) return cur - origin >= 0.2 ? 1 : 0;
-      return origin - cur >= 0.2 ? 0 : 1;
+      if (origin < 0.5) return cur - origin >= 0.15 ? 1 : 0;
+      return origin - cur >= 0.15 ? 0 : 1;
     }
 
-    function canStart(target: EventTarget | null, clientY: number) {
-      if (isInsideCardScroll(target)) return false;
-      if ((target as HTMLElement | null)?.closest?.("input, textarea, select")) return false;
-      if (isInsideHeroGesture(target)) return true;
+    function finish(origin: number) {
+      const next = snapFrom(origin, pRef.current);
+      targetRef.current = next;
+      gestureRef.current = false;
+      setDecor(next);
+    }
+
+    function canStart(el: EventTarget | null, clientY: number) {
+      if (isInsideCardScroll(el)) return false;
+      if ((el as HTMLElement | null)?.closest?.("input, textarea, select, button")) return false;
+      if (isInsideHeroGesture(el)) return true;
       if (pRef.current > 0.08) return true;
-      const coverH = window.innerHeight * (0.33 + pRef.current * 0.55);
+      const coverH = window.innerHeight * (0.33 + pRef.current * 0.67);
       return clientY <= coverH;
     }
 
     let wheelTimer: ReturnType<typeof setTimeout> | null = null;
     let wheelOrigin: number | null = null;
+    let wheelRaf = 0;
+    let wheelDelta = 0;
 
     function onWheel(e: WheelEvent) {
       if (!canStart(e.target, e.clientY)) return;
@@ -145,14 +158,21 @@ export function ProfilePage() {
       e.preventDefault();
       gestureRef.current = true;
       if (wheelOrigin == null) wheelOrigin = cur;
-      writeP(cur + -e.deltaY * 0.002);
+      wheelDelta += -e.deltaY;
+
+      if (!wheelRaf) {
+        wheelRaf = requestAnimationFrame(() => {
+          wheelRaf = 0;
+          writeP(pRef.current + wheelDelta * 0.0011);
+          wheelDelta = 0;
+        });
+      }
 
       if (wheelTimer) clearTimeout(wheelTimer);
       wheelTimer = setTimeout(() => {
         const origin = wheelOrigin ?? 0;
         wheelOrigin = null;
-        gestureRef.current = false;
-        setDecor(snapFrom(origin, pRef.current));
+        finish(origin);
       }, 120);
     }
 
@@ -160,6 +180,8 @@ export function ProfilePage() {
     let startP = 0;
     let active = false;
     let pointerId = -1;
+    let moveY = 0;
+    let moveRaf = 0;
 
     function onPointerDown(e: PointerEvent) {
       if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -168,21 +190,33 @@ export function ProfilePage() {
       pointerId = e.pointerId;
       startY = e.clientY;
       startP = pRef.current;
+      moveY = e.clientY;
       gestureRef.current = true;
     }
 
     function onPointerMove(e: PointerEvent) {
       if (!active || e.pointerId !== pointerId) return;
-      writeP(startP + (e.clientY - startY) / 320);
+      moveY = e.clientY;
       if (e.cancelable) e.preventDefault();
+      if (!moveRaf) {
+        moveRaf = requestAnimationFrame(() => {
+          moveRaf = 0;
+          if (!active) return;
+          writeP(startP + (moveY - startY) / 300);
+        });
+      }
     }
 
     function onPointerUp(e: PointerEvent) {
       if (!active || e.pointerId !== pointerId) return;
       active = false;
       pointerId = -1;
-      gestureRef.current = false;
-      setDecor(snapFrom(startP, pRef.current));
+      if (moveRaf) {
+        cancelAnimationFrame(moveRaf);
+        moveRaf = 0;
+      }
+      writeP(startP + (e.clientY - startY) / 300);
+      finish(startP);
     }
 
     const opts = { passive: false, capture: true } as const;
@@ -193,6 +227,8 @@ export function ProfilePage() {
     window.addEventListener("pointercancel", onPointerUp, opts);
     return () => {
       if (wheelTimer) clearTimeout(wheelTimer);
+      if (wheelRaf) cancelAnimationFrame(wheelRaf);
+      if (moveRaf) cancelAnimationFrame(moveRaf);
       window.removeEventListener("wheel", onWheel, opts);
       window.removeEventListener("pointerdown", onPointerDown, opts);
       window.removeEventListener("pointermove", onPointerMove, opts);
@@ -296,17 +332,30 @@ export function ProfilePage() {
 
   const name = nameDraft ?? profile.displayName;
 
+  const handleSaveName = () => {
+    const next = name.trim() || "pixel200p";
+    if (next !== profile.displayName) {
+      save.mutate(
+        { data: { displayName: next } },
+        { onSuccess: () => { setNameDraft(null); setEditingName(false); } }
+      );
+    } else {
+      setNameDraft(null);
+      setEditingName(false);
+    }
+  };
+
   return (
-    <div 
-      ref={containerRef} 
-      className="relative min-h-dvh w-full flex flex-col bg-background select-none overflow-x-hidden"
+    <div
+      ref={containerRef}
+      className="relative min-h-dvh w-full flex flex-col bg-background select-none overflow-x-hidden touch-pan-x"
       style={{
         "--p": 0,
         "--cover-clip": "calc((1 - var(--p)) * 67vh)",
       } as React.CSSProperties}
     >
       {/* 1. COVER LAYER */}
-      <div 
+      <div
         data-profile-gesture
         className="fixed inset-0 w-full h-full bg-[#4a5d4e] [contain:strict] will-change-[clip-path] touch-none"
         style={{
@@ -316,9 +365,9 @@ export function ProfilePage() {
         onDoubleClick={() => coverRef.current?.click()}
       >
         {profile.coverData ? (
-          <img 
-            src={profile.coverData} 
-            alt="Cover" 
+          <img
+            src={profile.coverData}
+            alt="Cover"
             decoding="async"
             fetchPriority="low"
             draggable={false}
@@ -333,7 +382,7 @@ export function ProfilePage() {
 
       <div className="h-[33vh] w-full shrink-0 pointer-events-none" aria-hidden />
 
-      {/* INPUTS */}
+      {/* INPUT FILE */}
       <input
         ref={coverRef}
         type="file"
@@ -363,7 +412,7 @@ export function ProfilePage() {
 
       {/* BACKDROP ĐÁY */}
       <div
-        className="fixed left-0 right-0 bottom-0 w-full h-[12.5vh] bg-background pointer-events-none z-[101]"
+        className="fixed left-0 right-0 bottom-0 w-full h-[12.5vh] bg-background pointer-events-none z-[101] will-change-opacity"
         style={{ opacity: "var(--p)" }}
       />
 
@@ -372,110 +421,109 @@ export function ProfilePage() {
         <div className={`w-full shrink-0 pointer-events-none ${isMobile ? "h-[8.5rem]" : "h-[5.5rem]"}`} aria-hidden />
 
         <div
-          className="fixed z-[110] left-4 max-w-[calc(100vw-2rem)] flex flex-col items-start shrink-0 pointer-events-none md:left-[16.5rem] md:flex-row md:items-end md:gap-4"
+          className="fixed z-[110] left-4 max-w-[calc(100vw-2rem)] flex flex-col items-start shrink-0 pointer-events-none md:left-[17.5rem] md:flex-row md:items-end md:gap-4"
           style={{
-            top: isMobile ? "calc(26vh - 3.25rem)" : "calc(33vh - 4.5rem)",
+            top: isMobile ? "calc(29vh - 3.25rem)" : "calc(33vh - 5rem)",
             gap: isMobile ? "0.35rem" : undefined,
           }}
         >
-          <div 
+          {/* KHỐI CHỨA CẢ AVATAR + TÊN (Mobile: flex-col | Desktop: flex-row) */}
+          <div
             data-profile-gesture
-            className="flex max-w-full flex-col items-start pointer-events-auto will-change-transform md:flex-row md:items-end md:gap-4"
+            className="flex max-w-full flex-col items-start gap-1.5 pointer-events-auto will-change-transform md:flex-row md:items-end md:gap-4"
             style={{
               transform: isMobile
-                ? "translate3d(calc(var(--p) * -0.75rem), calc(var(--p) * 50vh), 0) scale(calc(1 + var(--p) * 0.1))"
+                ? "translate3d(0, calc(var(--p) * 53vh), 0) scale(calc(1 + var(--p) * 0.2))"
                 : "translate3d(calc(var(--p) * -12.5rem), calc(var(--p) * (52vh - 6rem)), 0) scale(calc(1 + var(--p) * 1.2))",
               transformOrigin: "top left",
             }}
           >
-            {/* Avatar */}
-            <div
-              className={isMobile ? "relative shrink-0 w-[76px] h-[76px]" : "relative shrink-0 w-28 h-28 sm:w-32 sm:h-32"}
-              style={
-                isMobile
-                  ? {
-                      transform: "scale(calc(1 - var(--p) * 0.15))",
-                      transformOrigin: "left center"
-                    }
-                  : undefined
-              }
+            {/* AVATAR BUTTON */}
+            <button
+              type="button"
+              className="relative h-20 w-20 md:h-32 md:w-32 rounded-full border-4 border-background bg-muted overflow-hidden shrink-0 shadow-lg cursor-pointer group transition-transform active:scale-95"
+              onClick={() => avaRef.current?.click()}
+              title="Bấm để đổi avatar"
             >
-              <button
-                type="button"
-                onDoubleClick={() => avaRef.current?.click()}
-                className={isMobile ? "h-full w-full overflow-hidden rounded-full border-2 border-background bg-muted shadow-lg active:scale-95 transition-transform" : "h-full w-full overflow-hidden rounded-full border-4 border-background bg-muted shadow-lg active:scale-95 transition-transform"}
-                title="Nhấp đúp để đổi avatar"
-                style={isMobile ? { borderWidth: "2px" } : undefined}
-              >
-                {profile.avatarData ? (
-                  <img src={profile.avatarData} alt="Avatar" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="grid h-full place-items-center text-muted-foreground">
-                    <UserRound className={isMobile ? "h-8 w-8" : "h-12 w-12"} />
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Display Name */}
-            <div
-              className={isMobile ? "min-w-0 max-w-[calc(100vw-7rem)]" : "min-w-0 flex-1 pb-1"}
-              style={
-                isMobile 
-                  ? { 
-                      marginTop: "-0.15rem", 
-                      transform: "translate3d(0, calc(var(--p) * 0.35rem), 0)" 
-                    } 
-                  : undefined
-              }
-            >
-              {editingName ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const next = name.trim() || "pixel200p";
-                    save.mutate(
-                      { data: { displayName: next } },
-                      { onSuccess: () => { setNameDraft(null); setEditingName(false); } }
-                    );
-                  }}
-                >
-                  <Input
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    onBlur={() => {
-                      const next = name.trim() || "pixel200p";
-                      if (next !== profile.displayName) {
-                        save.mutate(
-                          { data: { displayName: next } },
-                          { onSuccess: () => { setNameDraft(null); setEditingName(false); } }
-                        );
-                      } else {
-                        setNameDraft(null);
-                        setEditingName(false);
-                      }
-                    }}
-                    className="max-w-sm text-2xl font-bold tracking-tight"
-                  />
-                </form>
+              {profile.avatarData ? (
+                <img
+                  src={profile.avatarData}
+                  alt="Avatar"
+                  className="h-full w-full object-cover"
+                />
               ) : (
-                <h1
-                  className={isMobile ? "cursor-text text-xl font-bold tracking-tight drop-shadow-md select-none text-foreground" : "cursor-text text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-md select-none text-foreground"}
-                  title="Nhấp đúp để đổi tên"
-                  onDoubleClick={() => setEditingName(true)}
-                  style={isMobile ? { lineHeight: 1.1, maxWidth: "100%" } : undefined}
-                >
-                  {profile.displayName}
-                </h1>
+                <div className="grid h-full w-full place-items-center bg-muted text-muted-foreground">
+                  <UserRound className="h-10 w-10" />
+                </div>
               )}
-            </div>
+            </button>
+
+            {/* DISPLAY NAME (MOBILE) - NẰM BÊN DƯỚI AVATAR */}
+            {isMobile && (
+              <div className="w-full min-w-0">
+                {editingName ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveName();
+                    }}
+                  >
+                    <Input
+                      autoFocus
+                      value={name}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      onBlur={handleSaveName}
+                      className="max-w-sm text-xl font-bold tracking-tight bg-background/80"
+                    />
+                  </form>
+                ) : (
+                  <h1
+                    className="cursor-text text-xl font-bold tracking-tight select-none text-foreground truncate"
+                    title="Nhấp đúp để đổi tên"
+                    onDoubleClick={() => setEditingName(true)}
+                    style={{ lineHeight: 1.1 }}
+                  >
+                    {profile.displayName}
+                  </h1>
+                )}
+              </div>
+            )}
+
+            {/* DISPLAY NAME (DESKTOP) - GIỮ NGUYÊN NẰM NGANG */}
+            {!isMobile && (
+              <div className="min-w-0 flex-1 pb-1">
+                {editingName ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveName();
+                    }}
+                  >
+                    <Input
+                      autoFocus
+                      value={name}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      onBlur={handleSaveName}
+                      className="max-w-sm text-2xl font-bold tracking-tight"
+                    />
+                  </form>
+                ) : (
+                  <h1
+                    className="cursor-text text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-md select-none text-foreground"
+                    title="Nhấp đúp để đổi tên"
+                    onDoubleClick={() => setEditingName(true)}
+                  >
+                    {profile.displayName}
+                  </h1>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* 3. CARDS GRID */}
-        <div 
-          className="relative z-50 mt-4 flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-transform"
+        <div
+          className="relative z-50 mt-4 flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-[opacity,transform]"
           style={{
             opacity: "calc(1 - var(--p) * 2.5)",
             transform: "translate3d(0, calc(var(--p) * 60px), 0)",
@@ -488,7 +536,7 @@ export function ProfilePage() {
               <CardTitle>Thống kê lệnh</CardTitle>
               <CardDesc className="mb-3">Tổng · không tính lệnh đã xóa</CardDesc>
             </div>
-            <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 space-y-3">
+            <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 space-y-3 overscroll-contain">
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-background/70 px-3 py-2">
                   <p className="text-[11px] text-muted-foreground">Đang mở</p>
@@ -510,7 +558,7 @@ export function ProfilePage() {
                 <div key={year} className="space-y-2 pt-1">
                   <button
                     type="button"
-                    className="flex w-full items-center gap-3 text-left"
+                    className="flex w-full items-center gap-3 text-left transition-colors hover:opacity-80"
                     onClick={() => setOpenYear((cur) => (cur === year ? null : year))}
                   >
                     <span className="rounded-xl border border-border bg-background/80 px-3 py-1.5 text-sm font-semibold tabular-nums">
@@ -519,7 +567,7 @@ export function ProfilePage() {
                     <span className="h-px min-w-0 flex-1 bg-border" />
                   </button>
                   {openYear === year && (
-                    <div className="space-y-2 pl-1">
+                    <div className="space-y-2 pl-1 animate-in fade-in-50 duration-200">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="rounded-lg bg-background/70 px-3 py-2">
                           <p className="text-[11px] text-muted-foreground">Đang mở</p>
@@ -575,7 +623,7 @@ export function ProfilePage() {
               <CardDesc className="mt-1">Ngày đầu tiên cán mốc · mới nhất trên cùng</CardDesc>
             </div>
 
-            <div data-profile-scroll className="flex-1 min-h-0 overflow-y-auto pr-1 mt-2">
+            <div data-profile-scroll className="flex-1 min-h-0 overflow-y-auto pr-1 mt-2 overscroll-contain">
               {marksPending && <p className="text-sm text-muted-foreground">Đang tính mốc…</p>}
               {!marksPending && timeline.length === 0 && (
                 <p className="text-sm text-muted-foreground">
