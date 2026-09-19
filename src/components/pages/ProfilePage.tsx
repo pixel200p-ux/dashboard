@@ -341,7 +341,54 @@ export function ProfilePage() {
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[15] bg-background"
         style={{ height: "calc(10vh + (1 - var(--p)) * 32vh)" }}
       />
-      <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const coverData = await readImage(f, 1920); save.mutate({ data: { coverData } }); }} />
+
+      {/* Avt + tên: ngoài khối transform → không bị che / cắt */}
+      <div
+        data-profile-hero
+        className="relative z-10 flex w-max max-w-[calc(100%-1rem)] items-end gap-3 px-4 pb-2 md:gap-4 md:pb-3 -mt-8 md:-mt-10 pointer-events-none will-change-transform"
+        style={{
+          transform: "scale(calc(1 + var(--p) * 0.5))",
+          transformOrigin: "left bottom",
+        }}
+      >
+        <button
+          type="button"
+          className="pointer-events-auto relative h-16 w-16 md:h-20 md:w-20 rounded-full border-2 border-background bg-muted overflow-hidden shrink-0 shadow-md transition-transform active:scale-95"
+          onClick={() => avaRef.current?.click()}
+        >
+          {profile.avatarData ? (
+            <img src={profile.avatarData} alt="Avatar" className="h-full w-full object-cover" />
+          ) : (
+            <div className="grid h-full w-full place-items-center">
+              <UserRound className="h-7 w-7 text-muted-foreground" />
+            </div>
+          )}
+        </button>
+
+        <div className="pointer-events-auto mb-1 min-w-0 max-w-[min(16rem,50vw)] shrink-0">
+          {editingName ? (
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}>
+              <Input
+                autoFocus
+                value={name}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={handleSaveName}
+                className="max-w-sm text-lg md:text-xl font-bold tracking-tight bg-background h-8 md:h-10"
+              />
+            </form>
+          ) : (
+            <h1
+              className="cursor-text text-xl md:text-2xl font-bold tracking-tight select-none text-foreground truncate drop-shadow-sm"
+              onDoubleClick={() => setEditingName(true)}
+            >
+              {profile.displayName}
+            </h1>
+          )}
+        </div>
+      </div>
+
+      <input ref={coverRef}
+       type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const coverData = await readImage(f, 1920); save.mutate({ data: { coverData } }); }} />
       <input ref={avaRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const avatarData = await readImage(f, 512); save.mutate({ data: { avatarData } }); }} />
 
       {/* 2. KHU VỰC CHỨA CÁC CARD VÀ NỀN TRẮNG CHUYỂN ĐỘNG */}
@@ -358,53 +405,6 @@ export function ProfilePage() {
             transform: "translate3d(0, calc(var(--p) * 60vh), 0)",
           }}
         >
-
-                    {/* NHÓM AVATAR VÀ TÊN — full: x1.5, neo góc trái; thanh trắng bên phải giữ nguyên */}
-                    <div
-            data-profile-hero
-            className="relative z-10 flex w-max max-w-[calc(100%-1rem)] items-end gap-3 px-4 pb-2 md:gap-4 md:px-8 md:pb-3 -mt-8 md:-mt-10 pointer-events-none will-change-transform"
-            style={{
-              transform: "scale(calc(1 + var(--p) * 0.5))",
-              transformOrigin: "left bottom",
-              marginLeft: "calc(var(--p) * -17rem)",
-            }}
-          >
-            <button
-              type="button"
-              className="pointer-events-auto relative h-16 w-16 md:h-20 md:w-20 rounded-full border-2 border-background bg-muted overflow-hidden shrink-0 shadow-md transition-transform active:scale-95"
-              onClick={() => avaRef.current?.click()}
-            >
-              {profile.avatarData ? (
-                <img src={profile.avatarData} alt="Avatar" className="h-full w-full object-cover" />
-              ) : (
-                <div className="grid h-full w-full place-items-center">
-                  <UserRound className="h-7 w-7 text-muted-foreground" />
-                </div>
-              )}
-            </button>
-
-            <div className="pointer-events-auto mb-1 min-w-0 max-w-[min(16rem,50vw)] shrink-0">
-              {editingName ? (
-                <form onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}>
-                  <Input
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    onBlur={handleSaveName}
-                    className="max-w-sm text-lg md:text-xl font-bold tracking-tight bg-background h-8 md:h-10"
-                  />
-                </form>
-              ) : (
-                <h1
-                  className="cursor-text text-xl md:text-2xl font-bold tracking-tight select-none text-foreground truncate drop-shadow-sm"
-                  onDoubleClick={() => setEditingName(true)}
-                >
-                  {profile.displayName}
-                </h1>
-              )}
-            </div>
-          </div>
-
           {/* CÁC CARD NỘI DUNG */}
           <div
             className="relative z-10 flex-1 px-4 md:px-8 mt-6 pb-6 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-opacity"

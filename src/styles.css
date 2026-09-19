@@ -358,6 +358,19 @@ html.dark {
 }
 
 /* Mobile only: tất cả chữ -2px. PC không đổi. */
+/* PC: avt cố định viewport, trên sidebar, sát trái khi full */
+@media (min-width: 768px) {
+  [data-profile-hero] {
+    position: fixed !important;
+    z-index: 80;
+    left: calc((1 - var(--p)) * 15rem);
+    bottom: calc(10vh + (1 - var(--p)) * 32vh);
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    padding-left: calc(1rem * (1 - var(--p)));
+  }
+}
+
 @media (max-width: 767px) {
   [data-profile-hero] {
     margin-left: 0 !important;
