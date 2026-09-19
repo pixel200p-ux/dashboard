@@ -335,17 +335,12 @@ export function ProfilePage() {
           <div className="grid h-full place-items-center text-sm text-white/80">Nhấp đúp chọn ảnh</div>
         )}
       </div>
-
-      {/* PC: Nền trắng phủ cột sidebar khi Cover bung full */}
+      {/* Thanh trắng đáy — full ngang, 15% khi full (PC + mobile) */}
       <div
         aria-hidden
-        className="pointer-events-none fixed bottom-0 left-0 z-[25] hidden w-60 bg-background md:block will-change-transform"
-        style={{
-          transform: "translate3d(0, calc(var(--p) * 50vh), 0)",
-          top: "33vh",
-        }}
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[15] bg-background"
+        style={{ height: "calc(15vh + (1 - var(--p)) * 52vh)" }}
       />
-
       <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const coverData = await readImage(f, 1920); save.mutate({ data: { coverData } }); }} />
       <input ref={avaRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const avatarData = await readImage(f, 512); save.mutate({ data: { avatarData } }); }} />
 
