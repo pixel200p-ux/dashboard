@@ -234,15 +234,20 @@ export function TxDialog() {
     if (isBank) {
       const name = bankName === "Khác" ? bankCustom.trim() : bankName;
       const p = parseVndAmount(bankPrincipal);
-      if (!name || p <= 0) return;
+      const parsedTerm = Number(bankTerm.trim());
+      const parsedRate = parseDecimal(bankRate.trim());
+
+      if (!name || p <= 0 || !bankTerm.trim() || !Number.isFinite(parsedTerm) || parsedTerm <= 0) return;
+      if (!bankRate.trim() || !Number.isFinite(parsedRate) || parsedRate < 0) return;
+
       bankMut.mutate(
         {
           data: {
             bankName: name,
             principal: p,
             startDate: date,
-            termMonths: Number(bankTerm) || 1,
-            interestRate: parseDecimal(bankRate),
+            termMonths: parsedTerm,
+            interestRate: parsedRate,
             autoRollover: bankRollover,
           },
         },
@@ -384,12 +389,12 @@ export function TxDialog() {
                 </div>
                 <div className="space-y-1">
                   <Label>Kỳ hạn (tháng)</Label>
-                  <Input value={bankTerm} onChange={(e) => setBankTerm(e.target.value)} placeholder="..." />
+                  <Input value={bankTerm} onChange={(e) => setBankTerm(e.target.value)} placeholder="..." required />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label>Lãi suất (%/năm)</Label>
-                <Input value={bankRate} onChange={(e) => setBankRate(e.target.value)} placeholder="..." />
+                <Input value={bankRate} onChange={(e) => setBankRate(e.target.value)} placeholder="..." required />
               </div>
               <div className="flex items-center justify-between gap-3">
                 <Label>Tự động tái tục</Label>

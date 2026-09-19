@@ -3,6 +3,8 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { replayPortfolio } from "@/engine/replay";
 import { todayVnYmd } from "@/engine/dates";
+import { resolveRefreshPrice } from "@/lib/market-refresh.js";
+import { fetchFmarketDcdsNav } from "@/lib/api/fmarket";
 import { n } from "./map";
 import { mapAccount, mapAsset, mapBank, mapBankRate, mapCapital, mapFee, mapMatch, mapTx } from "./map";
 import type { LedgerSnapshot } from "@/engine/types";
@@ -170,6 +172,7 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
     const sql = await getSql();
     const ledger = await loadSnapshot();
     const notes: string[] = [];
+    const status: Record<string, { ok: boolean; label: string; detail?: string }> = {};
 
     const usd = await fetchUsdVnd();
     if (usd && usd > 0) {
@@ -178,8 +181,10 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
         on conflict (key) do update set value = excluded.value, updated_at = now()
       `;
       notes.push(`USD/VND ${usd.toLocaleString("vi-VN")}`);
+      status.usdVnd = { ok: true, label: "USD/VND", detail: usd.toLocaleString("vi-VN") };
     } else {
       notes.push("Không lấy được tỷ giá USD/VND");
+      status.usdVnd = { ok: false, label: "USD/VND", detail: "lỗi tỷ giá" };
     }
 
     const cryptoSyms = ledger.assets.filter((a) => a.assetType === "CRYPTO").map((a) => a.symbol);
@@ -187,19 +192,49 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
       .filter((a) => a.assetType === "STOCK" || a.assetType === "ETF")
       .map((a) => a.symbol);
 
-    const [cryptoPx, stockPx] = await Promise.all([fetchCrypto(cryptoSyms), fetchVnStocks(stockSyms)]);
+    const [cryptoPx, stockPx, dcdsNav] = await Promise.all([
+      fetchCrypto(cryptoSyms),
+      fetchVnStocks(stockSyms),
+      fetchFmarketDcdsNav(),
+    ]);
+
+    const stockEtfCount = Object.keys(stockPx ?? {}).length;
+    const cryptoCount = Object.keys(cryptoPx ?? {}).length;
+    const hasStocks = stockSyms.length > 0;
+    const hasCrypto = cryptoSyms.length > 0;
+
+    status.stockEtf = {
+      ok: !hasStocks || stockEtfCount > 0,
+      label: "Stock/ETF",
+      detail: hasStocks ? `${stockEtfCount} mã cập nhật` : "không có mã cần cập nhật",
+    };
+    status.crypto = {
+      ok: !hasCrypto || cryptoCount > 0,
+      label: "Crypto",
+      detail: hasCrypto ? `${cryptoCount} mã cập nhật` : "không có mã cần cập nhật",
+    };
+    status.dcds = {
+      ok: Boolean(dcdsNav),
+      label: "DCDS",
+      detail: dcdsNav ? `${dcdsNav.code ?? "DCDS"} ${dcdsNav.nav.toLocaleString("vi-VN")}` : "Fmarket timeout",
+    };
+
     let updated = 0;
     for (const a of ledger.assets) {
-      let px: number | undefined;
-      if (a.assetType === "CRYPTO") px = cryptoPx[a.symbol];
-      else if (a.assetType === "STOCK" || a.assetType === "ETF") px = stockPx[a.symbol];
+      let px = resolveRefreshPrice(a, stockPx, cryptoPx);
+      if (a.assetType === "DCDS" && dcdsNav) {
+        px = dcdsNav.nav;
+      }
       if (px && px > 0) {
         await sql`update assets set current_price = ${px}, price_updated_at = now() where id = ${a.id}`;
         updated += 1;
       }
     }
+    if (dcdsNav) {
+      notes.push(`DCDS ${dcdsNav.code ?? "DCDS"} ${dcdsNav.nav.toLocaleString("vi-VN")}`);
+    }
     notes.push(`Đã cập nhật ${updated} mã`);
     await writeDailySnapshot(todayVnYmd());
     const next = await loadSnapshot();
-    return { ledger: next, state: replayPortfolio(next), notes };
+    return { ledger: next, state: replayPortfolio(next), notes, status };
   });

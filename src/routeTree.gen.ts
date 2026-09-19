@@ -22,6 +22,7 @@ import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppStockRouteImport } from './routes/_app/stock'
 import { Route as AppTplusRouteImport } from './routes/_app/tplus'
+import { Route as ApiDcdsNavRouteImport } from './routes/api/dcds-nav'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const AppRoute = AppRouteImport.update({
@@ -88,6 +89,11 @@ const AppTplusRoute = AppTplusRouteImport.update({
   path: '/tplus',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiDcdsNavRoute = ApiDcdsNavRouteImport.update({
+  id: '/api/dcds-nav',
+  path: '/api/dcds-nav',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/stock': typeof AppStockRoute
   '/tplus': typeof AppTplusRoute
+  '/api/dcds-nav': typeof ApiDcdsNavRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/stock': typeof AppStockRoute
   '/tplus': typeof AppTplusRoute
+  '/api/dcds-nav': typeof ApiDcdsNavRoute
   '/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/stock': typeof AppStockRoute
   '/_app/tplus': typeof AppTplusRoute
+  '/api/dcds-nav': typeof ApiDcdsNavRoute
   '/_app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stock'
     | '/tplus'
+    | '/api/dcds-nav'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stock'
     | '/tplus'
+    | '/api/dcds-nav'
     | '/'
     | '/api/auth/$'
   id:
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/stock'
     | '/_app/tplus'
+    | '/api/dcds-nav'
     | '/_app/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -193,6 +205,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiDcdsNavRoute: typeof ApiDcdsNavRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -289,6 +302,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTplusRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/dcds-nav': {
+      id: '/api/dcds-nav'
+      path: '/api/dcds-nav'
+      fullPath: '/api/dcds-nav'
+      preLoaderRoute: typeof ApiDcdsNavRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -332,6 +352,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiDcdsNavRoute: ApiDcdsNavRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

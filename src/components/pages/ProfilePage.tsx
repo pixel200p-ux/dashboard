@@ -49,9 +49,26 @@ export function ProfilePage() {
   const decor = useUiStore((s) => s.profileDecor);
   const setDecor = useUiStore((s) => s.setProfileDecor);
 
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.innerWidth < 640 : false);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [kindFilter, setKindFilter] = useState("ALL");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const update = () => setIsMobile(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener("change", update);
+    window.addEventListener("resize", update);
+
+    return () => {
+      mediaQuery.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
 
   const target = Math.max(0, Math.min(1, Number(decor) || 0));
   const pRef = useRef(0);
@@ -88,47 +105,71 @@ export function ProfilePage() {
       return Boolean(el.closest("[data-profile-scroll]"));
     }
 
-        function onWheel(e: WheelEvent) {
-      if (isInsideCardScroll(e.target)) return;
+    function isInsideHeroGesture(el: EventTarget | null): boolean {
+      if (!(el instanceof Element)) return false;
+      return Boolean(el.closest("[data-profile-gesture]"));
+    }
+
+    function onWheel(e: WheelEvent) {
+      if (!isInsideHeroGesture(e.target) || isInsideCardScroll(e.target)) return;
 
       const cur = Math.max(0, Math.min(1, Number(useUiStore.getState().profileDecor) || 0));
-      // Ở 0 chỉ cho cuộn xuống (tăng p), ở 1 chỉ cho cuộn lên (giảm p)
-      if (cur <= 0 && e.deltaY < 0) return;
-      if (cur >= 1 && e.deltaY > 0) return;
+      // Đảo lại: cuộn lên mở cover, cuộn xuống đóng cover.
+      if (cur <= 0 && e.deltaY > 0) return;
+      if (cur >= 1 && e.deltaY < 0) return;
 
       e.preventDefault();
-      // Trở lại cảm giác cũ: chỉ nhích nhỏ là ảnh đã full gần hết
-      const step = Math.sign(e.deltaY) * 0.45;
+      const step = -Math.sign(e.deltaY) * 0.45;
       const next = Math.max(0, Math.min(1, cur + step));
       setDecor(next);
     }
 
     let startY = 0;
+    let activeGesture = false;
+
     function onTouchStart(e: TouchEvent) {
+      if (!isInsideHeroGesture(e.target)) {
+        activeGesture = false;
+        startY = 0;
+        return;
+      }
+
+      activeGesture = true;
       startY = e.touches[0]?.clientY ?? 0;
     }
+
     function onTouchMove(e: TouchEvent) {
-      if (isInsideCardScroll(e.target)) return;
+      if (!activeGesture || !isInsideHeroGesture(e.target) || isInsideCardScroll(e.target)) return;
 
       const y = e.touches[0]?.clientY ?? 0;
       const dy = startY - y;
       startY = y;
       const cur = Math.max(0, Math.min(1, Number(useUiStore.getState().profileDecor) || 0));
-      if (cur <= 0 && dy <= 0) return;
+      if (cur <= 0 && dy >= 0) return;
+      if (cur >= 1 && dy <= 0) return;
 
       e.preventDefault();
-      const next = Math.max(0, Math.min(1, cur + dy / 20));
+      const next = Math.max(0, Math.min(1, cur - dy / 20));
       setDecor(next);
+    }
+
+    function onTouchEnd() {
+      activeGesture = false;
+      startY = 0;
     }
 
     const opts = { passive: false, capture: true } as const;
     window.addEventListener("wheel", onWheel, opts);
     window.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
     window.addEventListener("touchmove", onTouchMove, opts);
+    window.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
+    window.addEventListener("touchcancel", onTouchEnd, { passive: true, capture: true });
     return () => {
       window.removeEventListener("wheel", onWheel, opts);
       window.removeEventListener("touchstart", onTouchStart, true);
       window.removeEventListener("touchmove", onTouchMove, opts);
+      window.removeEventListener("touchend", onTouchEnd, true);
+      window.removeEventListener("touchcancel", onTouchEnd, true);
     };
   }, [setDecor]);
 
@@ -230,11 +271,14 @@ export function ProfilePage() {
   if (isPending || !profile) return <Skeleton className="h-96" />;
 
   const name = nameDraft ?? profile.displayName;
+  const mobileFull = isMobile && target > 0.55;
+  const mobileHeroTop = `calc(${26 + target * 42}vh - 3.25rem)`;
+  const mobileAvatarSize = isMobile ? 76 - target * 12 : undefined;
 
   return (
     <div 
       ref={containerRef} 
-      className="relative h-dvh max-h-dvh w-full flex flex-col bg-background select-none overflow-hidden"
+      className="relative min-h-dvh w-full flex flex-col bg-background select-none overflow-x-hidden"
       style={{
         "--p": 0,
         // Dùng clip-path inset để mở rộng/thu hẹp Cover mà KHÔNG gây Reflow
@@ -243,6 +287,7 @@ export function ProfilePage() {
     >
       {/* 1. COVER LAYER: Cố định 100vh, cắt chiều cao bằng clip-path (GPU-accelerated) */}
       <div 
+        data-profile-gesture
         className="fixed inset-0 w-full h-full bg-[#4a5d4e] will-change-transform"
         style={{
           clipPath: "inset(0 0 var(--cover-clip) 0)",
@@ -303,36 +348,51 @@ export function ProfilePage() {
 
       {/* 2. PROFILE HERO INFO */}
       <div className="relative flex-1 flex flex-col px-4 md:px-8 pb-4 min-h-0">
-        <div className="h-[5.5rem] w-full shrink-0 pointer-events-none" aria-hidden />
+        <div className={`w-full shrink-0 pointer-events-none ${isMobile ? "h-[8.5rem]" : "h-[5.5rem]"}`} aria-hidden />
 
-        <div className="fixed z-[110] top-[calc(33vh-4.5rem)] left-4 md:left-[16.5rem] flex flex-col sm:flex-row items-start sm:items-end gap-4 shrink-0 pointer-events-none">
+        <div
+          className="fixed z-[110] left-4 max-w-[calc(100vw-2rem)] flex flex-col items-start shrink-0 pointer-events-none md:left-[16.5rem] md:flex-row md:items-end md:gap-4"
+          style={{
+            top: isMobile ? (mobileFull ? "calc(100vh - 22vh)" : mobileHeroTop) : "calc(33vh - 4.5rem)",
+            gap: isMobile ? "0.35rem" : undefined,
+          }}
+        >
           <div 
-            className="flex flex-col sm:flex-row items-start sm:items-end gap-4 pointer-events-auto will-change-transform"
+            data-profile-gesture
+            className="flex max-w-full flex-col items-start pointer-events-auto will-change-transform md:flex-row md:items-end md:gap-4"
             style={{
-              transform: `translate3d(calc(var(--p) * -12.5rem), calc(var(--p) * (52vh - 6rem)), 0) scale(calc(1 + var(--p) * 1.2))`,
+              transform: isMobile
+                ? (mobileFull
+                    ? `translate3d(0, 0, 0) scale(${1 + target * 0.08})`
+                    : `translate3d(${target * -0.75}rem, calc(var(--p) * 8vh), 0) scale(${1 + target * 0.1})`)
+                : `translate3d(calc(var(--p) * -12.5rem), calc(var(--p) * (52vh - 6rem)), 0) scale(calc(1 + var(--p) * 1.2))`,
               transformOrigin: "top left",
             }}
           >
             {/* Avatar */}
-            <div className="relative shrink-0 w-28 h-28 sm:w-32 sm:h-32">
+            <div
+              className={isMobile ? "relative shrink-0" : "relative shrink-0 w-28 h-28 sm:w-32 sm:h-32"}
+              style={isMobile ? { width: `${mobileAvatarSize ?? 76}px`, height: `${mobileAvatarSize ?? 76}px`, marginBottom: mobileFull ? "0" : undefined } : undefined}
+            >
               <button
                 type="button"
                 onDoubleClick={() => avaRef.current?.click()}
-                className="h-full w-full overflow-hidden rounded-full border-4 border-background bg-muted shadow-lg active:scale-95 transition-transform"
+                className={isMobile ? "h-full w-full overflow-hidden rounded-full border-2 border-background bg-muted shadow-lg active:scale-95 transition-transform" : "h-full w-full overflow-hidden rounded-full border-4 border-background bg-muted shadow-lg active:scale-95 transition-transform"}
                 title="Nhấp đúp để đổi avatar"
+                style={isMobile ? { borderWidth: "2px" } : undefined}
               >
                 {profile.avatarData ? (
                   <img src={profile.avatarData} alt="Avatar" className="h-full w-full object-cover" />
                 ) : (
                   <span className="grid h-full place-items-center text-muted-foreground">
-                    <UserRound className="h-12 w-12" />
+                    <UserRound className={isMobile ? "h-8 w-8" : "h-12 w-12"} />
                   </span>
                 )}
               </button>
             </div>
 
             {/* Display Name */}
-            <div className="min-w-0 flex-1 pb-1">
+            <div className={isMobile ? "min-w-0 max-w-[calc(100vw-7rem)]" : "min-w-0 flex-1 pb-1"} style={isMobile ? { marginTop: mobileFull ? "0.2rem" : "-0.15rem" } : undefined}>
               {editingName ? (
                 <form
                   onSubmit={(e) => {
@@ -365,9 +425,10 @@ export function ProfilePage() {
                 </form>
               ) : (
                 <h1
-                  className="cursor-text text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-md select-none text-foreground"
+                  className={isMobile ? "cursor-text text-xl font-bold tracking-tight drop-shadow-md select-none text-foreground" : "cursor-text text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-md select-none text-foreground"}
                   title="Nhấp đúp để đổi tên"
                   onDoubleClick={() => setEditingName(true)}
+                  style={isMobile ? { lineHeight: 1.1, marginTop: target > 0.35 ? "0.2rem" : "0", maxWidth: "100%" } : undefined}
                 >
                   {profile.displayName}
                 </h1>

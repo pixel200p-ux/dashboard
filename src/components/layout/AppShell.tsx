@@ -30,6 +30,7 @@ import { refreshMarketPrices } from "@/lib/api/prices";
 import { useQueryClient } from "@tanstack/react-query";
 import { PORTFOLIO_KEY, usePortfolio } from "@/lib/use-portfolio";
 import { toast } from "sonner";
+import { summarizeMarketStatus } from "@/lib/market-status.js";
 import { TxDialog } from "@/components/forms/TxDialog";
 import { CapitalDialog } from "@/components/forms/CapitalDialog";
 import { BankDialog } from "@/components/forms/BankDialog";
@@ -112,7 +113,21 @@ export function AppShell() {
     try {
       const res = await refreshMarketPrices();
       qc.setQueryData(PORTFOLIO_KEY, { ledger: res.ledger, state: res.state });
-      toast.success(res.notes.join(" · "));
+
+      const entries = Object.values(res.status ?? {});
+      if (entries.length > 0) {
+        for (const entry of entries) {
+          const msg = `${entry.label}: ${entry.ok ? "thành công" : "thất bại"}${entry.detail ? ` (${entry.detail})` : ""}`;
+          if (entry.ok) {
+            toast.success(msg);
+          } else {
+            toast.warning(msg);
+          }
+        }
+      } else {
+        const summary = res.notes.join(" · ");
+        toast.success(summary || "Cập nhật giá xong");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Không cập nhật được giá");
     } finally {
@@ -200,24 +215,25 @@ export function AppShell() {
             <aside
         className={cn(
           "fixed inset-y-0 left-0 flex w-60 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground transition-[width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-          mobile ? "translate-x-0 shadow-2xl" : "max-md:-translate-x-full"
+          mobile ? "translate-x-0 shadow-2xl" : "max-md:-translate-x-full",
+          !mobile && "md:inset-y-0"
         )}
         style={
           decor > 0.01
             ? {
                 // Khi phóng to: z thấp hơn cover (45) → ảnh nền phủ lên
                 // Khi thu nhỏ: z cao (50) → sidebar nằm trên, không bị đè
-                zIndex: decor > 0.08 ? 35 : 50,
+                zIndex: mobile ? (pathname.startsWith("/profile") ? 140 : 80) : decor > 0.08 ? 35 : 50,
                 width: `calc(15rem * ${1 - Math.min(1, decor * 1.4)})`,
                 minWidth: 0,
                 overflow: "hidden",
                 opacity: Math.max(0, 1 - decor * 1.6),
-                transform: `translateX(${-18 * decor}%)`,
+                transform: mobile ? "translateX(0)" : `translateX(${-18 * decor}%)`,
                 pointerEvents: decor > 0.2 ? "none" : "auto",
                 borderColor: decor > 0.4 ? "transparent" : undefined,
               }
             : {
-                zIndex: 50,
+                zIndex: mobile ? (pathname.startsWith("/profile") ? 140 : 80) : 50,
               }
         }
       >
@@ -273,37 +289,54 @@ export function AppShell() {
 
       <div className="md:pl-60">
         {pathname.startsWith("/profile") ? (
-          <div
-            className="pointer-events-none fixed top-0 right-0 z-[90] md:left-60"
-            style={{
-              transform: `translateY(${-120 * decor}%)`,
-              opacity: 1 - decor,
-            }}
-          >
+          <>
             <div
-              className="ml-auto flex h-14 w-fit items-center gap-1 px-3 sm:gap-2 md:px-6"
-              style={{ pointerEvents: decor > 0.2 ? "none" : "auto" }}
+              className="pointer-events-none fixed left-0 top-0 z-[90] md:left-60"
+              style={{
+                transform: `translateY(${-120 * decor}%)`,
+                opacity: 1 - decor,
+              }}
             >
-              <button
-                className="grid h-10 w-10 place-items-center rounded-md bg-background/70 hover:bg-muted md:hidden"
-                onClick={() => setMobile(true)}
-                aria-label="Menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <HeaderActions />
+              <div className="flex h-14 items-center px-3 md:px-6" style={{ pointerEvents: decor > 0.2 ? "none" : "auto" }}>
+                {!mobile && (
+                  <button
+                    className="grid h-10 w-10 place-items-center rounded-md bg-background/70 hover:bg-muted md:hidden"
+                    onClick={() => setMobile(true)}
+                    aria-label="Menu"
+                  >
+                    <Menu className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+
+            <div
+              className="pointer-events-none fixed right-0 top-0 z-[90] md:left-60"
+              style={{
+                transform: `translateY(${-120 * decor}%)`,
+                opacity: 1 - decor,
+              }}
+            >
+              <div
+                className="ml-auto flex h-14 w-fit items-center gap-1 px-3 sm:gap-2 md:px-6"
+                style={{ pointerEvents: decor > 0.2 ? "none" : "auto" }}
+              >
+                <HeaderActions />
+              </div>
+            </div>
+          </>
         ) : (
           <header className="sticky top-0 z-50 flex h-14 items-center justify-between gap-2 border-b bg-background/90 px-3 backdrop-blur md:px-6">
             <div className="flex items-center gap-2">
-              <button
-                className="grid h-10 w-10 place-items-center rounded-md hover:bg-muted md:hidden"
-                onClick={() => setMobile(true)}
-                aria-label="Menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
+              {!mobile && (
+                <button
+                  className="grid h-10 w-10 place-items-center rounded-md hover:bg-muted md:hidden"
+                  onClick={() => setMobile(true)}
+                  aria-label="Menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+              )}
               <span className="hidden text-sm font-semibold sm:inline">Portfolio Manager</span>
             </div>
 
@@ -325,7 +358,7 @@ export function AppShell() {
           className={cn(
             "min-w-0",
             pathname.startsWith("/profile")
-              ? "h-dvh max-h-dvh overflow-hidden p-0"
+              ? "min-h-dvh overflow-x-hidden overflow-y-auto p-0"
               : pathname.startsWith("/calendar")
                 ? "overflow-x-hidden p-3 pb-4 lg:flex lg:h-[calc(100dvh-3.5rem)] lg:max-h-[calc(100dvh-3.5rem)] lg:overflow-hidden lg:p-6"
                 : "overflow-x-hidden p-3 pb-4 md:p-6",
