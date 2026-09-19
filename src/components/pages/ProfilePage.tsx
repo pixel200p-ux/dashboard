@@ -73,16 +73,16 @@ export function ProfilePage() {
   const target = Math.max(0, Math.min(1, Number(decor) || 0));
   const pRef = useRef(0);
 
-  // 1. ENGINE ANIMATION DIRECT DOM (Chỉ ghi đè CSS Variable qua direct ref)
+  // 1. ENGINE
   useEffect(() => {
     let raf = 0;
-    const k = 0.16;
+    const k = 0.22;
 
     function tick() {
       const cur = pRef.current;
       const diff = target - cur;
 
-      if (Math.abs(diff) < 0.0005) {
+      if (Math.abs(diff) < 0.001) {
         pRef.current = target;
         containerRef.current?.style.setProperty("--p", target.toFixed(4));
         return;
@@ -98,7 +98,7 @@ export function ProfilePage() {
     return () => cancelAnimationFrame(raf);
   }, [target]);
 
-  // 2. XỬ LÝ GESTURE MƯỢT CHO CẢ TRACKPAD VÀ CHUỘT
+  // 2. GESTURE (FIXED FOR MOBILE UNTHROTTLE & SNAP)
   useEffect(() => {
     function isInsideCardScroll(el: EventTarget | null): boolean {
       if (!(el instanceof Element)) return false;
@@ -110,52 +110,76 @@ export function ProfilePage() {
       return Boolean(el.closest("[data-profile-gesture]"));
     }
 
+    function writeP(next: number) {
+      const v = Math.max(0, Math.min(1, next));
+      pRef.current = v;
+      containerRef.current?.style.setProperty("--p", v.toFixed(4));
+      return v;
+    }
+
+    let wheelTimer: ReturnType<typeof setTimeout> | null = null;
+
     function onWheel(e: WheelEvent) {
       if (!isInsideHeroGesture(e.target) || isInsideCardScroll(e.target)) return;
 
-      const cur = Math.max(0, Math.min(1, Number(useUiStore.getState().profileDecor) || 0));
-      // Đảo lại: cuộn lên mở cover, cuộn xuống đóng cover.
+      const cur = pRef.current;
       if (cur <= 0 && e.deltaY > 0) return;
       if (cur >= 1 && e.deltaY < 0) return;
 
       e.preventDefault();
-      const step = -Math.sign(e.deltaY) * 0.45;
-      const next = Math.max(0, Math.min(1, cur + step));
-      setDecor(next);
+      const step = -Math.sign(e.deltaY) * 0.28;
+      const next = writeP(cur + step);
+
+      if (wheelTimer) clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => setDecor(next), 80);
     }
 
     let startY = 0;
+    let startP = 0;
     let activeGesture = false;
 
     function onTouchStart(e: TouchEvent) {
-      if (!isInsideHeroGesture(e.target)) {
+      if (isInsideCardScroll(e.target)) {
         activeGesture = false;
-        startY = 0;
+        return;
+      }
+
+      // Khi cover đang mở rộng (p > 0.1), cho phép vuốt ở bất kỳ đâu trên viewport ngoại trừ phần scroll card
+      const cur = pRef.current;
+      if (!isInsideHeroGesture(e.target) && cur < 0.1) {
+        activeGesture = false;
         return;
       }
 
       activeGesture = true;
       startY = e.touches[0]?.clientY ?? 0;
+      startP = cur;
     }
 
     function onTouchMove(e: TouchEvent) {
-      if (!activeGesture || !isInsideHeroGesture(e.target) || isInsideCardScroll(e.target)) return;
+      if (!activeGesture || isInsideCardScroll(e.target)) return;
 
       const y = e.touches[0]?.clientY ?? 0;
-      const dy = startY - y;
-      startY = y;
-      const cur = Math.max(0, Math.min(1, Number(useUiStore.getState().profileDecor) || 0));
-      if (cur <= 0 && dy >= 0) return;
-      if (cur >= 1 && dy <= 0) return;
+      const deltaY = startY - y; // Vuốt lên => deltaY > 0, Vuốt xuống => deltaY < 0
 
-      e.preventDefault();
-      const next = Math.max(0, Math.min(1, cur - dy / 20));
-      setDecor(next);
+      // Quy đổi khoảng cách vuốt (px) ra tỷ lệ --p
+      // Vuốt xuống (deltaY < 0) làm tăng p (mở rộng Cover)
+      // Vuốt lên (deltaY > 0) làm giảm p (thu gọn Cover)
+      const sensitivity = 260; // Số px cần vuốt để đi hết từ 0 -> 1
+      const nextP = startP - (deltaY / sensitivity);
+
+      if (e.cancelable) e.preventDefault();
+      writeP(nextP);
     }
 
     function onTouchEnd() {
+      if (!activeGesture) return;
       activeGesture = false;
-      startY = 0;
+
+      // Snap thông minh: nếu p > 0.4 thì bung hết (1), ngược lại thu gọn về (0)
+      const snapped = pRef.current >= 0.4 ? 1 : 0;
+      writeP(snapped);
+      setDecor(snapped);
     }
 
     const opts = { passive: false, capture: true } as const;
@@ -165,6 +189,7 @@ export function ProfilePage() {
     window.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
     window.addEventListener("touchcancel", onTouchEnd, { passive: true, capture: true });
     return () => {
+      if (wheelTimer) clearTimeout(wheelTimer);
       window.removeEventListener("wheel", onWheel, opts);
       window.removeEventListener("touchstart", onTouchStart, true);
       window.removeEventListener("touchmove", onTouchMove, opts);
@@ -177,7 +202,7 @@ export function ProfilePage() {
     return () => setDecor(0);
   }, [setDecor]);
 
-    type TxStat = {
+  type TxStat = {
     open: number;
     closed: number;
     buys: number;
@@ -271,9 +296,6 @@ export function ProfilePage() {
   if (isPending || !profile) return <Skeleton className="h-96" />;
 
   const name = nameDraft ?? profile.displayName;
-  const mobileFull = isMobile && target > 0.55;
-  const mobileHeroTop = `calc(${26 + target * 42}vh - 3.25rem)`;
-  const mobileAvatarSize = isMobile ? 76 - target * 12 : undefined;
 
   return (
     <div 
@@ -281,19 +303,16 @@ export function ProfilePage() {
       className="relative min-h-dvh w-full flex flex-col bg-background select-none overflow-x-hidden"
       style={{
         "--p": 0,
-        // Dùng clip-path inset để mở rộng/thu hẹp Cover mà KHÔNG gây Reflow
         "--cover-clip": "calc((1 - var(--p)) * 67vh)",
       } as React.CSSProperties}
     >
-      {/* 1. COVER LAYER: Cố định 100vh, cắt chiều cao bằng clip-path (GPU-accelerated) */}
+      {/* 1. COVER LAYER */}
       <div 
         data-profile-gesture
-        className="fixed inset-0 w-full h-full bg-[#4a5d4e] will-change-transform"
+        className="fixed inset-0 w-full h-full bg-[#4a5d4e] [contain:strict] will-change-[clip-path] touch-none"
         style={{
           clipPath: "inset(0 0 var(--cover-clip) 0)",
-          // Thu nhỏ (p thấp) → z thấp hơn sidebar → sidebar không bị đè
-          // Phóng to (p cao) → z cao hơn sidebar → ảnh nền phủ lên sidebar
-          zIndex: target > 0.08 ? 45 : 30,
+          zIndex: 40,
         }}
         onDoubleClick={() => coverRef.current?.click()}
       >
@@ -301,7 +320,10 @@ export function ProfilePage() {
           <img 
             src={profile.coverData} 
             alt="Cover" 
-            className="h-full w-full object-cover object-center" 
+            decoding="async"
+            fetchPriority="low"
+            draggable={false}
+            className="h-full w-full object-cover object-center pointer-events-none select-none [transform:translateZ(0)]"
           />
         ) : (
           <div className="grid h-full place-items-center text-sm text-white/80">
@@ -353,7 +375,7 @@ export function ProfilePage() {
         <div
           className="fixed z-[110] left-4 max-w-[calc(100vw-2rem)] flex flex-col items-start shrink-0 pointer-events-none md:left-[16.5rem] md:flex-row md:items-end md:gap-4"
           style={{
-            top: isMobile ? (mobileFull ? "calc(100vh - 22vh)" : mobileHeroTop) : "calc(33vh - 4.5rem)",
+            top: isMobile ? "calc(26vh - 3.25rem)" : "calc(33vh - 4.5rem)",
             gap: isMobile ? "0.35rem" : undefined,
           }}
         >
@@ -362,17 +384,22 @@ export function ProfilePage() {
             className="flex max-w-full flex-col items-start pointer-events-auto will-change-transform md:flex-row md:items-end md:gap-4"
             style={{
               transform: isMobile
-                ? (mobileFull
-                    ? `translate3d(0, 0, 0) scale(${1 + target * 0.08})`
-                    : `translate3d(${target * -0.75}rem, calc(var(--p) * 8vh), 0) scale(${1 + target * 0.1})`)
-                : `translate3d(calc(var(--p) * -12.5rem), calc(var(--p) * (52vh - 6rem)), 0) scale(calc(1 + var(--p) * 1.2))`,
+                ? "translate3d(calc(var(--p) * -0.75rem), calc(var(--p) * 50vh), 0) scale(calc(1 + var(--p) * 0.1))"
+                : "translate3d(calc(var(--p) * -12.5rem), calc(var(--p) * (52vh - 6rem)), 0) scale(calc(1 + var(--p) * 1.2))",
               transformOrigin: "top left",
             }}
           >
             {/* Avatar */}
             <div
-              className={isMobile ? "relative shrink-0" : "relative shrink-0 w-28 h-28 sm:w-32 sm:h-32"}
-              style={isMobile ? { width: `${mobileAvatarSize ?? 76}px`, height: `${mobileAvatarSize ?? 76}px`, marginBottom: mobileFull ? "0" : undefined } : undefined}
+              className={isMobile ? "relative shrink-0 w-[76px] h-[76px]" : "relative shrink-0 w-28 h-28 sm:w-32 sm:h-32"}
+              style={
+                isMobile
+                  ? {
+                      transform: "scale(calc(1 - var(--p) * 0.15))",
+                      transformOrigin: "left center"
+                    }
+                  : undefined
+              }
             >
               <button
                 type="button"
@@ -392,7 +419,17 @@ export function ProfilePage() {
             </div>
 
             {/* Display Name */}
-            <div className={isMobile ? "min-w-0 max-w-[calc(100vw-7rem)]" : "min-w-0 flex-1 pb-1"} style={isMobile ? { marginTop: mobileFull ? "0.2rem" : "-0.15rem" } : undefined}>
+            <div
+              className={isMobile ? "min-w-0 max-w-[calc(100vw-7rem)]" : "min-w-0 flex-1 pb-1"}
+              style={
+                isMobile 
+                  ? { 
+                      marginTop: "-0.15rem", 
+                      transform: "translate3d(0, calc(var(--p) * 0.35rem), 0)" 
+                    } 
+                  : undefined
+              }
+            >
               {editingName ? (
                 <form
                   onSubmit={(e) => {
@@ -428,7 +465,7 @@ export function ProfilePage() {
                   className={isMobile ? "cursor-text text-xl font-bold tracking-tight drop-shadow-md select-none text-foreground" : "cursor-text text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-md select-none text-foreground"}
                   title="Nhấp đúp để đổi tên"
                   onDoubleClick={() => setEditingName(true)}
-                  style={isMobile ? { lineHeight: 1.1, marginTop: target > 0.35 ? "0.2rem" : "0", maxWidth: "100%" } : undefined}
+                  style={isMobile ? { lineHeight: 1.1, maxWidth: "100%" } : undefined}
                 >
                   {profile.displayName}
                 </h1>
@@ -439,72 +476,72 @@ export function ProfilePage() {
 
         {/* 3. CARDS GRID */}
         <div 
-          className="mt-4 flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-transform"
+          className="relative z-50 mt-4 flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-transform"
           style={{
             opacity: "calc(1 - var(--p) * 2.5)",
             transform: "translate3d(0, calc(var(--p) * 60px), 0)",
-            pointerEvents: target > 0.3 ? "none" : "auto",
+            pointerEvents: "auto",
           }}
         >
           {/* Card 1: Thống kê */}
           <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5">
-                  <div className="shrink-0">
-        <CardTitle>Thống kê lệnh</CardTitle>
-        <CardDesc className="mb-3">Tổng · không tính lệnh đã xóa</CardDesc>
-      </div>
-      <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 space-y-3">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg bg-background/70 px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Đang mở</p>
-            <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.open}</p>
-          </div>
-          <div className="rounded-lg bg-background/70 px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Đã chốt</p>
-            <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.closed}</p>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Mua {txStats.buys} · Bán {txStats.sells}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Sổ Bank: đang gửi {txStats.bankOpen} · tất toán {txStats.bankClosed}
-        </p>
-
-        {yearStats.map(({ year, stats }) => (
-          <div key={year} className="space-y-2 pt-1">
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 text-left"
-              onClick={() => setOpenYear((cur) => (cur === year ? null : year))}
-            >
-              <span className="rounded-xl border border-border bg-background/80 px-3 py-1.5 text-sm font-semibold tabular-nums">
-                {year}
-              </span>
-              <span className="h-px min-w-0 flex-1 bg-border" />
-            </button>
-            {openYear === year && (
-              <div className="space-y-2 pl-1">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-background/70 px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">Đang mở</p>
-                    <p className="font-mono text-2xl font-semibold tabular-nums">{stats.open}</p>
-                  </div>
-                  <div className="rounded-lg bg-background/70 px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">Đã chốt</p>
-                    <p className="font-mono text-2xl font-semibold tabular-nums">{stats.closed}</p>
-                  </div>
+            <div className="shrink-0">
+              <CardTitle>Thống kê lệnh</CardTitle>
+              <CardDesc className="mb-3">Tổng · không tính lệnh đã xóa</CardDesc>
+            </div>
+            <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-background/70 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Đang mở</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.open}</p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Mua {stats.buys} · Bán {stats.sells}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Sổ Bank: đang gửi {stats.bankOpen} · tất toán {stats.bankClosed}
-                </p>
+                <div className="rounded-lg bg-background/70 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Đã chốt</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums">{txStats.closed}</p>
+                </div>
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+              <p className="text-xs text-muted-foreground">
+                Mua {txStats.buys} · Bán {txStats.sells}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Sổ Bank: đang gửi {txStats.bankOpen} · tất toán {txStats.bankClosed}
+              </p>
+
+              {yearStats.map(({ year, stats }) => (
+                <div key={year} className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 text-left"
+                    onClick={() => setOpenYear((cur) => (cur === year ? null : year))}
+                  >
+                    <span className="rounded-xl border border-border bg-background/80 px-3 py-1.5 text-sm font-semibold tabular-nums">
+                      {year}
+                    </span>
+                    <span className="h-px min-w-0 flex-1 bg-border" />
+                  </button>
+                  {openYear === year && (
+                    <div className="space-y-2 pl-1">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-background/70 px-3 py-2">
+                          <p className="text-[11px] text-muted-foreground">Đang mở</p>
+                          <p className="font-mono text-2xl font-semibold tabular-nums">{stats.open}</p>
+                        </div>
+                        <div className="rounded-lg bg-background/70 px-3 py-2">
+                          <p className="text-[11px] text-muted-foreground">Đã chốt</p>
+                          <p className="font-mono text-2xl font-semibold tabular-nums">{stats.closed}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Mua {stats.buys} · Bán {stats.sells}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Sổ Bank: đang gửi {stats.bankOpen} · tất toán {stats.bankClosed}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </Card>
 
           {/* Card 2: Trống */}
