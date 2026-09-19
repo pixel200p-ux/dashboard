@@ -360,13 +360,13 @@ export function ProfilePage() {
         >
 
                     {/* NHÓM AVATAR VÀ TÊN — full: x1.5, neo góc trái; thanh trắng bên phải giữ nguyên */}
-          <div
+                    <div
+            data-profile-hero
             className="relative z-10 flex w-max max-w-[calc(100%-1rem)] items-end gap-3 px-4 pb-2 md:gap-4 md:px-8 md:pb-3 -mt-8 md:-mt-10 pointer-events-none will-change-transform"
-                        style={{
+            style={{
               transform: "scale(calc(1 + var(--p) * 0.5))",
               transformOrigin: "left bottom",
-              // Chỉ desktop: trượt vào vùng sidebar khi full
-              marginLeft: undefined as unknown as string,
+              marginLeft: "calc(var(--p) * -17rem)",
             }}
           >
             <button

@@ -359,6 +359,10 @@ html.dark {
 
 /* Mobile only: tất cả chữ -2px. PC không đổi. */
 @media (max-width: 767px) {
+  [data-profile-hero] {
+    margin-left: 0 !important;
+  }
+
   html,
   body {
     font-size: 14px;
