@@ -236,7 +236,7 @@ export function AppShell() {
             : decor > 0.01
               ? {
                   zIndex: decor > 0.08 ? 35 : 50,
-                  width: `calc(15rem * ${1 - Math.min(1, decor * 1.4)})`,
+                  width: `calc(5rem * ${1 - Math.min(1, decor * 1.4)})`,
                   minWidth: 0,
                   overflow: "hidden",
                   opacity: Math.max(0, 1 - decor * 1.6),

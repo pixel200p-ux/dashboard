@@ -312,7 +312,7 @@ export function ProfilePage() {
             className="relative h-dvh max-h-dvh w-full flex flex-col bg-background text-foreground select-none overflow-hidden touch-pan-x"
       style={{
         "--p": 0,
-        "--cover-clip": "calc(67vh - var(--p) * 52vh)",
+        "--cover-clip": "calc(67vh - var(--p) * 62vh)",
       } as React.CSSProperties}
     >
       {/* 1. LAYER COVER CỐ ĐỊNH Ở DƯỚI CÙNG */}
@@ -339,7 +339,7 @@ export function ProfilePage() {
       <div
         aria-hidden
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[15] bg-background"
-        style={{ height: "calc(15vh + (1 - var(--p)) * 52vh)" }}
+        style={{ height: "calc(10vh + (1 - var(--p)) * 32vh)" }}
       />
       <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const coverData = await readImage(f, 1920); save.mutate({ data: { coverData } }); }} />
       <input ref={avaRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const avatarData = await readImage(f, 512); save.mutate({ data: { avatarData } }); }} />
@@ -355,16 +355,18 @@ export function ProfilePage() {
           data-profile-gesture
           className="relative flex-1 w-full bg-background border-t border-border/40 pointer-events-auto will-change-transform flex flex-col"
           style={{
-            transform: "translate3d(0, calc(var(--p) * 52vh), 0)",
+            transform: "translate3d(0, calc(var(--p) * 60vh), 0)",
           }}
         >
 
-        {/* NHÓM AVATAR VÀ TÊN — full: x1.5, neo góc trái; thanh trắng bên phải giữ nguyên */}
+                    {/* NHÓM AVATAR VÀ TÊN — full: x1.5, neo góc trái; thanh trắng bên phải giữ nguyên */}
           <div
             className="relative z-10 flex w-max max-w-[calc(100%-1rem)] items-end gap-3 px-4 pb-2 md:gap-4 md:px-8 md:pb-3 -mt-8 md:-mt-10 pointer-events-none will-change-transform"
-            style={{
+                        style={{
               transform: "scale(calc(1 + var(--p) * 0.5))",
               transformOrigin: "left bottom",
+              // Chỉ desktop: trượt vào vùng sidebar khi full
+              marginLeft: undefined as unknown as string,
             }}
           >
             <button
