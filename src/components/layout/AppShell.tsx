@@ -74,6 +74,7 @@ export function AppShell() {
   const { user, isPending } = useCurrentUserState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobile, setMobile] = useState(false);
+  const [isPhone, setIsPhone] = useState(false);
   const theme = useUiStore((s) => s.theme);
   const currency = useUiStore((s) => s.currency);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
@@ -102,6 +103,14 @@ export function AppShell() {
       useUiStore.getState().setProfileDecor(0);
     }
   }, [pathname]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setIsPhone(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   if (isPending) return <LoginScreen />;
   if (!user) return <RedirectToSignIn />;
@@ -206,7 +215,7 @@ export function AppShell() {
     <div className="min-h-dvh bg-background text-foreground">
       {mobile && (
         <button
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          className="fixed inset-0 z-[120] bg-black/50 md:hidden"
           onClick={() => setMobile(false)}
           aria-label="Đóng menu"
         />
@@ -218,22 +227,26 @@ export function AppShell() {
           mobile ? "translate-x-0 shadow-2xl" : "max-md:-translate-x-full",
           !mobile && "md:inset-y-0"
         )}
-        style={
-          // Chỉ desktop dùng decor. Mobile không gắn → hết hiện/mất sidebar khi thu cover
-          !mobile && decor > 0.01
+                style={
+          isPhone
             ? {
-                zIndex: decor > 0.08 ? 35 : 50,
-                width: `calc(15rem * ${1 - Math.min(1, decor * 1.4)})`,
-                minWidth: 0,
-                overflow: "hidden",
-                opacity: Math.max(0, 1 - decor * 1.6),
-                transform: `translateX(${-18 * decor}%)`,
-                pointerEvents: decor > 0.2 ? "none" : "auto",
-                borderColor: decor > 0.4 ? "transparent" : undefined,
+                // Phone: không gắn cover/decor. Menu mở thì luôn trên avatar + cover
+                zIndex: mobile ? 130 : 40,
               }
-            : {
-                zIndex: mobile ? 80 : 50,
-              }
+            : decor > 0.01
+              ? {
+                  zIndex: decor > 0.08 ? 35 : 50,
+                  width: `calc(15rem * ${1 - Math.min(1, decor * 1.4)})`,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  opacity: Math.max(0, 1 - decor * 1.6),
+                  transform: `translateX(${-18 * decor}%)`,
+                  pointerEvents: decor > 0.2 ? "none" : "auto",
+                  borderColor: decor > 0.4 ? "transparent" : undefined,
+                }
+              : {
+                  zIndex: 50,
+                }
         }
       >
         <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-5">

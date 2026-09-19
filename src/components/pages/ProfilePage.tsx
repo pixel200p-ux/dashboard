@@ -70,35 +70,53 @@ export function ProfilePage() {
     };
   }, []);
 
-  const target = Math.max(0, Math.min(1, Number(decor) || 0));
+const target = Math.max(0, Math.min(1, Number(decor) || 0));
   const pRef = useRef(0);
+  const velocityRef = useRef(0); // Lưu vận tốc lướt hiện tại
 
-  // 1. ENGINE
+  // 1. ENGINE (SMOOTH INERTIA & LERP)
   useEffect(() => {
     let raf = 0;
-    const k = 0.22;
+    const friction = 0.92; // Hệ số giảm đà lướt (0.9 -> 0.95 cho độ lướt mượt)
+    const k = 0.12;        // Hệ số lực hút về target (nhẹ hơn để tạo cảm giác êm)
 
     function tick() {
-      const cur = pRef.current;
-      const diff = target - cur;
+      let cur = pRef.current;
+      let v = velocityRef.current;
 
-      if (Math.abs(diff) < 0.001) {
-        pRef.current = target;
-        containerRef.current?.style.setProperty("--p", target.toFixed(4));
-        return;
+      // Áp dụng lực lướt đà
+      if (Math.abs(v) > 0.0001) {
+        cur += v;
+        v *= friction;
+        velocityRef.current = v;
+      } else {
+        velocityRef.current = 0;
+        // Tiến dần về target khi đà lướt gần hết
+        const diff = target - cur;
+        cur += diff * k;
       }
 
-      const next = cur + diff * k;
-      pRef.current = next;
-      containerRef.current?.style.setProperty("--p", next.toFixed(4));
-      raf = requestAnimationFrame(tick);
+      // Giới hạn trong khoảng [0, 1]
+      const clamped = Math.max(0, Math.min(1, cur));
+      if (clamped !== cur) {
+        velocityRef.current = 0; // Đụng biên thì dập tắt vận tốc
+        cur = clamped;
+      }
+
+      pRef.current = cur;
+      containerRef.current?.style.setProperty("--p", cur.toFixed(4));
+
+      // Tiếp tục loop nếu chưa ổn định hoàn toàn
+      if (Math.abs(target - cur) > 0.0005 || Math.abs(velocityRef.current) > 0.0001) {
+        raf = requestAnimationFrame(tick);
+      }
     }
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [target]);
 
-  // 2. GESTURE (FIXED FOR MOBILE UNTHROTTLE & SNAP)
+  // 2. GESTURE (MOMENTUM & SMOOTH TOUCH/WHEEL)
   useEffect(() => {
     function isInsideCardScroll(el: EventTarget | null): boolean {
       if (!(el instanceof Element)) return false;
@@ -108,13 +126,6 @@ export function ProfilePage() {
     function isInsideHeroGesture(el: EventTarget | null): boolean {
       if (!(el instanceof Element)) return false;
       return Boolean(el.closest("[data-profile-gesture]"));
-    }
-
-    function writeP(next: number) {
-      const v = Math.max(0, Math.min(1, next));
-      pRef.current = v;
-      containerRef.current?.style.setProperty("--p", v.toFixed(4));
-      return v;
     }
 
     let wheelTimer: ReturnType<typeof setTimeout> | null = null;
@@ -127,15 +138,22 @@ export function ProfilePage() {
       if (cur >= 1 && e.deltaY < 0) return;
 
       e.preventDefault();
-      const step = -Math.sign(e.deltaY) * 0.28;
-      const next = writeP(cur + step);
+
+      // Bơm vận tốc theo nhịp lăn chuột
+      const wheelDelta = -e.deltaY * 0.0015;
+      velocityRef.current += wheelDelta;
 
       if (wheelTimer) clearTimeout(wheelTimer);
-      wheelTimer = setTimeout(() => setDecor(next), 80);
+      wheelTimer = setTimeout(() => {
+        // Snap nhẹ về mốc gần nhất sau khi ngừng lăn chuột
+        const snapped = pRef.current >= 0.4 ? 1 : 0;
+        setDecor(snapped);
+      }, 150);
     }
 
     let startY = 0;
-    let startP = 0;
+    let lastY = 0;
+    let lastTime = 0;
     let activeGesture = false;
 
     function onTouchStart(e: TouchEvent) {
@@ -144,7 +162,6 @@ export function ProfilePage() {
         return;
       }
 
-      // Khi cover đang mở rộng (p > 0.1), cho phép vuốt ở bất kỳ đâu trên viewport ngoại trừ phần scroll card
       const cur = pRef.current;
       if (!isInsideHeroGesture(e.target) && cur < 0.1) {
         activeGesture = false;
@@ -153,32 +170,50 @@ export function ProfilePage() {
 
       activeGesture = true;
       startY = e.touches[0]?.clientY ?? 0;
-      startP = cur;
+      lastY = startY;
+      lastTime = performance.now();
+      velocityRef.current = 0; // Triệt tiêu đà cũ khi ngón tay chạm vào
     }
 
     function onTouchMove(e: TouchEvent) {
       if (!activeGesture || isInsideCardScroll(e.target)) return;
 
       const y = e.touches[0]?.clientY ?? 0;
-      const deltaY = startY - y; // Vuốt lên => deltaY > 0, Vuốt xuống => deltaY < 0
+      const now = performance.now();
+      const dt = Math.max(16, now - lastTime);
+      const dy = y - lastY;
 
-      // Quy đổi khoảng cách vuốt (px) ra tỷ lệ --p
-      // Vuốt xuống (deltaY < 0) làm tăng p (mở rộng Cover)
-      // Vuốt lên (deltaY > 0) làm giảm p (thu gọn Cover)
-      const sensitivity = 260; // Số px cần vuốt để đi hết từ 0 -> 1
-      const nextP = startP - (deltaY / sensitivity);
+      // Độ nhạy quãng đường kéo (px) để đi hết biến --p từ 0 -> 1
+      const sensitivity = 320; 
+      const deltaP = dy / sensitivity;
+
+      pRef.current = Math.max(0, Math.min(1, pRef.current + deltaP));
+      containerRef.current?.style.setProperty("--p", pRef.current.toFixed(4));
+
+      // Tính vận tốc tức thời (px/ms) quy ra tỷ lệ --p
+      velocityRef.current = (deltaP / dt) * 16; 
+
+      lastY = y;
+      lastTime = now;
 
       if (e.cancelable) e.preventDefault();
-      writeP(nextP);
     }
 
     function onTouchEnd() {
       if (!activeGesture) return;
       activeGesture = false;
 
-      // Snap thông minh: nếu p > 0.4 thì bung hết (1), ngược lại thu gọn về (0)
-      const snapped = pRef.current >= 0.4 ? 1 : 0;
-      writeP(snapped);
+      const v = velocityRef.current;
+      const cur = pRef.current;
+
+      // Snap dựa trên HƯỚNG VUỐT NHANH (Velocity) hoặc VỊ TRÍ (Position)
+      let snapped = cur >= 0.4 ? 1 : 0;
+      if (v > 0.005) {
+        snapped = 1; // Vuốt nhanh xuống -> Bung full cover
+      } else if (v < -0.005) {
+        snapped = 0; // Vuốt nhanh lên -> Thu gọn cover
+      }
+
       setDecor(snapped);
     }
 
@@ -188,6 +223,7 @@ export function ProfilePage() {
     window.addEventListener("touchmove", onTouchMove, opts);
     window.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
     window.addEventListener("touchcancel", onTouchEnd, { passive: true, capture: true });
+
     return () => {
       if (wheelTimer) clearTimeout(wheelTimer);
       window.removeEventListener("wheel", onWheel, opts);
@@ -196,10 +232,6 @@ export function ProfilePage() {
       window.removeEventListener("touchend", onTouchEnd, true);
       window.removeEventListener("touchcancel", onTouchEnd, true);
     };
-  }, [setDecor]);
-
-  useEffect(() => {
-    return () => setDecor(0);
   }, [setDecor]);
 
   type TxStat = {
