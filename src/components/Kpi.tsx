@@ -7,14 +7,16 @@ export function Kpi({
   value,
   hint,
   tone,
+  className,
 }: {
   label: string;
   value: ReactNode;
   hint?: string;
   tone?: "profit" | "loss" | "default";
+  className?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className={cn("flex h-full flex-col p-4", className)}>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p
         className={cn(
@@ -25,7 +27,9 @@ export function Kpi({
       >
         {value}
       </p>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+      {hint ? (
+        <p className="mt-auto pt-1 text-xs text-muted-foreground">{hint}</p>
+      ) : null}
     </Card>
   );
 }

@@ -1,4 +1,5 @@
 import { AllocChart } from "@/components/AllocChart";
+import { DepositCapitalButton } from "@/components/DepositCapitalButton";
 import { HoldingsTable } from "@/components/HoldingsTable";
 import { NavCapitalChart } from "@/components/NavCapitalChart";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +73,11 @@ export function DashboardPage() {
           <p className="text-sm text-muted-foreground">Sổ cái thật · Asset-Only Ledger</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => openCapital("DEPOSIT")}>Nạp vốn gốc</Button>
+          <DepositCapitalButton
+            originalByBucket={state.originalByBucket}
+            usdVnd={usd}
+            onDeposit={() => openCapital("DEPOSIT")}
+          />
           <Button variant="outline" onClick={() => openCapital("WITHDRAW")}>
             Rút vốn gốc
           </Button>

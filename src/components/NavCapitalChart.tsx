@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -95,6 +96,15 @@ export function NavCapitalChart({
   usdVnd: number;
 }) {
   const data = buildHistory(ledger, 6);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   if (data.length === 0) {
     return (
@@ -105,9 +115,16 @@ export function NavCapitalChart({
   }
 
   return (
-        <div className="h-[260px] w-full text-muted-foreground">
+        <div className="mx-auto h-[260px] w-full text-muted-foreground">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 8 }}>
+        <LineChart
+          data={data}
+          margin={
+            isMobile
+              ? { top: 8, right: 36, left: 0, bottom: 4 }
+              : { top: 8, right: 12, left: 4, bottom: 8 }
+          }
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" />
           <XAxis
             dataKey="label"
@@ -121,7 +138,7 @@ export function NavCapitalChart({
             tick={{ fontSize: 11, fill: "var(--app-fg-muted)" }}
             axisLine={false}
             tickLine={false}
-            width={72}
+            width={isMobile ? 36 : 72}
             tickFormatter={(v) => {
               const n = Number(v);
               if (!Number.isFinite(n)) return "";
@@ -144,8 +161,13 @@ export function NavCapitalChart({
           />
           <Legend
             verticalAlign="top"
+            align="center"
             height={28}
-            wrapperStyle={{ color: "var(--app-fg-muted)" }}
+            wrapperStyle={
+              isMobile
+                ? { color: "var(--app-fg-muted)", left: 0, width: "100%" }
+                : { color: "var(--app-fg-muted)" }
+            }
             formatter={(value) => (value === "nav" ? "NAV" : "Original Capital")}
           />
           <Line

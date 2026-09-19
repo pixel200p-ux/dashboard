@@ -49,15 +49,21 @@ export function ReportsPage() {
         <p className="text-sm text-muted-foreground">Sổ lịch sử toàn danh mục · chỉ xem, không sửa/xóa</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Kpi label="Original Capital" value={displayMoney(s.originalCapital, currency, usd)} />
-        <Kpi label="NAV" value={displayMoney(s.nav, currency, usd)} />
-        <Kpi
-          label="Hiệu suất"
-          value={s.originalCapital > 0 ? formatPct(s.totalReturnPct) : displayMoney(s.totalPnl, currency, usd)}
-          hint={s.originalCapital > 0 ? displayMoney(s.totalPnl, currency, usd) : "Original Capital = 0 · toàn bộ NAV là lãi/lỗ"}
-          tone={s.totalPnl > 0 ? "profit" : s.totalPnl < 0 ? "loss" : "default"}
-        />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="col-span-2 min-w-0 sm:col-span-1">
+          <Kpi label="Original Capital" value={displayMoney(s.originalCapital, currency, usd)} />
+        </div>
+        <div className="min-w-0">
+          <Kpi label="NAV" value={displayMoney(s.nav, currency, usd)} />
+        </div>
+        <div className="min-w-0">
+          <Kpi
+            label="Hiệu suất"
+            value={s.originalCapital > 0 ? formatPct(s.totalReturnPct) : displayMoney(s.totalPnl, currency, usd)}
+            hint={s.originalCapital > 0 ? displayMoney(s.totalPnl, currency, usd) : "Original Capital = 0 · toàn bộ NAV là lãi/lỗ"}
+            tone={s.totalPnl > 0 ? "profit" : s.totalPnl < 0 ? "loss" : "default"}
+          />
+        </div>
       </div>
 
       <Card>
