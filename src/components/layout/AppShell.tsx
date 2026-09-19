@@ -219,21 +219,20 @@ export function AppShell() {
           !mobile && "md:inset-y-0"
         )}
         style={
-          decor > 0.01
+          // Chỉ desktop dùng decor. Mobile không gắn → hết hiện/mất sidebar khi thu cover
+          !mobile && decor > 0.01
             ? {
-                // Khi phóng to: z thấp hơn cover (45) → ảnh nền phủ lên
-                // Khi thu nhỏ: z cao (50) → sidebar nằm trên, không bị đè
-                zIndex: mobile ? (pathname.startsWith("/profile") ? 140 : 80) : decor > 0.08 ? 35 : 50,
+                zIndex: decor > 0.08 ? 35 : 50,
                 width: `calc(15rem * ${1 - Math.min(1, decor * 1.4)})`,
                 minWidth: 0,
                 overflow: "hidden",
                 opacity: Math.max(0, 1 - decor * 1.6),
-                transform: mobile ? "translateX(0)" : `translateX(${-18 * decor}%)`,
+                transform: `translateX(${-18 * decor}%)`,
                 pointerEvents: decor > 0.2 ? "none" : "auto",
                 borderColor: decor > 0.4 ? "transparent" : undefined,
               }
             : {
-                zIndex: mobile ? (pathname.startsWith("/profile") ? 140 : 80) : 50,
+                zIndex: mobile ? 80 : 50,
               }
         }
       >
