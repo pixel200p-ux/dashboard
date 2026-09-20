@@ -1,7 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:where(.dark, .dark *));
+/* Sửa lỗi cú pháp custom-variant tại đây */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+}
 
 @theme {
   --font-sans: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
@@ -74,7 +79,7 @@
   --app-chart-crypto: #3d5a80;
   --app-chart-bank: #2a6f97;
   --shadow-card: 0 1px 2px color-mix(in oklab, #0a2540 14%, transparent),
-  0 4px 12px color-mix(in oklab, #0a2540 8%, transparent);
+    0 4px 12px color-mix(in oklab, #0a2540 8%, transparent);
 }
 
 html.dark {
@@ -187,7 +192,8 @@ html.dark {
 .table-scroll table {
   min-width: 640px;
 }
-/* ========== Login themes (riêng, không đụng dark/light) ========== */
+
+/* ========== Login themes ========== */
 .login-theme-aurora .login-bg {
   background:
     radial-gradient(ellipse 80% 60% at 20% 30%, #4f46e5 0%, transparent 50%),
@@ -246,7 +252,8 @@ html.dark {
 .login-noise {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-/* ===== Login screen (navy + white, wave card) ===== */
+
+/* ===== Login screen ===== */
 .login-stage {
   --login-navy: #0a2540;
   --login-btn: #c5d4e0;
@@ -256,9 +263,6 @@ html.dark {
     #e8ecef;
 }
 
-.login-stage[data-skin="default"] {
-  /* màu lấy từ style inline JS */
-}
 .login-stage[data-skin="spring"],
 .login-stage[data-skin="summer"],
 .login-stage[data-skin="autumn"],
@@ -357,23 +361,30 @@ html.dark {
   }
 }
 
-/* Mobile only: tất cả chữ -2px. PC không đổi. */
-/* PC: avt cố định viewport, trên sidebar, sát trái khi full */
+/* Profile hero */
 @media (min-width: 768px) {
   [data-profile-hero] {
     position: fixed !important;
     z-index: 80;
-    left: calc((1 - var(--p)) * 15rem);
-    bottom: calc(10vh + (1 - var(--p)) * 32vh);
-    margin-left: 0 !important;
-    margin-top: 0 !important;
-    padding-left: calc(1rem * (1 - var(--p)));
+    left: 0;
+    top: calc(33vh - 2.5rem);
+    margin: 0 !important;
+    transform: translate3d(calc((1 - var(--p)) * 15rem), calc(var(--p) * 60vh), 0)
+      scale(calc(1 + var(--p) * 0.5));
+    transform-origin: left bottom;
   }
 }
 
 @media (max-width: 767px) {
   [data-profile-hero] {
-    margin-left: 0 !important;
+    position: fixed !important;
+    z-index: 40;
+    left: 0;
+    top: calc(33vh - 2rem);
+    margin: 0 !important;
+    transform: translate3d(0, calc(var(--p) * 60vh), 0)
+      scale(calc(1 + var(--p) * 0.5));
+    transform-origin: left bottom;
   }
 
   html,
