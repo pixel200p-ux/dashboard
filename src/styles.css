@@ -1,12 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Sửa lỗi cú pháp custom-variant tại đây */
-@custom-variant dark {
-  &:where(.dark, .dark *) {
-    @slot;
-  }
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
@@ -54,6 +49,7 @@
 }
 
 :root {
+  --p: 0;
   --app-bg: #cdd5df;
   --app-surface: #e2e8ef;
   --app-sidebar: #162238;
@@ -361,63 +357,440 @@ html.dark {
   }
 }
 
-/* Profile hero */
-@media (min-width: 768px) {
+/* ============================================================
+   PROFILE — SMOOTH HERO / COVER / SIDEBAR / CARDS ANIMATION
+   ============================================================ */
+
+/*
+ * --p:
+ * 0 = trạng thái bình thường
+ * 1 = cover full + sidebar biến mất + hero về góc trái + cards xuống đáy
+ *
+ * Tất cả chuyển động chính đều dùng transform3d/scale3d.
+ * Không dùng transition cho transform để tránh xung đột với RAF.
+ */
+
+
+/* ============================================================
+   1. SIDEBAR
+   ============================================================ */
+
+/*
+ * Sidebar giữ nguyên kích thước/layout.
+ * Chỉ di chuyển bằng GPU từ vị trí ban đầu sang ngoài màn hình bên trái.
+ *
+ * p = 0  → translateX(0)
+ * p = 1  → translateX(-100%)
+ */
+.profile-aside {
+  will-change: transform;
+  transform: translate3d(
+    calc(var(--p, 0) * -100%),
+    0,
+    0
+  ) !important;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+
+/* ============================================================
+   2. COVER
+   ============================================================ */
+
+/*
+ * Cover được điều khiển bởi clip-path trong JSX.
+ *
+ * p = 0 → cover cao 33vh
+ * p = 1 → cover cao 90vh
+ *
+ * Phần 10vh cuối dành cho vùng trắng/card.
+ *
+ * Không dùng transition ở đây vì --p đã được RAF điều khiển.
+ */
+[data-profile-gesture] {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+
+/* ============================================================
+   3. HERO CONTAINER
+   ============================================================ */
+
+/*
+ * Hero luôn nằm trên tất cả:
+ *
+ * Cover       z-index 10
+ * White       z-index 15
+ * Cards       z-index 20
+ * Hero        z-index 100
+ *
+ * Vì vậy avatar không thể bị card che.
+ */
+[data-profile-hero] {
+  position: fixed !important;
+
+  top: 0;
+  left: 0;
+
+  z-index: 100 !important;
+
+  margin: 0 !important;
+
+  display: flex;
+  align-items: flex-end;
+
+  width: max-content;
+
+  /*
+   * Khoảng cách avatar → tên.
+   * Khi full, tăng nhẹ để tránh tên chạm avatar 2x.
+   */
+  gap: calc(
+    0.75rem +
+    var(--p, 0) * 1rem
+  );
+
+  pointer-events: none;
+
+  will-change: transform;
+
+  /*
+   * ----------------------------------------------------------
+   * X POSITION
+   * ----------------------------------------------------------
+   *
+   * Khi p = 0:
+   *     hero nằm ở vùng vị trí ban đầu.
+   *
+   * Khi p = 1:
+   *     tâm avatar = 6.25vw
+   *
+   * Avatar mặc định:
+   *     4rem = 64px
+   *
+   * Avatar full:
+   *     8rem = 128px
+   *
+   * Nửa đường kính full:
+   *     4rem
+   *
+   * Vì vậy left của hero được tính:
+   *
+   *     6.25vw - 4rem
+   *
+   * để TÂM avatar nằm đúng 1/16 viewport.
+   *
+   * ----------------------------------------------------------
+   *
+   * Y POSITION
+   * ----------------------------------------------------------
+   *
+   * p = 0:
+   *     tâm hero nằm tại mép trên của vùng cover.
+   *
+   * p = 1:
+   *     tâm avatar vẫn nằm trên vùng cover,
+   *     trong khi tên rơi vào nền trắng.
+   */
+  transform:
+    translate3d(
+      calc(
+        (var(--hero-start-x, 16rem) * (1 - var(--p, 0))) +
+        ((6.25vw - 4rem) * var(--p, 0))
+      ),
+      calc(
+        33dvh +
+        (var(--p, 0) * 57dvh) -
+        50%
+      ),
+      0
+    ) !important;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+
+/* ============================================================
+   4. AVATAR
+   ============================================================ */
+
+/*
+ * Avatar:
+ *
+ * p = 0 → 1x
+ * p = 1 → 2x
+ *
+ * Chỉ scale bằng transform.
+ * Không thay width/height → không gây reflow.
+ */
+.profile-hero-avt {
+  position: relative;
+
+  flex: 0 0 auto;
+
+  will-change: transform;
+
+  transform:
+    scale3d(
+      calc(1 + var(--p, 0)),
+      calc(1 + var(--p, 0)),
+      1
+    ) !important;
+
+  /*
+   * Scale quanh chính tâm avatar.
+   * Không dùng center bottom để tránh cắt góc.
+   */
+  transform-origin: center center !important;
+
+  z-index: 120 !important;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+
+  overflow: visible !important;
+
+  isolation: isolate;
+}
+.profile-hero-avt img {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  transform: translate3d(0, 0, 0);
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ============================================================
+   5. AVATAR IMAGE
+   ============================================================ */
+
+.profile-hero-avt img {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  /*
+   * Giúp trình duyệt rasterize ảnh ổn định khi scale.
+   */
+  transform: translate3d(0, 0, 0);
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+
+/* ============================================================
+   6. NAME
+   ============================================================ */
+
+/*
+ * Tên không được phép bị avatar che.
+ *
+ * Tên vẫn scale cùng progress nhưng nhỏ hơn một chút về cảm giác
+ * vì avatar là điểm nhấn chính.
+ */
+.profile-hero-name-scale {
+  position: relative;
+
+  will-change: transform;
+
+  transform:
+    scale3d(
+      calc(1 + var(--p, 0) * 0.55),
+      calc(1 + var(--p, 0) * 0.55),
+      1
+    ) !important;
+
+  transform-origin: left center;
+
+  z-index: 110;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+
+  /*
+   * Không cho tên tràn vào card.
+   */
+  max-width: min(16rem, 45vw);
+
+  overflow: hidden;
+}
+
+
+/*
+ * Phần wrapper tên nằm trên nền trắng khi p tiến tới 1.
+ */
+.profile-hero-name {
+  position: relative;
+
+  z-index: 110;
+
+  pointer-events: auto;
+
+  /*
+   * Tên luôn nằm phía phải avatar.
+   */
+  min-width: 0;
+
+  /*
+   * Không cho text chui xuống dưới avatar.
+   */
+  isolation: isolate;
+}
+
+
+/* ============================================================
+   7. CARD SHEET
+   ============================================================ */
+
+/*
+ * Vùng chứa card:
+ *
+ * p = 0 → bắt đầu tại 33vh
+ * p = 1 → bắt đầu tại 90vh
+ *
+ * Do đó:
+ *
+ * 100vh - 90vh = 10vh
+ *
+ * = 10% chiều cao viewport.
+ *
+ * Đây là vùng card nhìn thấy khi animation hoàn tất.
+ */
+[data-profile-sheet] {
+  position: relative !important;
+
+  z-index: 20;
+
+  will-change: opacity;
+
+  transform: none !important;
+
+  opacity: calc(1 - var(--p, 0)) !important;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+
+/* ============================================================
+   8. CARD CONTENT
+   ============================================================ */
+
+/*
+ * QUAN TRỌNG:
+ *
+ * Không fade card nữa.
+ *
+ * Code cũ:
+ *
+ * opacity: calc(1 - var(--p) * 2.5)
+ *
+ * đã được bỏ.
+ *
+ * Card vẫn tồn tại trong suốt animation.
+ */
+[data-profile-cards] {
+  position: relative;
+
+  z-index: 20;
+
+  will-change: opacity;
+
+  /*
+   * Card chỉ fade-out.
+   * Không translate.
+   * Không padding-top động.
+   */
+  padding-top: 0 !important;
+
+  opacity: calc(1 - var(--p, 0)) !important;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+
+/* ============================================================
+   9. CARD LAYER SAFETY
+   ============================================================ */
+
+/*
+ * Cards luôn nằm dưới hero.
+ */
+[data-profile-cards] > * {
+  position: relative;
+
+  z-index: 20;
+
+  backface-visibility: hidden;
+}
+
+
+/* ============================================================
+   10. MOBILE
+   ============================================================ */
+
+/*
+ * Mobile:
+ *
+ * Không dùng công thức X khác desktop.
+ * Đây là điểm quan trọng để tránh animation bị "nhảy"
+ * khi viewport chuyển breakpoint.
+ *
+ * Tâm avatar vẫn = 1/16 viewport.
+ */
+@media (max-width: 767px) {
+
   [data-profile-hero] {
-    position: fixed !important;
-    z-index: 80;
-    left: 0;
-    top: calc(33vh - 2.5rem);
-    margin: 0 !important;
-    transform: translate3d(calc((1 - var(--p)) * 15rem), calc(var(--p) * 60vh), 0)
-      scale(calc(1 + var(--p) * 0.5));
-    transform-origin: left bottom;
+    transform:
+      translate3d(
+        calc(
+          (1rem * (1 - var(--p, 0))) +
+          ((6.25vw - 4rem) * var(--p, 0))
+        ),
+        calc(
+          33dvh +
+          (var(--p, 0) * 57dvh) -
+          50%
+        ),
+        0
+      ) !important;
+  }
+
+  .profile-hero-name-scale {
+    max-width: 52vw;
   }
 }
 
-@media (max-width: 767px) {
+
+/* ============================================================
+   11. VERY SMALL MOBILE
+   ============================================================ */
+
+@media (max-width: 380px) {
+
   [data-profile-hero] {
-    position: fixed !important;
-    z-index: 40;
-    left: 0;
-    top: calc(33vh - 2rem);
-    margin: 0 !important;
-    transform: translate3d(0, calc(var(--p) * 60vh), 0)
-      scale(calc(1 + var(--p) * 0.5));
-    transform-origin: left bottom;
+    gap: calc(
+      0.5rem +
+      var(--p, 0) * 0.75rem
+    );
   }
 
-  html,
-  body {
-    font-size: 14px;
-  }
-
-  .text-xs { font-size: 10px !important; }
-  .text-sm { font-size: 12px !important; }
-  .text-base { font-size: 14px !important; }
-  .text-lg { font-size: 16px !important; }
-  .text-xl,
-  .sm\:text-xl { font-size: 18px !important; }
-  .text-2xl { font-size: 22px !important; }
-  .text-3xl,
-  .sm\:text-3xl { font-size: 28px !important; }
-  .text-4xl,
-  .sm\:text-4xl { font-size: 34px !important; }
-
-  .text-\[10px\] { font-size: 8px !important; }
-  .text-\[11px\] { font-size: 9px !important; }
-  .text-\[12px\] { font-size: 10px !important; }
-  .text-\[13px\] { font-size: 11px !important; }
-  .text-\[15px\] { font-size: 13px !important; }
-  .text-\[1\.85rem\] { font-size: calc(1.85rem - 2px) !important; }
-
-  .login-submit {
-    font-size: calc(0.95rem - 2px) !important;
-  }
-
-  .recharts-text,
-  .recharts-cartesian-axis-tick-value,
-  .recharts-legend-item-text {
-    font-size: 9px !important;
+  .profile-hero-name-scale {
+    max-width: 48vw;
   }
 }

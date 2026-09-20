@@ -53,54 +53,85 @@ export function ProfilePage() {
   const [editingName, setEditingName] = useState(false);
   const [kindFilter, setKindFilter] = useState("ALL");
 
-  const target = Math.max(0, Math.min(1, Number(decor) || 0));
+    const target = Math.max(0, Math.min(1, Number(decor) || 0));
+
   const pRef = useRef(0);
   const targetRef = useRef(target);
   const gestureRef = useRef(false);
 
-  function writeCssP(v: number) {
-    const n = Math.max(0, Math.min(1, v));
-    const s = n.toFixed(4);
-    pRef.current = n;
-    containerRef.current?.style.setProperty("--p", s);
-    document.documentElement.style.setProperty("--p", s);
-    document.documentElement.toggleAttribute("data-profile-full", n > 0.2);
-    return n;
+  function writeCssP(value: number) {
+    const next = Math.max(0, Math.min(1, value));
+    const root = document.documentElement;
+    const container = containerRef.current;
+
+    pRef.current = next;
+
+    const cssP = next.toFixed(5);
+
+    if (container) {
+      container.style.setProperty("--p", cssP);
+    }
+
+    root.style.setProperty("--p", cssP);
+
+    root.toggleAttribute("data-profile-full", next > 0.2);
+
+    return next;
   }
 
   useEffect(() => {
     targetRef.current = target;
   }, [target]);
 
-  // Loop mượt với hệ thống lò xo Damped Spring — --p trên :root để sidebar/hero/nền cùng nhịp
+  /*
+   * Animation engine
+   *
+   * --p là progress duy nhất:
+   * 0 = trạng thái ban đầu
+   * 1 = cover full + sidebar ẩn + hero về góc trái + cards xuống đáy
+   *
+   * Chỉ dùng transform/opacity theo frame.
+   * Không dùng CSS transition cho các transform chính để tránh
+   * transition cạnh tranh với requestAnimationFrame.
+   */
   useEffect(() => {
     writeCssP(pRef.current);
+
     let raf = 0;
-    const k = 0.28;
+
+    /*
+     * Damped spring:
+     * - nhanh khi bắt đầu
+     * - giảm tốc tự nhiên khi gần đích
+     * - không overshoot
+     */
+    const stiffness = 0.24;
 
     function tick() {
       if (!gestureRef.current) {
-        const tgt = targetRef.current;
-        const cur = pRef.current;
-        const diff = tgt - cur;
+        const current = pRef.current;
+        const targetValue = targetRef.current;
+        const delta = targetValue - current;
 
-        if (Math.abs(diff) >= 0.0002) {
-          writeCssP(cur + diff * k);
-        } else if (cur !== tgt) {
-          writeCssP(tgt);
+        if (Math.abs(delta) > 0.00005) {
+          writeCssP(current + delta * stiffness);
+        } else if (current !== targetValue) {
+          writeCssP(targetValue);
         }
       }
+
       raf = requestAnimationFrame(tick);
     }
 
     raf = requestAnimationFrame(tick);
+
     return () => {
       cancelAnimationFrame(raf);
+
       document.documentElement.style.setProperty("--p", "0");
       document.documentElement.removeAttribute("data-profile-full");
     };
   }, []);
-
   useEffect(() => {
     function isInsideCardScroll(el: EventTarget | null): boolean {
       if (!(el instanceof Element)) return false;
@@ -328,9 +359,11 @@ export function ProfilePage() {
     >
       {/* 1. LAYER COVER CỐ ĐỊNH Ở DƯỚI CÙNG */}
       <div
-        data-profile-gesture
-        className="fixed inset-0 z-10 h-full w-full bg-[#4a5d4e] touch-none will-change-[clip-path] [transform:translateZ(0)]"
-        style={{ clipPath: "inset(0 0 var(--cover-clip) 0)" }}
+  data-profile-gesture
+  className="fixed inset-0 z-10 h-full w-full bg-[#4a5d4e] touch-none will-change-[clip-path] [transform:translate3d(0,0,0)]"
+  style={{
+    clipPath: "inset(0 0 var(--cover-clip) 0)",
+  }}
         onDoubleClick={() => coverRef.current?.click()}
       >
         {profile.coverData ? (
@@ -346,13 +379,22 @@ export function ProfilePage() {
           <div className="grid h-full place-items-center text-sm text-white/80">Nhấp đúp chọn ảnh</div>
         )}
       </div>
-      {/* Thanh trắng đáy đã gộp vào nền 3 card (full ngang, kể cả dưới sidebar) */}
+      {/* Avt + tên đã gộp vào khối nền trắng bên dưới (cùng 1 lần trượt) */}
 
-      {/* Avt + tên: position/scale trong CSS, z cao hơn sidebar + card */}
+      {/* Nền trắng full ngang (kể cả dưới sidebar) — một mép trên, không lệch px */}
       <div
-        data-profile-hero
-        className="flex w-max items-end pointer-events-none"
-      >
+  aria-hidden
+  className="pointer-events-none fixed inset-x-0 bottom-0 z-[15] bg-background border-t border-border/40 will-change-[top]"
+  style={{
+    top: "calc(33dvh + var(--p) * 57dvh)",
+  }}
+/>
+
+      {/* Avt + tên: fixed, cùng công thức top với nền trắng → một nhịp --p */}
+      <div
+  data-profile-hero
+  className="pointer-events-none fixed z-[100] flex w-max items-end"
+>
         <button
           type="button"
           className="profile-hero-avt pointer-events-auto relative h-16 w-16 md:h-20 md:w-20 rounded-full border-2 border-background bg-muted overflow-hidden shrink-0 shadow-md"
@@ -369,24 +411,24 @@ export function ProfilePage() {
 
         <div className="profile-hero-name pointer-events-auto mb-1 min-w-0 max-w-[min(16rem,50vw)] shrink-0">
           <div className="profile-hero-name-scale">
-          {editingName ? (
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}>
-              <Input
-                autoFocus
-                value={name}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={handleSaveName}
-                className="max-w-sm text-lg md:text-xl font-bold tracking-tight bg-background h-8 md:h-10"
-              />
-            </form>
-          ) : (
-            <h1
-              className="cursor-text text-xl md:text-2xl font-bold tracking-tight select-none text-foreground truncate drop-shadow-sm"
-              onDoubleClick={() => setEditingName(true)}
-            >
-              {profile.displayName}
-            </h1>
-          )}
+            {editingName ? (
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveName(); }}>
+                <Input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onBlur={handleSaveName}
+                  className="max-w-sm text-lg md:text-xl font-bold tracking-tight bg-background h-8 md:h-10"
+                />
+              </form>
+            ) : (
+              <h1
+                className="cursor-text text-xl md:text-2xl font-bold tracking-tight select-none text-foreground truncate drop-shadow-sm"
+                onDoubleClick={() => setEditingName(true)}
+              >
+                {profile.displayName}
+              </h1>
+            )}
           </div>
         </div>
       </div>
@@ -403,23 +445,18 @@ export function ProfilePage() {
 
         {/* Nền trắng 3 card — kéo sang trái dưới sidebar, khi full xuống đáy 10dvh */}
         <div
-          data-profile-gesture
-          className="relative flex-1 w-full bg-background border-t border-border/40 pointer-events-auto will-change-transform flex flex-col overflow-hidden"
-          style={{
-            marginLeft: "calc(-1 * var(--sidebar-w, 0px))",
-            width: "calc(100% + var(--sidebar-w, 0px))",
-            transform: "translate3d(0, calc(var(--p) * 57dvh), 0)",
-            paddingTop: "calc(var(--p) * 12dvh)",
-          }}
-        >
+  data-profile-gesture
+  data-profile-sheet
+  className="relative flex-1 w-full bg-transparent border-t border-transparent pointer-events-auto will-change-transform flex flex-col overflow-visible"
+  style={{
+    transform: "translate3d(0, calc(var(--p) * 57dvh), 0)",
+  }}
+>
           {/* CÁC CARD NỘI DUNG */}
           <div
-            data-profile-cards
-            className="relative z-10 flex-1 pl-[calc(var(--sidebar-w,0px)+1rem)] pr-4 md:pl-[calc(var(--sidebar-w,0px)+2rem)] md:pr-8 mt-6 pb-6 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3 will-change-opacity"
-            style={{
-              opacity: "calc(1 - var(--p) * 2.5)",
-            }}
-          >
+  data-profile-cards
+  className="relative z-10 flex-1 pl-[calc(var(--sidebar-w,0px)+1rem)] pr-4 md:pl-[calc(var(--sidebar-w,0px)+2rem)] md:pr-8 mt-6 pt-14 md:pt-16 pb-6 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-3"
+>
             {/* Card 1: Thống kê */}
             <Card className="flex flex-col h-full min-h-0 overflow-hidden p-5 shadow-sm bg-background border border-border">
               <div className="shrink-0">

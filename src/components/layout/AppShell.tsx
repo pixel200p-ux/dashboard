@@ -224,25 +224,14 @@ export function AppShell() {
         className={cn(
           "fixed inset-y-0 left-0 flex w-60 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground",
           pathname.startsWith("/profile") && !isPhone
-            ? "profile-aside will-change-transform"
+            ? "profile-aside"
             : "transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
           mobile ? "translate-x-0 shadow-2xl" : "max-md:-translate-x-full",
           !mobile && "md:inset-y-0"
         )}
-                style={
-          isPhone
-            ? {
-                zIndex: mobile ? 130 : 40,
-              }
-            : pathname.startsWith("/profile")
-              ? {
-                  zIndex: 50,
-                  transform: "translate3d(calc(var(--p, 0) * -100%), 0, 0)",
-                }
-              : {
-                  zIndex: 50,
-                }
-        }
+        style={{
+          zIndex: mobile ? 130 : 50,
+        }}
       >
         <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-5">
           <Link to="/" onClick={() => setMobile(false)} className="flex min-w-0 items-center gap-2.5">
@@ -359,17 +348,17 @@ export function AppShell() {
         )}
 
         <main
-          className={cn(
-            "min-w-0",
-            pathname.startsWith("/profile")
-              ? "min-h-dvh overflow-x-hidden overflow-y-auto p-0"
-              : pathname.startsWith("/calendar")
-                ? "overflow-x-hidden p-3 pb-4 lg:flex lg:h-[calc(100dvh-3.5rem)] lg:max-h-[calc(100dvh-3.5rem)] lg:overflow-hidden lg:p-6"
-                : "overflow-x-hidden p-3 pb-4 md:p-6",
-          )}
-        >
-          <Outlet />
-        </main>
+  className={cn(
+    "min-w-0",
+    pathname.startsWith("/profile")
+      ? "min-h-dvh overflow-x-hidden overflow-y-auto p-0 touch-pan-y"
+      : pathname.startsWith("/calendar")
+        ? "overflow-x-hidden p-3 pb-4 lg:flex lg:h-[calc(100dvh-3.5rem)] lg:max-h-[calc(100dvh-3.5rem)] lg:overflow-hidden lg:p-6"
+        : "overflow-x-hidden p-3 pb-4 md:p-6",
+  )}
+>
+  <Outlet />
+</main>
         <NotificationFooter />
       </div>
 
