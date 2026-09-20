@@ -30,7 +30,6 @@ import { refreshMarketPrices } from "@/lib/api/prices";
 import { useQueryClient } from "@tanstack/react-query";
 import { PORTFOLIO_KEY, usePortfolio } from "@/lib/use-portfolio";
 import { toast } from "sonner";
-import { summarizeMarketStatus } from "@/lib/market-status.js";
 import { TxDialog } from "@/components/forms/TxDialog";
 import { CapitalDialog } from "@/components/forms/CapitalDialog";
 import { BankDialog } from "@/components/forms/BankDialog";
@@ -78,8 +77,6 @@ export function AppShell() {
   const theme = useUiStore((s) => s.theme);
   const currency = useUiStore((s) => s.currency);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
-  const decorRaw = useUiStore((s) => s.profileDecor);
-  const decor = pathname.startsWith("/profile") ? Math.max(0, Math.min(1, Number(decorRaw) || 0)) : 0;
   const toggleCurrency = useUiStore((s) => s.toggleCurrency);
   const qc = useQueryClient();
   const { data: portfolio } = usePortfolio();
@@ -101,6 +98,8 @@ export function AppShell() {
   useEffect(() => {
     if (!pathname.startsWith("/profile")) {
       useUiStore.getState().setProfileDecor(0);
+      document.documentElement.style.setProperty("--p", "0");
+      document.documentElement.removeAttribute("data-profile-full");
     }
   }, [pathname]);
 
@@ -221,28 +220,24 @@ export function AppShell() {
         />
       )}
 
-            <aside
+      <aside
         className={cn(
-          "fixed inset-y-0 left-0 flex w-60 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground transition-[width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "fixed inset-y-0 left-0 flex w-60 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground",
+          pathname.startsWith("/profile") && !isPhone
+            ? "profile-aside will-change-transform"
+            : "transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
           mobile ? "translate-x-0 shadow-2xl" : "max-md:-translate-x-full",
           !mobile && "md:inset-y-0"
         )}
                 style={
           isPhone
             ? {
-                // Phone: không gắn cover/decor. Menu mở thì luôn trên avatar + cover
                 zIndex: mobile ? 130 : 40,
               }
-            : decor > 0.01
+            : pathname.startsWith("/profile")
               ? {
-                  zIndex: decor > 0.08 ? 35 : 50,
-                  width: `calc(5rem * ${1 - Math.min(1, decor * 1.4)})`,
-                  minWidth: 0,
-                  overflow: "hidden",
-                  opacity: Math.max(0, 1 - decor * 1.6),
-                  transform: `translateX(${-18 * decor}%)`,
-                  pointerEvents: decor > 0.2 ? "none" : "auto",
-                  borderColor: decor > 0.4 ? "transparent" : undefined,
+                  zIndex: 50,
+                  transform: "translate3d(calc(var(--p, 0) * -100%), 0, 0)",
                 }
               : {
                   zIndex: 50,
@@ -299,17 +294,17 @@ export function AppShell() {
         </nav>
       </aside>
 
-      <div className="md:pl-60">
+      <div className="md:pl-60 [--sidebar-w:0px] md:[--sidebar-w:15rem]">
         {pathname.startsWith("/profile") ? (
           <>
             <div
-              className="pointer-events-none fixed left-0 top-0 z-[90] md:left-60"
+              className="profile-header-actions pointer-events-none fixed left-0 top-0 z-[90] md:left-60"
               style={{
-                transform: `translateY(${-120 * decor}%)`,
-                opacity: 1 - decor,
+                transform: "translateY(calc(var(--p, 0) * -120%))",
+                opacity: "calc(1 - var(--p, 0))",
               }}
             >
-              <div className="flex h-14 items-center px-3 md:px-6" style={{ pointerEvents: decor > 0.2 ? "none" : "auto" }}>
+              <div className="flex h-14 items-center px-3 md:px-6">
                 {!mobile && (
                   <button
                     className="grid h-10 w-10 place-items-center rounded-md bg-background/70 hover:bg-muted md:hidden"
@@ -323,16 +318,13 @@ export function AppShell() {
             </div>
 
             <div
-              className="pointer-events-none fixed right-0 top-0 z-[90] md:left-60"
+              className="profile-header-actions pointer-events-none fixed right-0 top-0 z-[90] md:left-60"
               style={{
-                transform: `translateY(${-120 * decor}%)`,
-                opacity: 1 - decor,
+                transform: "translateY(calc(var(--p, 0) * -120%))",
+                opacity: "calc(1 - var(--p, 0))",
               }}
             >
-              <div
-                className="ml-auto flex h-14 w-fit items-center gap-1 px-3 sm:gap-2 md:px-6"
-                style={{ pointerEvents: decor > 0.2 ? "none" : "auto" }}
-              >
+              <div className="ml-auto flex h-14 w-fit items-center gap-1 px-3 sm:gap-2 md:px-6">
                 <HeaderActions />
               </div>
             </div>
