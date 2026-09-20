@@ -96,14 +96,6 @@ export function AppShell() {
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    if (!pathname.startsWith("/profile")) {
-      useUiStore.getState().setProfileDecor(0);
-      document.documentElement.style.setProperty("--p", "0");
-      document.documentElement.removeAttribute("data-profile-full");
-    }
-  }, [pathname]);
-
-  useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
     const apply = () => setIsPhone(mq.matches);
     apply();
@@ -222,7 +214,7 @@ export function AppShell() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 flex w-60 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground",
+          "fixed inset-y-0 left-0 flex w-[17rem] flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground",
           pathname.startsWith("/profile") && !isPhone
             ? "profile-aside"
             : "transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
@@ -283,43 +275,9 @@ export function AppShell() {
         </nav>
       </aside>
 
-      <div className="md:pl-60 [--sidebar-w:0px] md:[--sidebar-w:15rem]">
-        {pathname.startsWith("/profile") ? (
-          <>
-            <div
-              className="profile-header-actions pointer-events-none fixed left-0 top-0 z-[90] md:left-60"
-              style={{
-                transform: "translateY(calc(var(--p, 0) * -120%))",
-                opacity: "calc(1 - var(--p, 0))",
-              }}
-            >
-              <div className="flex h-14 items-center px-3 md:px-6">
-                {!mobile && (
-                  <button
-                    className="grid h-10 w-10 place-items-center rounded-md bg-background/70 hover:bg-muted md:hidden"
-                    onClick={() => setMobile(true)}
-                    aria-label="Menu"
-                  >
-                    <Menu className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div
-              className="profile-header-actions pointer-events-none fixed right-0 top-0 z-[90] md:left-60"
-              style={{
-                transform: "translateY(calc(var(--p, 0) * -120%))",
-                opacity: "calc(1 - var(--p, 0))",
-              }}
-            >
-              <div className="ml-auto flex h-14 w-fit items-center gap-1 px-3 sm:gap-2 md:px-6">
-                <HeaderActions />
-              </div>
-            </div>
-          </>
-        ) : (
-          <header className="sticky top-0 z-50 flex h-14 items-center justify-between gap-2 border-b bg-background/90 px-3 backdrop-blur md:px-6">
+      <div className="md:pl-[17rem] [--sidebar-w:0px] md:[--sidebar-w:17rem]">
+        <header className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur">
+          <div className="mx-auto flex h-14 w-full items-center justify-between gap-2 px-3 md:px-5">
             <div className="flex items-center gap-2">
               {!mobile && (
                 <button
@@ -344,21 +302,23 @@ export function AppShell() {
               </div>
               <HeaderActions />
             </div>
-          </header>
-        )}
+          </div>
+        </header>
 
         <main
-  className={cn(
-    "min-w-0",
-    pathname.startsWith("/profile")
-      ? "min-h-dvh overflow-x-hidden overflow-y-auto p-0 touch-pan-y"
-      : pathname.startsWith("/calendar")
-        ? "overflow-x-hidden p-3 pb-4 lg:flex lg:h-[calc(100dvh-3.5rem)] lg:max-h-[calc(100dvh-3.5rem)] lg:overflow-hidden lg:p-6"
-        : "overflow-x-hidden p-3 pb-4 md:p-6",
-  )}
->
-  <Outlet />
-</main>
+          className={cn(
+            "min-w-0",
+            pathname.startsWith("/profile")
+              ? "min-h-dvh overflow-x-hidden overflow-y-auto p-0 pb-4 touch-pan-y"
+              : pathname.startsWith("/calendar")
+                ? "overflow-x-hidden p-3 pb-4 lg:flex lg:h-[calc(100dvh-3.5rem)] lg:max-h-[calc(100dvh-3.5rem)] lg:overflow-hidden lg:p-6"
+                : "overflow-x-hidden p-3 pb-4 md:p-6",
+          )}
+        >
+          <div className="w-full">
+            <Outlet />
+          </div>
+        </main>
         <NotificationFooter />
       </div>
 

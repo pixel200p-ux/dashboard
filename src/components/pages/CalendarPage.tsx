@@ -336,7 +336,7 @@ export function CalendarPage() {
       </div>
 
       {/* ── Main ───────────────────────────────────────── */}
-      <div className="grid h-full min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,5.6fr)_minmax(0,3fr)] lg:overflow-hidden">
+      <div className="grid h-full min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:overflow-hidden">
         {/* Calendar */}
         <Card className="min-h-0 overflow-hidden border border-border bg-card p-3 text-[#0F172A] shadow-(--shadow-card) dark:border-[#334155] dark:bg-[#162238] sm:p-4">
           {/* Month navigation */}

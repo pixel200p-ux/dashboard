@@ -47,7 +47,6 @@ type UiState = {
   bankOpen: boolean;
   bankEditId: string | null;
   notifyOpen: boolean;
-  profileDecor: number;
   setTheme: (t: ThemeMode) => void;
   setLoginTheme: (t: LoginThemeId) => void;
   toggleTheme: () => void;
@@ -62,7 +61,6 @@ type UiState = {
   closeBank: () => void;
   setNotifyOpen: (v: boolean) => void;
   toggleNotify: () => void;
-  setProfileDecor: (n: number) => void;
 };
 
 export const useUiStore = create<UiState>()(
@@ -78,7 +76,6 @@ export const useUiStore = create<UiState>()(
       bankOpen: false,
       bankEditId: null,
       notifyOpen: false,
-      profileDecor: 0,
       setTheme: (theme) => set({ theme }),
       setLoginTheme: (loginTheme) => set({ loginTheme }),
       toggleTheme: () => set({ theme: get().theme === "light" ? "dark" : "light" }),
@@ -97,7 +94,6 @@ export const useUiStore = create<UiState>()(
       closeBank: () => set({ bankOpen: false, bankEditId: null }),
       setNotifyOpen: (notifyOpen) => set({ notifyOpen }),
       toggleNotify: () => set({ notifyOpen: !get().notifyOpen }),
-      setProfileDecor: (n) => set({ profileDecor: Math.max(0, Math.min(1, n)) }),
     }),
     {
       name: "pm-ui",
