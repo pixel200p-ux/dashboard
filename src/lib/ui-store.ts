@@ -39,6 +39,7 @@ export type TxPrefill = {
 type UiState = {
   theme: ThemeMode;
   loginTheme: LoginThemeId;
+  loginThemeOverrideMonth: string | null;
   currency: DisplayCurrency;
   stockFilter: "ALL" | "vps" | "ssi";
   txOpen: TxPrefill | null;
@@ -49,6 +50,7 @@ type UiState = {
   notifyOpen: boolean;
   setTheme: (t: ThemeMode) => void;
   setLoginTheme: (t: LoginThemeId) => void;
+  syncLoginTheme: () => void;
   toggleTheme: () => void;
   toggleCurrency: () => void;
   setStockFilter: (f: UiState["stockFilter"]) => void;
@@ -68,6 +70,7 @@ export const useUiStore = create<UiState>()(
     (set, get) => ({
       theme: "light",
       loginTheme: "default",
+      loginThemeOverrideMonth: null,
       currency: "VND",
       stockFilter: "ALL",
       txOpen: null,
@@ -77,7 +80,22 @@ export const useUiStore = create<UiState>()(
       bankEditId: null,
       notifyOpen: false,
       setTheme: (theme) => set({ theme }),
-      setLoginTheme: (loginTheme) => set({ loginTheme }),
+      setLoginTheme: (loginTheme) => {
+        const now = new Date();
+        set({
+          loginTheme,
+          loginThemeOverrideMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+        });
+      },
+      syncLoginTheme: () => {
+        const { loginThemeOverrideMonth } = get();
+        const now = new Date();
+        const month = now.getMonth() + 1;
+        const monthKey = `${now.getFullYear()}-${String(month).padStart(2, "0")}`;
+        if (loginThemeOverrideMonth === monthKey) return;
+        const loginTheme = month <= 2 || month === 12 ? "winter" : month <= 5 ? "spring" : month <= 8 ? "summer" : "autumn";
+        set({ loginTheme, loginThemeOverrideMonth: null });
+      },
       toggleTheme: () => set({ theme: get().theme === "light" ? "dark" : "light" }),
       toggleCurrency: () => set({ currency: get().currency === "VND" ? "USD" : "VND" }),
       setStockFilter: (stockFilter) => set({ stockFilter }),
@@ -100,6 +118,7 @@ export const useUiStore = create<UiState>()(
       partialize: (s) => ({
         theme: s.theme,
         loginTheme: s.loginTheme,
+        loginThemeOverrideMonth: s.loginThemeOverrideMonth,
         currency: s.currency,
         stockFilter: s.stockFilter,
       }),

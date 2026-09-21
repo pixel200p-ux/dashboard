@@ -5,32 +5,33 @@ import { formatViDate } from "@/engine/dates";
 import { displayMoney } from "@/lib/display";
 import { useMilestones, useProfile, useSaveProfile } from "@/lib/use-profile";
 import { usePortfolio } from "@/lib/use-portfolio";
-import { UserRound, Activity, BarChart3, PlusCircle } from "lucide-react";
-import React, { useMemo, useRef, useState } from "react";
+import { PROFILE_SEASON_BG, resolveProfileSeason, type ProfileSeason } from "@/constants/seasons";
+import { useUiStore } from "@/lib/ui-store";
+import { UserRound, Activity, BarChart3, PlusCircle, ChevronDown, ChevronUp } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FilterMenu } from "@/components/FilterMenu";
 
-function readImage(file: File, maxEdge: number): Promise<string> {
+async function readImage(file: File, maxEdge: number): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) {
+    bitmap.close();
+    throw new Error("Không khởi tạo được context canvas");
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("canvas"));
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.92));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Không đọc được ảnh"));
-    };
-    img.src = url;
+    canvas.toBlob((blob) => {
+      if (!blob) return reject(new Error("Lỗi khi chuyển đổi ảnh"));
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Không đọc được blob ảnh"));
+      reader.readAsDataURL(blob);
+    }, "image/jpeg", 0.92);
   });
 }
 
@@ -58,14 +59,62 @@ export function ProfilePage() {
   const { data: portfolio } = usePortfolio();
   const save = useSaveProfile();
   const usd = portfolio?.state.usdVnd ?? 25000;
+  const theme = useUiStore((s) => s.theme);
+  const loginTheme = useUiStore((s) => s.loginTheme);
+  const season = resolveProfileSeason(loginTheme);
 
-  const coverRef = useRef<HTMLInputElement>(null);
-  const avaRef = useRef<HTMLInputElement>(null);
+  const avaRef = React.useRef<HTMLInputElement>(null);
 
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [kindFilter, setKindFilter] = useState("ALL");
   const [openYear, setOpenYear] = useState<string | null>(null);
+  const [previousSeason, setPreviousSeason] = useState<ProfileSeason | null>(null);
+  const [seasonTransitioning, setSeasonTransitioning] = useState(false);
+  const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
+  const [coverExpanded, setCoverExpanded] = useState(false);
+  const lastSeasonTapAt = React.useRef(0);
+
+  useEffect(() => {
+    if (previousSeason === null || previousSeason === season) return;
+    const frame = requestAnimationFrame(() => setSeasonTransitioning(true));
+    const timeout = window.setTimeout(() => {
+      setPreviousSeason(null);
+      setSeasonTransitioning(false);
+    }, 700);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [previousSeason, season]);
+
+  useEffect(() => {
+    const current = PROFILE_SEASON_BG[season];
+    const light = new Image();
+    const dark = new Image();
+    light.src = current.light;
+    dark.src = current.dark;
+  }, [season]);
+
+  const selectSeason = (nextSeason: ProfileSeason) => {
+    if (nextSeason === season) return;
+    setPreviousSeason(season);
+    useUiStore.getState().setLoginTheme(nextSeason);
+    setSeasonMenuOpen(false);
+  };
+
+  const handleSeasonPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse") return;
+    const now = Date.now();
+    if (now - lastSeasonTapAt.current < 350) {
+      event.preventDefault();
+      setSeasonMenuOpen((open) => !open);
+      lastSeasonTapAt.current = 0;
+      return;
+    }
+    lastSeasonTapAt.current = now;
+  };
+
   const { txStats, yearStats } = useMemo(() => {
     const empty = { txStats: emptyStat, yearStats: [] as { year: string; stats: TxStat }[] };
     if (!portfolio) return empty;
@@ -151,26 +200,79 @@ export function ProfilePage() {
       <div className="mx-auto w-full px-3 pb-6 pt-4 md:px-6 md:pt-6 xl:px-8">
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-[#3d4d41] shadow-sm">
           <div
-            className="relative min-h-[180px] md:min-h-[220px]"
-            onDoubleClick={() => coverRef.current?.click()}
+            className={`profile-cover-season relative transition-[min-height] duration-500 ease-out ${coverExpanded ? "min-h-[360px] md:min-h-[760px]" : "min-h-[180px] md:min-h-[380px]"}`}
+            style={{
+              "--profile-bg-light": `url(${PROFILE_SEASON_BG[season].light})`,
+              "--profile-bg-dark": `url(${PROFILE_SEASON_BG[season].dark})`,
+            } as React.CSSProperties}
           >
-            {profile.coverData ? (
-              <img
-                src={profile.coverData}
-                alt="Cover"
-                decoding="async"
-                fetchPriority="low"
-                draggable={false}
-                className="h-full w-full object-cover object-center"
+            {previousSeason && (
+              <div
+                aria-hidden
+                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ease-out ${seasonTransitioning ? "opacity-0" : "opacity-100"}`}
+                style={{
+                  backgroundImage: `url(${PROFILE_SEASON_BG[previousSeason][theme]})`,
+                } as React.CSSProperties}
               />
-            ) : (
-              <div className="grid min-h-[180px] h-full place-items-center text-sm text-white/80 md:min-h-[220px]">
-                Nhấp đúp để chọn ảnh bìa
-              </div>
             )}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/30 via-background/0 to-black/10" />
-
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${PROFILE_SEASON_BG[season][theme]})` }}
+              aria-hidden
+            />
+            <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-background/30 via-background/0 to-black/10" />
+            <div
+              className="absolute right-3 top-3 z-10"
+              onDoubleClick={(event) => { event.preventDefault(); setSeasonMenuOpen((open) => !open); }}
+              onPointerUp={handleSeasonPointerUp}
+            >
+              <button
+                type="button"
+                aria-label={`Mùa ${season}. Nhấn đúp để đổi mùa`}
+                aria-expanded={seasonMenuOpen}
+                className="h-10 w-10 rounded-full border-2 border-white/90 bg-cover bg-center shadow-lg ring-2 ring-black/10 transition hover:scale-105"
+                style={{ backgroundImage: `url(${PROFILE_SEASON_BG[season][theme]})` }}
+              />
+              {seasonMenuOpen && (
+  <div className="absolute right-0 top-12 z-30 flex flex-row-reverse items-center gap-1.5 rounded-2xl border border-white/20 bg-black/60 p-1.5 shadow-xl backdrop-blur-md md:w-12 md:flex-col md:gap-1 md:p-1">
+    {(Object.keys(PROFILE_SEASON_BG) as ProfileSeason[])
+      .filter((item) => item !== season)
+      .map((item) => (
+        <button
+          key={item}
+          type="button"
+          aria-label={`Chọn mùa ${item}`}
+          aria-pressed={season === item}
+          onClick={(event) => {
+            event.stopPropagation();
+            selectSeason(item);
+          }}
+          onPointerUp={(event) => event.stopPropagation()}
+          className={`h-9 w-9 shrink-0 rounded-full border bg-cover bg-center transition-transform hover:scale-110 ${
+            season === item
+              ? "border-white ring-2 ring-white/60"
+              : "border-white/40"
+          }`}
+          style={{
+            backgroundImage: `url(${PROFILE_SEASON_BG[item][theme]})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+      ))}
+  </div>
+)}
+            </div>
             <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 px-4 pb-4 md:gap-4 md:px-6 md:pb-5">
+            <button
+              type="button"
+              aria-label={coverExpanded ? "Thu gọn ảnh nền" : "Mở rộng ảnh nền"}
+              aria-expanded={coverExpanded}
+              onClick={() => setCoverExpanded((expanded) => !expanded)}
+              className="absolute bottom-3 right-3 z-20 grid h-10 w-10 place-items-center rounded-full border border-white/40 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:scale-105 hover:bg-black/55"
+            >
+              {coverExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </button>
               <button
                 type="button"
                 className="profile-hero-avt pointer-events-auto relative h-16 w-16 overflow-hidden rounded-full border-2 border-background/80 bg-card/80 shadow-md backdrop-blur-sm md:h-20 md:w-20"
@@ -212,17 +314,6 @@ export function ProfilePage() {
         </div>
 
         <input
-          ref={coverRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={async (e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (f) save.mutate({ data: { coverData: await readImage(f, 1920) } });
-          }}
-        />
-        <input
           ref={avaRef}
           type="file"
           accept="image/*"
@@ -230,7 +321,10 @@ export function ProfilePage() {
           onChange={async (e) => {
             const f = e.target.files?.[0];
             e.target.value = "";
-            if (f) save.mutate({ data: { avatarData: await readImage(f, 512) } });
+            if (f) {
+              const data = await readImage(f, 512);
+              save.mutate({ data: { avatarData: data } });
+            }
           }}
         />
 
@@ -258,7 +352,7 @@ export function ProfilePage() {
                 </div>
               </div>
 
-              {/* ===== BẮT ĐẦU PHẦN DESIGN LẠI: Giao dịch khớp & Sổ Ngân hàng ===== */}
+              {/* ===== SECTION: Giao dịch khớp & Sổ Ngân hàng ===== */}
               <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-muted/20">
                 {/* Giao dịch khớp */}
                 <div className="flex items-center justify-between gap-3 px-3.5 py-3">
@@ -310,7 +404,6 @@ export function ProfilePage() {
                   </div>
                 </div>
               </div>
-              {/* ===== KẾT THÚC PHẦN DESIGN LẠI ===== */}
 
               <div className="pt-2">
                 <p className="mb-2 text-xs font-semibold text-muted-foreground">Chi tiết theo năm</p>
@@ -388,9 +481,9 @@ export function ProfilePage() {
                       {formatViDate(g.date)}
                     </p>
                     <ul className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {g.items.map((m) => (
+                      {g.items.map((m, idx) => (
                         <li
-                          key={m.id}
+                          key={`${m.id}-${idx}`}
                           className="rounded-lg border border-border bg-muted/35 p-2.5 shadow-2xs"
                         >
                           <p className="text-xs font-medium leading-snug text-foreground">{m.label}</p>

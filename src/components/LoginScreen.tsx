@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { BarChart3, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useUiStore, type LoginThemeId } from "@/lib/ui-store";
+import { type ProfileSeason } from "@/constants/seasons";
 
 const SEASONS: {
   id: LoginThemeId;
@@ -189,7 +190,7 @@ export function LoginScreen() {
 
           {menuOpen && (
             <div className="absolute right-0 top-12 w-44 overflow-hidden rounded-2xl border border-black/10 bg-white/95 py-1 shadow-xl backdrop-blur">
-              {SEASONS.map((s) => (
+              {SEASONS.filter((s): s is typeof s & { id: ProfileSeason; day: string; night: string } => s.id !== "default").map((s) => (
                 <button
                   key={s.id}
                   type="button"

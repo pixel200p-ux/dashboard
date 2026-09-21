@@ -162,51 +162,11 @@ export function AppShell() {
     });
   }
 
-  const HeaderActions = () => (
-    <div className="flex items-center gap-1 sm:gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={onRefresh}
-        disabled={refreshing}
-        className={cn("relative gap-1.5", pathname.startsWith("/profile") && "bg-background/80")}
-      >
-        <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-        <span className="hidden sm:inline">
-          {refreshing
-            ? "Đang cập nhật..."
-            : lastPriceAt
-              ? `Cập nhật giá (${formatPriceAgoShort(lastPriceAt)})`
-              : "Cập nhật giá"}
-        </span>
-        <span
-          className={cn(
-            "absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background",
-            !lastPriceAt || stale ? "bg-orange-500" : "bg-emerald-500"
-          )}
-          aria-hidden
-        />
-      </Button>
-
-      <Button size="sm" variant="outline" onClick={toggleCurrency} title="Chuyển VND / USD" className={cn(pathname.startsWith("/profile") && "bg-background/80")}>
-        <span className={currency === "VND" ? "font-semibold" : "text-muted-foreground"}>VND</span>
-        <span className="text-muted-foreground">/</span>
-        <span className={currency === "USD" ? "font-semibold" : "text-muted-foreground"}>USD</span>
-      </Button>
-
-      <NotifyBell />
-
-      <Button size="icon" variant="outline" onClick={toggleTheme} title="Theme" className={cn(pathname.startsWith("/profile") && "bg-background/80")}>
-        {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      </Button>
-    </div>
-  );
-
   return (
     <div className="min-h-dvh bg-background text-foreground">
       {mobile && (
         <button
-          className="fixed inset-0 z-[120] bg-black/50 md:hidden"
+          className="fixed inset-0 z-120 bg-black/50 md:hidden"
           onClick={() => setMobile(false)}
           aria-label="Đóng menu"
         />
@@ -214,7 +174,7 @@ export function AppShell() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 flex w-[17rem] flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground",
+          "fixed inset-y-0 left-0 flex w-68 flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground",
           pathname.startsWith("/profile") && !isPhone
             ? "profile-aside"
             : "transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
@@ -264,7 +224,7 @@ export function AppShell() {
                     setSigningOut(true);
                     void signOut().catch(() => setSigningOut(false));
                   }}
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-white/70 hover:bg-white/10 hover:text-white"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-50"
                   aria-label="Đăng xuất"
                 >
                   <LogOut className="h-4 w-4" />
@@ -275,7 +235,7 @@ export function AppShell() {
         </nav>
       </aside>
 
-      <div className="md:pl-[17rem] [--sidebar-w:0px] md:[--sidebar-w:17rem]">
+      <div className="md:pl-68 [--sidebar-w:0px] md:[--sidebar-w:17rem]">
         <header className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur">
           <div className="mx-auto flex h-14 w-full items-center justify-between gap-2 px-3 md:px-5">
             <div className="flex items-center gap-2">
@@ -293,14 +253,53 @@ export function AppShell() {
 
             <div className="flex items-center gap-2">
               <div className="mr-1 hidden min-w-0 flex-col items-end leading-tight sm:flex">
-                <span className={cn("max-w-[11rem] truncate text-[11px]", stale || !lastPriceAt ? "text-orange-500" : "text-muted-foreground")}>
+                <span className={cn("max-w-44 truncate text-[11px]", stale || !lastPriceAt ? "text-orange-500" : "text-muted-foreground")}>
                   {lastPriceAt ? formatPriceAgoShort(lastPriceAt) : "Chưa cập nhật"}
                 </span>
                 {!lastPriceAt && (
                   <span className="text-[10px] text-muted-foreground">Đang dùng giá vốn</span>
                 )}
               </div>
-              <HeaderActions />
+              
+              {/* Header Actions Direct JSX */}
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onRefresh}
+                  disabled={refreshing}
+                  className={cn("relative gap-1.5", pathname.startsWith("/profile") && "bg-background/80")}
+                >
+                  <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+                  <span className="hidden sm:inline">
+                    {refreshing
+                      ? "Đang cập nhật..."
+                      : lastPriceAt
+                        ? `Cập nhật giá (${formatPriceAgoShort(lastPriceAt)})`
+                        : "Cập nhật giá"}
+                  </span>
+                  <span
+                    className={cn(
+                      "absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                      !lastPriceAt || stale ? "bg-orange-500" : "bg-emerald-500"
+                    )}
+                    aria-hidden
+                  />
+                </Button>
+
+                <Button size="sm" variant="outline" onClick={toggleCurrency} title="Chuyển VND / USD" className={cn(pathname.startsWith("/profile") && "bg-background/80")}>
+                  <span className={currency === "VND" ? "font-semibold" : "text-muted-foreground"}>VND</span>
+                  <span className="text-muted-foreground">/</span>
+                  <span className={currency === "USD" ? "font-semibold" : "text-muted-foreground"}>USD</span>
+                </Button>
+
+                <NotifyBell />
+
+                <Button size="icon" variant="outline" onClick={toggleTheme} title="Theme" className={cn(pathname.startsWith("/profile") && "bg-background/80")}>
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+              </div>
+
             </div>
           </div>
         </header>

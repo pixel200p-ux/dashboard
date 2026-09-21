@@ -386,6 +386,17 @@ html.dark {
   max-width: min(18rem, 52vw);
 }
 
+.profile-cover-season {
+  background-image: var(--profile-bg-light);
+  background-position: center;
+  background-size: cover;
+  will-change: opacity;
+}
+
+.dark .profile-cover-season {
+  background-image: var(--profile-bg-dark);
+}
+
 [data-profile-scroll] {
   overscroll-behavior: contain;
 }

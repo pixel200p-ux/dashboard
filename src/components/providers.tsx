@@ -7,9 +7,13 @@ import { useEffect } from "react";
 
 function ThemeSync() {
   const theme = useUiStore((s) => s.theme);
+  const syncLoginTheme = useUiStore((s) => s.syncLoginTheme);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+  useEffect(() => {
+    syncLoginTheme();
+  }, [syncLoginTheme]);
   return null;
 }
 
