@@ -235,7 +235,7 @@ export function ProfilePage() {
         />
 
         <div className="mt-4 grid gap-3 lg:grid-cols-12 lg:gap-3">
-          <Card className="lg:col-span-5 flex h-[min(70vh,520px)] flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
+          <Card className="lg:col-span-5 flex h-auto min-h-0 flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
             <div className="mb-3 flex items-center justify-between border-b border-border/70 pb-2">
               <div>
                 <CardTitle className="flex items-center gap-2 text-foreground">
@@ -246,7 +246,7 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <div data-profile-scroll className="flex-1 space-y-3 overflow-y-auto pr-1 overscroll-contain">
+            <div data-profile-scroll className="space-y-3 pr-1 overscroll-contain">
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="rounded-xl border border-border bg-muted/50 px-3.5 py-2.5">
                   <p className="text-[11px] font-medium text-muted-foreground">Đang mở</p>
@@ -258,20 +258,59 @@ export function ProfilePage() {
                 </div>
               </div>
 
-              <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3 text-xs">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Giao dịch khớp:</span>
-                  <span className="font-semibold text-foreground">
-                    Mua <strong className="text-emerald-600 dark:text-emerald-400">{txStats.buys}</strong> · Bán <strong className="text-rose-600 dark:text-rose-400">{txStats.sells}</strong>
-                  </span>
+              {/* ===== BẮT ĐẦU PHẦN DESIGN LẠI: Giao dịch khớp & Sổ Ngân hàng ===== */}
+              <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-muted/20">
+                {/* Giao dịch khớp */}
+                <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-background text-[10px] font-bold text-muted-foreground ring-1 ring-border/70">
+                      GD
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">Giao dịch khớp</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-mono text-base font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {txStats.buys}
+                      </span>
+                      <span className="text-[10px] font-medium text-muted-foreground">Mua</span>
+                    </div>
+                    <div className="h-3.5 w-px bg-border" />
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-mono text-base font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                        {txStats.sells}
+                      </span>
+                      <span className="text-[10px] font-medium text-muted-foreground">Bán</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Sổ Ngân hàng:</span>
-                  <span className="font-semibold text-foreground">
-                    Đang gửi <strong className="text-amber-600 dark:text-amber-400">{txStats.bankOpen}</strong> · Tất toán <strong>{txStats.bankClosed}</strong>
-                  </span>
+
+                {/* Sổ Ngân hàng */}
+                <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-background text-[10px] font-bold text-muted-foreground ring-1 ring-border/70">
+                      NH
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">Sổ Ngân hàng</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-mono text-base font-semibold tabular-nums text-foreground">
+                        {txStats.bankOpen}
+                      </span>
+                      <span className="text-[10px] font-medium text-muted-foreground">Đang gửi</span>
+                    </div>
+                    <div className="h-3.5 w-px bg-border" />
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-mono text-base font-semibold tabular-nums text-foreground">
+                        {txStats.bankClosed}
+                      </span>
+                      <span className="text-[10px] font-medium text-muted-foreground">Tất toán</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+              {/* ===== KẾT THÚC PHẦN DESIGN LẠI ===== */}
 
               <div className="pt-2">
                 <p className="mb-2 text-xs font-semibold text-muted-foreground">Chi tiết theo năm</p>
@@ -308,7 +347,7 @@ export function ProfilePage() {
             </div>
           </Card>
 
-          <Card className="lg:col-span-7 flex h-[min(70vh,520px)] flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
+          <Card className="lg:col-span-7 flex h-auto min-h-0 flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
             <div className="mb-3 shrink-0 border-b border-border/70 pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-foreground">
@@ -336,7 +375,7 @@ export function ProfilePage() {
               <CardDesc className="mt-0.5">Mốc lịch sử đạt được · xếp mới nhất trên cùng</CardDesc>
             </div>
 
-            <div data-profile-scroll className="flex-1 overflow-y-auto pr-1 lg:min-h-0 overscroll-contain">
+            <div data-profile-scroll className="pr-1 overscroll-contain">
               {marksPending && <p className="text-sm text-muted-foreground">Đang tính mốc…</p>}
               {!marksPending && timeline.length === 0 && (
                 <p className="text-sm text-muted-foreground">Chưa có snapshot giá.</p>
