@@ -6,7 +6,8 @@
 @theme {
   --font-sans: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
   --font-display: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "IBM Plex Sans", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono:
+    "IBM Plex Sans", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --color-background: var(--app-bg);
   --color-foreground: var(--app-fg);
@@ -63,9 +64,17 @@
   --app-secondary: #d9e1ea;
   --app-accent: #163e6f;
   --app-border: color-mix(in oklab, #0c1929 18%, transparent);
-  --app-scrollbar-track: color-mix(in oklab, var(--app-surface) 82%, transparent);
+  --app-scrollbar-track: color-mix(
+    in oklab,
+    var(--app-surface) 82%,
+    transparent
+  );
   --app-scrollbar-thumb: color-mix(in oklab, var(--app-navy) 32%, #9aa8b5);
-  --app-scrollbar-thumb-hover: color-mix(in oklab, var(--app-navy) 46%, #8b9bb0);
+  --app-scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--app-navy) 46%,
+    #8b9bb0
+  );
   --app-profit: #0f7b5a;
   --app-loss: #c2413b;
   --app-warn: #b45309;
@@ -74,7 +83,8 @@
   --app-chart-stock: #163e6f;
   --app-chart-crypto: #3d5a80;
   --app-chart-bank: #2a6f97;
-  --shadow-card: 0 1px 2px color-mix(in oklab, #0a2540 14%, transparent),
+  --shadow-card:
+    0 1px 2px color-mix(in oklab, #0a2540 14%, transparent),
     0 4px 12px color-mix(in oklab, #0a2540 8%, transparent);
 }
 
@@ -93,9 +103,17 @@ html.dark {
   --app-secondary: #122033;
   --app-accent: #7aa2d4;
   --app-border: color-mix(in oklab, #e8eef4 12%, transparent);
-  --app-scrollbar-track: color-mix(in oklab, var(--app-surface) 82%, transparent);
+  --app-scrollbar-track: color-mix(
+    in oklab,
+    var(--app-surface) 82%,
+    transparent
+  );
   --app-scrollbar-thumb: color-mix(in oklab, var(--app-navy) 56%, #8ca5cc);
-  --app-scrollbar-thumb-hover: color-mix(in oklab, var(--app-navy) 72%, #a8bddc);
+  --app-scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--app-navy) 72%,
+    #a8bddc
+  );
   --app-profit: #34d399;
   --app-loss: #f87171;
   --app-warn: #fbbf24;
@@ -159,13 +177,17 @@ html.dark {
     background: transparent;
   }
 
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font: inherit;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -198,7 +220,11 @@ html.dark {
     #0f172a;
 }
 .login-theme-aurora .login-glow {
-  background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.25), transparent 55%);
+  background: radial-gradient(
+    circle at 50% 0%,
+    rgba(139, 92, 246, 0.25),
+    transparent 55%
+  );
 }
 
 .login-theme-midnight .login-bg {
@@ -207,7 +233,11 @@ html.dark {
     linear-gradient(180deg, #020617 0%, #0f172a 100%);
 }
 .login-theme-midnight .login-glow {
-  background: radial-gradient(circle at 70% 80%, rgba(56, 189, 248, 0.12), transparent 40%);
+  background: radial-gradient(
+    circle at 70% 80%,
+    rgba(56, 189, 248, 0.12),
+    transparent 40%
+  );
 }
 
 .login-theme-ember .login-bg {
@@ -217,7 +247,11 @@ html.dark {
     #1c0a00;
 }
 .login-theme-ember .login-glow {
-  background: radial-gradient(circle at 50% 100%, rgba(251, 146, 60, 0.2), transparent 50%);
+  background: radial-gradient(
+    circle at 50% 100%,
+    rgba(251, 146, 60, 0.2),
+    transparent 50%
+  );
 }
 
 .login-theme-forest .login-bg {
@@ -227,14 +261,18 @@ html.dark {
     #052e16;
 }
 .login-theme-forest .login-glow {
-  background: radial-gradient(circle at 40% 20%, rgba(74, 222, 128, 0.15), transparent 45%);
+  background: radial-gradient(
+    circle at 40% 20%,
+    rgba(74, 222, 128, 0.15),
+    transparent 45%
+  );
 }
 
 .login-theme-pixel .login-bg {
   background-color: #0c0a1d;
   background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 .login-theme-pixel .login-glow {
@@ -254,61 +292,157 @@ html.dark {
   --login-navy: #0a2540;
   --login-btn: #c5d4e0;
   --login-left: #ffffff;
-  background:
-    radial-gradient(ellipse 70% 50% at 50% 110%, color-mix(in oklab, var(--login-navy) 22%, transparent), transparent 60%),
-    #e8ecef;
+  background: #15251e;
 }
 
 .login-stage[data-skin="spring"],
 .login-stage[data-skin="summer"],
 .login-stage[data-skin="autumn"],
 .login-stage[data-skin="winter"] {
-  background: transparent;
+  background: #15251e;
 }
 
 .login-season-bg {
-  transition: opacity 0.35s ease;
+  filter: saturate(0.86) contrast(1.03);
+  transition:
+    opacity 0.35s ease,
+    transform 1.2s ease;
+  transform: scale(1.025);
+}
+
+.login-stage::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(5, 15, 12, 0.62) 0%,
+      rgba(5, 15, 12, 0.16) 48%,
+      rgba(5, 15, 12, 0.54) 100%
+    ),
+    linear-gradient(180deg, rgba(5, 15, 12, 0.18), rgba(5, 15, 12, 0.3));
+  content: "";
 }
 
 .login-stage[data-skin="spring"] .login-card,
 .login-stage[data-skin="summer"] .login-card,
 .login-stage[data-skin="autumn"] .login-card,
 .login-stage[data-skin="winter"] .login-card {
-  background: color-mix(in oklab, #ffffff 92%, transparent);
-  backdrop-filter: blur(8px);
+  background: rgba(6, 22, 17, 0.14);
+  backdrop-filter: blur(10px);
 }
 
 .login-card {
-  min-height: 580px;
-  border-radius: 28px;
-  background: var(--login-left);
+  min-height: 590px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 30px;
+  background: rgba(7, 27, 21, 0.08);
+  backdrop-filter: blur(6px);
+  grid-template-columns: minmax(0, 1.35fr) minmax(390px, 0.72fr);
   box-shadow:
-    0 2px 4px rgba(10, 37, 64, 0.06),
-    0 28px 64px -18px rgba(10, 37, 64, 0.28);
+    0 2px 4px rgba(5, 15, 12, 0.08),
+    0 30px 90px -20px rgba(5, 15, 12, 0.64);
 }
 
 .login-left {
-  background: var(--login-left);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(5, 22, 17, 0.2)
+  );
+}
+
+.login-visual-frame {
+  background-position: center;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 18px 35px rgba(5, 15, 12, 0.18);
+}
+
+.login-visual-shade {
+  background: linear-gradient(
+    180deg,
+    rgba(5, 15, 12, 0.04) 25%,
+    rgba(5, 15, 12, 0.68) 100%
+  );
 }
 
 .login-left-mark {
   position: absolute;
-  inset: auto auto 12% 12%;
-  width: 220px;
-  height: 220px;
+  inset: auto auto -18% -8%;
+  width: 260px;
+  height: 260px;
   border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--login-navy) 10%, transparent);
-  box-shadow: 0 0 0 28px color-mix(in oklab, var(--login-navy) 5%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow:
+    0 0 0 30px rgba(255, 255, 255, 0.06),
+    0 0 0 60px rgba(255, 255, 255, 0.035);
 }
 
-.login-mark-icon { background: var(--login-navy); }
-.login-kicker { color: color-mix(in oklab, var(--login-navy) 35%, transparent); }
-.login-title { color: var(--login-navy); }
-.login-title-sub { color: color-mix(in oklab, var(--login-navy) 55%, transparent); }
-.login-sub { color: color-mix(in oklab, var(--login-navy) 45%, transparent); }
+.login-mark-icon {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+}
+.login-kicker {
+  color: rgba(255, 255, 255, 0.62);
+}
+.login-title {
+  color: #fff;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.22);
+}
+.login-title-sub {
+  color: rgba(255, 255, 255, 0.72);
+}
+.login-sub {
+  color: rgba(255, 255, 255, 0.7);
+}
 
 .login-panel {
-  background: var(--login-navy);
+  background: rgba(221, 232, 232, 0.68);
+  color: #163541;
+  backdrop-filter: blur(28px) saturate(0.82);
+  box-shadow: -22px 0 42px rgba(5, 15, 12, 0.16);
+}
+
+.login-panel > .login-wave,
+.login-panel > .login-orbs {
+  display: none;
+}
+
+.login-panel .text-white\/45 {
+  color: rgba(23, 59, 49, 0.48);
+}
+
+.login-panel h1,
+.login-panel p,
+.login-panel label {
+  color: #163541;
+}
+
+.login-panel h1 {
+  letter-spacing: -0.035em;
+}
+
+.login-panel > .relative > div:first-child > p:last-child {
+  color: rgba(22, 53, 65, 0.66);
+}
+
+.login-panel > .relative > button {
+  color: rgba(22, 53, 65, 0.66);
+}
+
+.login-panel > .relative > button:hover {
+  color: #163541;
+}
+
+.login-panel .login-field + button {
+  color: rgba(22, 53, 65, 0.6);
+}
+
+.login-panel .login-field + button:hover {
+  background: rgba(22, 53, 65, 0.08);
+  color: #163541;
 }
 
 .login-orbs {
@@ -317,25 +451,36 @@ html.dark {
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 88% 18%, rgba(255, 255, 255, 0.09), transparent 28%),
-    radial-gradient(circle at 18% 92%, rgba(197, 212, 224, 0.12), transparent 32%);
+    radial-gradient(
+      circle at 88% 18%,
+      rgba(255, 255, 255, 0.09),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 18% 92%,
+      rgba(197, 212, 224, 0.12),
+      transparent 32%
+    );
 }
 
 .login-field {
   height: 2.75rem !important;
   min-height: 2.75rem !important;
   border-radius: 999px !important;
-  border-color: rgba(255, 255, 255, 0.28) !important;
-  background: transparent !important;
+  border-color: rgba(22, 53, 65, 0.25) !important;
+  background: rgba(246, 250, 249, 0.26) !important;
   padding-left: 1.1rem !important;
   padding-right: 1.1rem !important;
-  color: #fff !important;
+  color: #163541 !important;
   box-shadow: none !important;
 }
-.login-field::placeholder { color: rgba(255, 255, 255, 0.38); }
+.login-field::placeholder {
+  color: rgba(22, 53, 65, 0.48);
+}
 .login-field:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) !important;
+  border-color: rgba(22, 53, 65, 0.62) !important;
+  box-shadow: 0 0 0 3px rgba(22, 53, 65, 0.11) !important;
 }
 
 .login-submit {
@@ -343,17 +488,35 @@ html.dark {
   height: 2.75rem !important;
   width: 100%;
   border-radius: 999px !important;
-  background: var(--login-btn) !important;
-  color: var(--login-navy) !important;
+  background: #163541 !important;
+  color: #f1f7f6 !important;
   font-size: 0.95rem !important;
   font-weight: 600 !important;
 }
-.login-submit:hover { filter: brightness(1.08); }
+.login-submit:hover {
+  background: #214e5d !important;
+}
+
+.login-panel .login-submit {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+}
 
 @media (max-width: 1023px) {
   .login-card {
     min-height: auto;
     max-width: 420px;
+    border-radius: 28px;
+    background: rgba(7, 27, 21, 0.12);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .login-left {
+    min-height: 225px;
+  }
+
+  .login-panel {
+    background: rgba(221, 232, 232, 0.78);
+    box-shadow: 0 -18px 36px rgba(5, 15, 12, 0.14);
   }
 }
 

@@ -2,10 +2,10 @@ import { authClient, authEnabled } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Moon, Sun } from "lucide-react";
+import { BarChart3, Eye, EyeOff, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useUiStore, type LoginThemeId } from "@/lib/ui-store";
-import { type ProfileSeason } from "@/constants/seasons";
+import { PROFILE_SEASON_BG, type ProfileSeason } from "@/constants/seasons";
 
 const SEASONS: {
   id: LoginThemeId;
@@ -64,7 +64,9 @@ const SEASONS: {
 const VALID_SEASONS = new Set(SEASONS.map((s) => s.id));
 
 function resolveSeason(id: string): LoginThemeId {
-  return VALID_SEASONS.has(id as LoginThemeId) ? (id as LoginThemeId) : "default";
+  return VALID_SEASONS.has(id as LoginThemeId)
+    ? (id as LoginThemeId)
+    : "default";
 }
 
 export function LoginScreen() {
@@ -75,7 +77,9 @@ export function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const lastSeasonTapAt = useRef(0);
 
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
@@ -84,11 +88,10 @@ export function LoginScreen() {
   const season = resolveSeason(loginThemeRaw);
   const skin = SEASONS.find((s) => s.id === season)!;
 
-  const bgUrl =
-    season === "default" ? null : theme === "dark" ? (skin.night ?? null) : (skin.day ?? null);
+  const visualSeason = season === "default" ? "spring" : season;
+  const bgUrl = PROFILE_SEASON_BG[visualSeason][theme];
 
   useEffect(() => {
-    if (!bgUrl) return;
     const img = new Image();
     img.src = bgUrl;
   }, [bgUrl]);
@@ -108,20 +111,42 @@ export function LoginScreen() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
+  function handleSeasonPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse") return;
+    const now = Date.now();
+    if (now - lastSeasonTapAt.current < 350) {
+      event.preventDefault();
+      setMenuOpen((open) => !open);
+      lastSeasonTapAt.current = 0;
+      return;
+    }
+    lastSeasonTapAt.current = now;
+  }
+
+  function normalizeEmail(value: string) {
+    const trimmed = value.trim();
+    return trimmed && !trimmed.includes("@") ? `${trimmed}@gmail.com` : trimmed;
+  }
+
   async function onEmail(e: React.FormEvent) {
     e.preventDefault();
+    const normalizedEmail = normalizeEmail(email);
+    setEmail(normalizedEmail);
     setBusy(true);
     setError(null);
     try {
       if (mode === "up") {
         const { error: err } = await authClient.signUp.email({
-          email,
+          email: normalizedEmail,
           password,
           name: name || email,
         });
         if (err) throw new Error(err.message);
       } else {
-        const { error: err } = await authClient.signIn.email({ email, password });
+        const { error: err } = await authClient.signIn.email({
+          email: normalizedEmail,
+          password,
+        });
         if (err) throw new Error(err.message);
       }
       window.location.href = "/";
@@ -134,7 +159,7 @@ export function LoginScreen() {
 
   return (
     <main
-      className="login-stage relative grid min-h-dvh place-items-center overflow-hidden p-4 sm:p-8"
+      className="login-stage relative isolate grid min-h-dvh place-items-center overflow-hidden p-4 sm:p-8"
       data-skin={season}
       style={
         {
@@ -145,7 +170,7 @@ export function LoginScreen() {
     >
       {bgUrl ? (
         <div
-          className="login-season-bg pointer-events-none absolute inset-0 -z-10"
+          className="login-season-bg pointer-events-none absolute inset-0 z-0"
           style={{
             backgroundImage: `url(${bgUrl})`,
             backgroundSize: "cover",
@@ -155,22 +180,32 @@ export function LoginScreen() {
         />
       ) : null}
       <div
-        className={`pointer-events-none absolute inset-0 -z-10 ${bgUrl ? "bg-black/25" : ""}`}
+        className={`pointer-events-none absolute inset-0 z-[1] ${bgUrl ? "bg-black/25" : ""}`}
         aria-hidden
       />
 
-      <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+      <div className="absolute right-4 top-4 z-30 flex items-center gap-2 sm:right-7 sm:top-7">
         <button
           type="button"
-          title={theme === "dark" ? "Chuyển sáng (ảnh ngày)" : "Chuyển tối (ảnh đêm)"}
+          title={
+            theme === "dark" ? "Chuyển sáng (ảnh ngày)" : "Chuyển tối (ảnh đêm)"
+          }
           aria-label="Đổi sáng tối"
           onClick={toggleTheme}
           className="grid h-10 w-10 place-items-center rounded-full border border-white/80 bg-white/85 text-[#0a2540] shadow-md backdrop-blur"
         >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
         </button>
 
-        <div ref={menuRef} className="relative">
+        <div
+          ref={menuRef}
+          className="relative"
+          onPointerUp={handleSeasonPointerUp}
+        >
           <button
             type="button"
             title={`${skin.label} · Nhấn đúp để đổi mùa`}
@@ -184,62 +219,76 @@ export function LoginScreen() {
               e.preventDefault();
               setMenuOpen((v) => !v);
             }}
-            className="h-10 w-10 rounded-full border-2 border-white/90 shadow-lg ring-2 ring-black/10 transition hover:scale-105"
-            style={{ background: skin.swatch }}
+            className="h-10 w-10 rounded-full border-2 border-white/90 bg-cover bg-center shadow-lg ring-2 ring-black/10 transition hover:scale-105"
+            style={{
+              backgroundImage: `url(${PROFILE_SEASON_BG[visualSeason][theme]})`,
+            }}
           />
 
           {menuOpen && (
-            <div className="absolute right-0 top-12 w-44 overflow-hidden rounded-2xl border border-black/10 bg-white/95 py-1 shadow-xl backdrop-blur">
-              {SEASONS.filter((s): s is typeof s & { id: ProfileSeason; day: string; night: string } => s.id !== "default").map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    setLoginTheme(s.id);
-                    setMenuOpen(false);
-                    const url = theme === "dark" ? s.night : s.day;
-                    if (url) {
-                      const img = new Image();
-                      img.src = url;
-                    }
-                  }}
-                  className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[#0a2540] transition hover:bg-black/5 ${
-                    season === s.id ? "font-semibold" : ""
-                  }`}
-                >
-                  <span
-                    className="h-5 w-5 shrink-0 rounded-full border border-black/10"
-                    style={{ background: s.swatch }}
-                  />
-                  {s.label}
-                </button>
-              ))}
+            <div className="absolute right-0 top-12 z-30 flex flex-row-reverse items-center gap-1.5 rounded-2xl border border-white/20 bg-black/60 p-1.5 shadow-xl backdrop-blur-md md:w-12 md:flex-col md:gap-1 md:p-1">
+              {(Object.keys(PROFILE_SEASON_BG) as ProfileSeason[])
+                .filter((item) => item !== visualSeason)
+                .map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => {
+                      setLoginTheme(item);
+                      setMenuOpen(false);
+                    }}
+                    onPointerUp={(event) => event.stopPropagation()}
+                    aria-label={`Chọn mùa ${item}`}
+                    className="h-9 w-9 shrink-0 rounded-full border border-white/40 bg-cover bg-center transition-transform hover:scale-110"
+                    style={{
+                      backgroundImage: `url(${PROFILE_SEASON_BG[item][theme]})`,
+                    }}
+                  ></button>
+                ))}
             </div>
           )}
         </div>
       </div>
 
-      <div className="login-card relative z-20 flex w-full max-w-[980px] overflow-hidden">
-        {/* Trái: trắng */}
-        <aside className="login-left relative hidden w-[46%] lg:block">
-          <div className="login-left-mark" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-10">
-            <div className="login-mark-icon grid h-16 w-16 place-items-center rounded-2xl text-white shadow-lg">
-              <BarChart3 className="h-8 w-8" />
+      <div className="login-card relative z-20 grid w-full max-w-[1120px] overflow-hidden">
+        <aside className="login-left relative p-3 sm:p-4 lg:p-5">
+          <div
+            className="login-visual-frame relative flex h-full min-h-[190px] items-end overflow-hidden rounded-[20px] border border-white/35 bg-cover bg-center p-5 sm:min-h-[230px] lg:min-h-0 lg:p-7"
+            style={{ backgroundImage: `url(${bgUrl})` }}
+          >
+            <div className="login-visual-shade absolute inset-0" aria-hidden />
+            <div className="login-left-mark" aria-hidden />
+            <div className="relative z-10">
+              <div className="login-mark-icon grid h-12 w-12 place-items-center rounded-2xl text-white shadow-lg sm:h-14 sm:w-14">
+                <BarChart3 className="h-6 w-6 sm:h-7 sm:w-7" />
+              </div>
+              <p className="login-kicker mt-5 text-[10px] font-semibold tracking-[0.5em]">
+                WELCOME
+              </p>
+              <h2 className="login-title mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Portfolio
+                <span className="login-title-sub block font-normal">
+                  Manager
+                </span>
+              </h2>
+              <p className="login-sub mt-2 text-sm">
+                Sổ cái danh mục · Trade T+
+              </p>
             </div>
-            <p className="login-kicker mt-8 text-[11px] font-semibold tracking-[0.55em]">WELCOME</p>
-            <h2 className="login-title mt-3 text-center text-3xl font-semibold tracking-tight">
-              Portfolio
-              <span className="login-title-sub block font-normal">Manager</span>
-            </h2>
-            <p className="login-sub mt-3 text-center text-sm">Sổ cái danh mục · Trade T+</p>
           </div>
         </aside>
 
         {/* Phải: form + sóng cùng 1 màu */}
-        <section className="login-panel relative z-20 flex w-full flex-col justify-center px-8 py-14 text-white sm:px-12 lg:w-[54%] lg:py-16 lg:pl-16 lg:pr-14">
-          <div className="login-wave pointer-events-none absolute inset-y-0 right-full z-0 hidden w-[120px] lg:block" aria-hidden>
-            <svg viewBox="0 0 120 800" preserveAspectRatio="none" className="h-full w-full">
+        <section className="login-panel relative z-20 flex w-full flex-col justify-center px-5 py-10 text-white sm:px-8 sm:py-14 lg:px-10 lg:py-16">
+          <div
+            className="login-wave pointer-events-none absolute inset-y-0 right-full z-0 hidden w-[120px] lg:block"
+            aria-hidden
+          >
+            <svg
+              viewBox="0 0 120 800"
+              preserveAspectRatio="none"
+              className="h-full w-full"
+            >
               <path
                 d="M18,0
                    C72,70  108,150  62,250
@@ -252,13 +301,17 @@ export function LoginScreen() {
           </div>
           <div className="login-orbs" aria-hidden />
 
-          <div className="relative mx-auto w-full max-w-[340px] space-y-7">
+          <div className="relative mx-auto w-full max-w-[310px] space-y-7">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">
                 Portfolio Manager
               </p>
-              <h1 className="mt-2 text-[1.85rem] font-semibold leading-snug tracking-tight">Xin chào!</h1>
-              <p className="mt-1.5 text-[15px] text-white/70">Rất vui được gặp bạn :)</p>
+              <h1 className="mt-2 text-[1.85rem] font-semibold leading-snug tracking-tight">
+                Xin chào!
+              </h1>
+              <p className="mt-1.5 text-[15px] text-white/70">
+                Rất vui được gặp bạn :)
+              </p>
             </div>
 
             {authEnabled ? (
@@ -266,7 +319,9 @@ export function LoginScreen() {
                 <form className="space-y-4" onSubmit={onEmail}>
                   {mode === "up" && (
                     <div className="space-y-1.5">
-                      <Label className="text-[13px] font-medium text-white/70">Tên</Label>
+                      <Label className="text-[13px] font-medium text-white/70">
+                        Tên
+                      </Label>
                       <Input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
@@ -276,31 +331,62 @@ export function LoginScreen() {
                     </div>
                   )}
                   <div className="space-y-1.5">
-                    <Label className="text-[13px] font-medium text-white/70">Email</Label>
+                    <Label className="text-[13px] font-medium text-white/70">
+                      Email
+                    </Label>
                     <Input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) =>
+                        setEmail(e.target.value.replace(/\s/g, ""))
+                      }
+                      onBlur={() => setEmail((value) => normalizeEmail(value))}
                       required
-                      placeholder="Email"
+                      placeholder="tenban"
                       className="login-field"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-[13px] font-medium text-white/70">Mật khẩu</Label>
-                    <Input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={8}
-                      placeholder="Mật khẩu"
-                      className="login-field"
-                    />
+                    <Label className="text-[13px] font-medium text-white/70">
+                      Mật khẩu
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={8}
+                        placeholder="Mật khẩu"
+                        className="login-field pr-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        aria-label={
+                          showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                        }
+                        className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-white/55 transition hover:bg-white/10 hover:text-white"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   {error && <p className="text-sm text-red-300">{error}</p>}
-                  <Button type="submit" disabled={busy} className="login-submit">
-                    {busy ? "Đang xử lý..." : mode === "up" ? "Tạo tài khoản" : "Đăng nhập"}
+                  <Button
+                    type="submit"
+                    disabled={busy}
+                    className="login-submit"
+                  >
+                    {busy
+                      ? "Đang xử lý..."
+                      : mode === "up"
+                        ? "Tạo tài khoản"
+                        : "Đăng nhập"}
                   </Button>
                 </form>
                 <button
@@ -308,7 +394,9 @@ export function LoginScreen() {
                   className="w-full text-center text-sm text-white/55 transition hover:text-white"
                   onClick={() => setMode(mode === "up" ? "in" : "up")}
                 >
-                  {mode === "up" ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Đăng ký"}
+                  {mode === "up"
+                    ? "Đã có tài khoản? Đăng nhập"
+                    : "Chưa có tài khoản? Đăng ký"}
                 </button>
               </>
             ) : (
