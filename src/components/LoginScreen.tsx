@@ -250,7 +250,7 @@ export function LoginScreen() {
         </div>
       </div>
 
-      <div className="login-card relative z-20 grid w-full max-w-[1120px] overflow-hidden">
+      <div className="login-card relative z-20 grid w-full max-w-[1360px] overflow-hidden">
         <aside className="login-left relative p-3 sm:p-4 lg:p-5">
           <div
             className="login-visual-frame relative flex h-full min-h-[190px] items-end overflow-hidden rounded-[20px] border border-white/35 bg-cover bg-center p-5 sm:min-h-[230px] lg:min-h-0 lg:p-7"
