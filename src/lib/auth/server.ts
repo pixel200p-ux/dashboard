@@ -78,7 +78,8 @@ const authDisabled = env("VITE_AUTH_ENABLED") === "false";
 // for any `*.grok-sandbox.com` callback (see `./preview`).
 const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
-const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
+const grokClientSecret =
+  env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
 
 /** True when federated sign-in is active (real auth is enforced). */
 export const authConfigured =
@@ -91,6 +92,17 @@ export const authConfigured =
 // preview allowlist, which makes the OAuth `redirect_uri` the concrete preview URL
 // the broker's preview client accepts.
 const explicitBaseURL = env("BETTER_AUTH_URL");
+const vercelOrigins = [
+  env("VERCEL_URL"),
+  env("VERCEL_BRANCH_URL"),
+  env("VERCEL_PROJECT_PRODUCTION_URL"),
+]
+  .filter((host): host is string => Boolean(host))
+  .map((host) =>
+    host.startsWith("http://") || host.startsWith("https://")
+      ? host
+      : `https://${host}`,
+  );
 // Explicit `string[]` (not a readonly tuple) — Better Auth's DynamicBaseURLConfig
 // requires a mutable `allowedHosts: string[]`.
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
@@ -115,12 +127,16 @@ const baseURL = explicitBaseURL ?? {
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
 const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
+  ? [explicitBaseURL, ...vercelOrigins, ...LOCAL_DEV_ORIGINS]
   : [
       // Host wildcards (matched against Origin's host)
       ...previewAllowedHosts,
       // Full-origin wildcards (matched against Origin)
-      ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
+      ...previewAllowedHosts.flatMap((host) => [
+        `https://${host}`,
+        `http://${host}`,
+      ]),
+      ...vercelOrigins,
       ...LOCAL_DEV_ORIGINS,
     ];
 

@@ -92,7 +92,7 @@ create table if not exists bank_deposits (
 
 create table if not exists bank_rate_updates (
   id text primary key,
-  deposit_id text not null references bank_deposits(id) on delete cascade,
+  deposit_id uuid not null references bank_deposits(id) on delete cascade,
   period_number integer not null,
   interest_rate numeric not null,
   confirmed_at timestamptz not null default now(),
