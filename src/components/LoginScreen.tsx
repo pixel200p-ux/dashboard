@@ -258,7 +258,7 @@ export function LoginScreen() {
                 </span>
               </h2>
               <p className="login-sub mt-2 text-sm">
-                Sổ cái danh mục · Trade T+
+                Sổ danh mục · Trade T+
               </p>
             </div>
           </div>
@@ -331,7 +331,7 @@ export function LoginScreen() {
                       }
                       onBlur={() => setEmail((value) => normalizeEmail(value))}
                       required
-                      placeholder="tenban"
+                      placeholder="...@gmail.com"
                       className="login-field"
                     />
                   </div>
@@ -346,7 +346,7 @@ export function LoginScreen() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         minLength={8}
-                        placeholder="Mật khẩu"
+                        placeholder="..."
                         className="login-field pr-12"
                       />
                       <button

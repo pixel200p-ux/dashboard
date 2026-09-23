@@ -374,11 +374,14 @@ html.dark {
 
 .login-left-mark {
   position: absolute;
-  inset: auto auto -18% -8%;
-  width: 260px;
-  height: 260px;
+  inset: auto auto -14% -8%;
+  width: clamp(320px, 42%, 460px);
+  height: auto;
+  aspect-ratio: 1 / 1;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
   box-shadow:
     0 0 0 30px rgba(255, 255, 255, 0.06),
     0 0 0 60px rgba(255, 255, 255, 0.035);
@@ -390,16 +393,20 @@ html.dark {
 }
 .login-kicker {
   color: rgba(255, 255, 255, 0.62);
+  font-size: clamp(0.7rem, 1vw, 0.9rem);
 }
 .login-title {
   color: #fff;
+  font-size: clamp(2rem, 3.4vw, 3.7rem);
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.22);
 }
 .login-title-sub {
   color: rgba(255, 255, 255, 0.72);
+  font-size: 0.86em;
 }
 .login-sub {
   color: rgba(255, 255, 255, 0.7);
+  font-size: clamp(0.85rem, 1.3vw, 1.15rem);
 }
 
 .login-panel {
@@ -506,12 +513,20 @@ html.dark {
 }
 
 @media (max-width: 1023px) {
+  .login-stage {
+    overflow-y: auto;
+  }
+
   .login-card {
     width: min(calc(100vw - 32px), 420px);
     max-width: 420px;
+    height: auto;
+    max-height: none;
     border-radius: 28px;
     background: rgba(7, 27, 21, 0.12);
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-self: end;
   }
 
   .login-left {
@@ -520,12 +535,70 @@ html.dark {
 
   .login-visual-frame {
     aspect-ratio: 16 / 8;
+    height: 100%;
     min-height: 0;
   }
 
+  .login-left-mark {
+    width: 260px;
+    height: 260px;
+    min-width: 0;
+    min-height: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .login-visual-frame > .relative.z-10 {
+    transform: translateY(0.5rem);
+  }
+
+  .login-kicker {
+    font-size: 0.62rem;
+    letter-spacing: 0.36em;
+  }
+
+  .login-title {
+    font-size: 1.45rem;
+  }
+
+  .login-sub {
+    font-size: 0.78rem;
+  }
+
+  .login-mark-icon {
+    height: 2.5rem !important;
+    width: 2.5rem !important;
+  }
+
   .login-panel {
-    background: rgba(221, 232, 232, 0.78);
-    box-shadow: 0 -18px 36px rgba(5, 15, 12, 0.14);
+    min-height: 0;
+    overflow: visible;
+    justify-content: flex-start;
+    padding: clamp(1rem, 3.5vh, 1.75rem) clamp(1rem, 5vw, 1.5rem) 1rem;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(232, 242, 239, 0.92));
+    border-radius: 26px 26px 0 0;
+    box-shadow: 0 -18px 40px rgba(5, 15, 12, 0.2);
+    backdrop-filter: blur(22px) saturate(0.9);
+  }
+
+  .login-panel > .relative {
+    width: 100%;
+    max-width: 310px;
+    gap: 1rem;
+  }
+
+  .login-panel form {
+    gap: 0.65rem;
+  }
+
+  .login-panel .login-field,
+  .login-panel .login-submit {
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+  }
+
+  .login-panel .login-submit {
+    margin-top: 0.1rem;
   }
 }
 
