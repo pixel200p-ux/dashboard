@@ -5,6 +5,11 @@ type FmarketProduct = {
   nav?: number | string;
   price?: number | string;
   latestNav?: number | string;
+  extra?: {
+    currentNAV?: number | string;
+    lastNAV?: number | string;
+    lastNAVDate?: string | number;
+  };
   productDetail?: {
     navDate?: string;
     createdAt?: string;
@@ -31,7 +36,19 @@ export async function fetchFmarketDcdsNav(): Promise<{ nav: number; updatedAt: s
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
-      body: JSON.stringify({ search: "DCDS" }),
+      body: JSON.stringify({
+        types: ["NEW_FUND", "TRADING_FUND"],
+        issuerIds: [],
+        sortOrder: "desc",
+        sortField: "id",
+        page: 1,
+        pageSize: 25,
+        isIpo: false,
+        fundAssetTypes: [],
+        bondRemainPeriods: [],
+        searchField: "DCDS",
+        isBuyByReward: false,
+      }),
       signal: AbortSignal.timeout(12000),
     });
 
@@ -61,6 +78,8 @@ export async function fetchFmarketDcdsNav(): Promise<{ nav: number; updatedAt: s
 
     const nav =
       asNumber(product.nav) ??
+      asNumber(product.extra?.currentNAV) ??
+      asNumber(product.extra?.lastNAV) ??
       asNumber(product.price) ??
       asNumber(product.latestNav) ??
       asNumber((product.productDetail as { nav?: number | string } | undefined)?.nav) ??
@@ -69,7 +88,7 @@ export async function fetchFmarketDcdsNav(): Promise<{ nav: number; updatedAt: s
     if (nav == null || nav <= 0) return null;
 
     const updatedAt =
-      String(product.productDetail?.navDate ?? product.productDetail?.updatedAt ?? product.productDetail?.createdAt ?? new Date().toISOString());
+      String(product.extra?.lastNAVDate ?? product.productDetail?.navDate ?? product.productDetail?.updatedAt ?? product.productDetail?.createdAt ?? new Date().toISOString());
 
     return {
       nav,
