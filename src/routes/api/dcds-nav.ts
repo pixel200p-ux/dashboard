@@ -6,13 +6,13 @@ export const Route = createFileRoute("/api/dcds-nav")({
     handlers: {
       GET: async () => {
         const result = await fetchFmarketDcdsNav();
-        if (!result) {
-          return Response.json({ success: false, message: "Không lấy được giá DCDS từ Fmarket" }, { status: 502 });
+        if (!result.ok) {
+          return Response.json({ success: false, message: result.error }, { status: result.status && result.status >= 400 ? result.status : 502 });
         }
 
         return Response.json({
           success: true,
-          code: result.code,
+          code: "DCDS",
           nav: result.nav,
           updatedAt: result.updatedAt,
         });

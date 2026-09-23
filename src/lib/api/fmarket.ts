@@ -1,6 +1,7 @@
 type FmarketProduct = {
   code?: string;
   symbol?: string;
+  shortName?: string;
   name?: string;
   nav?: number | string;
   price?: number | string;
@@ -19,6 +20,10 @@ type FmarketProduct = {
   [key: string]: unknown;
 };
 
+export type FmarketDcdsResult =
+  | { ok: true; nav: number; updatedAt: string | null; code: "DCDS" }
+  | { ok: false; error: string; status?: number };
+
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -28,7 +33,7 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
-export async function fetchFmarketDcdsNav(): Promise<{ nav: number; updatedAt: string | null; code: string | null } | null> {
+export async function fetchFmarketDcdsNav(): Promise<FmarketDcdsResult> {
   try {
     const response = await fetch("https://api.fmarket.vn/res/products/filter", {
       method: "POST",
@@ -54,7 +59,7 @@ export async function fetchFmarketDcdsNav(): Promise<{ nav: number; updatedAt: s
 
     if (!response.ok) {
       console.error("[fmarket] bad response", response.status, response.statusText);
-      return null;
+      return { ok: false, status: response.status, error: `Fmarket HTTP ${response.status}` };
     }
 
     const payload = (await response.json()) as {
@@ -71,10 +76,12 @@ export async function fetchFmarketDcdsNav(): Promise<{ nav: number; updatedAt: s
 
     const product = rows.find((p) => {
       const code = String(p.code ?? p.symbol ?? "").toUpperCase();
-      return code === "DCDS" || String(p.name ?? "").toUpperCase().includes("DCDS");
+      const shortName = String(p.shortName ?? "").toUpperCase();
+      const name = String(p.name ?? "").toUpperCase();
+      return shortName === "DCDS" || code === "DCDS" || name.includes("DCDS");
     });
 
-    if (!product) return null;
+    if (!product) return { ok: false, error: "Không tìm thấy quỹ DCDS trên Fmarket" };
 
     const nav =
       asNumber(product.nav) ??
@@ -85,18 +92,22 @@ export async function fetchFmarketDcdsNav(): Promise<{ nav: number; updatedAt: s
       asNumber((product.productDetail as { nav?: number | string } | undefined)?.nav) ??
       null;
 
-    if (nav == null || nav <= 0) return null;
+    if (nav == null || nav <= 0) return { ok: false, error: "Fmarket không trả NAV hợp lệ cho DCDS" };
 
     const updatedAt =
       String(product.extra?.lastNAVDate ?? product.productDetail?.navDate ?? product.productDetail?.updatedAt ?? product.productDetail?.createdAt ?? new Date().toISOString());
 
     return {
+      ok: true,
       nav,
       updatedAt: updatedAt || null,
-      code: String(product.code ?? product.symbol ?? "DCDS"),
+      code: "DCDS",
     };
   } catch (error) {
     console.error("[fmarket] DCDS proxy failed", error);
-    return null;
+    return {
+      ok: false,
+      error: error instanceof DOMException && error.name === "TimeoutError" ? "Fmarket timeout" : "Không kết nối được Fmarket",
+    };
   }
 }

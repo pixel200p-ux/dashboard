@@ -214,15 +214,15 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
       detail: hasCrypto ? `${cryptoCount} mã cập nhật` : "không có mã cần cập nhật",
     };
     status.dcds = {
-      ok: Boolean(dcdsNav),
+      ok: dcdsNav.ok,
       label: "DCDS",
-      detail: dcdsNav ? `${dcdsNav.code ?? "DCDS"} ${dcdsNav.nav.toLocaleString("vi-VN")}` : "Fmarket timeout",
+      detail: dcdsNav.ok ? `DCDS ${dcdsNav.nav.toLocaleString("vi-VN")}` : dcdsNav.error,
     };
 
     let updated = 0;
     for (const a of ledger.assets) {
       let px = resolveRefreshPrice(a, stockPx, cryptoPx);
-      if (a.assetType === "DCDS" && dcdsNav) {
+      if (a.assetType === "DCDS" && dcdsNav.ok) {
         px = dcdsNav.nav;
       }
       if (px && px > 0) {
@@ -230,8 +230,8 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
         updated += 1;
       }
     }
-    if (dcdsNav) {
-      notes.push(`DCDS ${dcdsNav.code ?? "DCDS"} ${dcdsNav.nav.toLocaleString("vi-VN")}`);
+    if (dcdsNav.ok) {
+      notes.push(`DCDS ${dcdsNav.nav.toLocaleString("vi-VN")}`);
     }
     notes.push(`Đã cập nhật ${updated} mã`);
     await writeDailySnapshot(todayVnYmd());
