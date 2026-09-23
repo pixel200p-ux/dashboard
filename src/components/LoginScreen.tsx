@@ -79,7 +79,6 @@ export function LoginScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const lastSeasonTapAt = useRef(0);
 
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
@@ -110,18 +109,6 @@ export function LoginScreen() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
-
-  function handleSeasonPointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.pointerType === "mouse") return;
-    const now = Date.now();
-    if (now - lastSeasonTapAt.current < 350) {
-      event.preventDefault();
-      setMenuOpen((open) => !open);
-      lastSeasonTapAt.current = 0;
-      return;
-    }
-    lastSeasonTapAt.current = now;
-  }
 
   function normalizeEmail(value: string) {
     const trimmed = value.trim();
@@ -204,17 +191,13 @@ export function LoginScreen() {
         <div
           ref={menuRef}
           className="relative"
-          onPointerUp={handleSeasonPointerUp}
         >
           <button
             type="button"
-            title={`${skin.label} · Nhấn đúp để đổi mùa`}
-            aria-label={`Theme ${skin.label}. Nhấn đúp để mở menu mùa`}
+            title={`${skin.label} · Nhấn để đổi mùa`}
+            aria-label={`Theme ${skin.label}. Nhấn để mở menu mùa`}
             aria-expanded={menuOpen}
-            onDoubleClick={(e) => {
-              e.preventDefault();
-              setMenuOpen((v) => !v);
-            }}
+            onClick={() => setMenuOpen((v) => !v)}
             onContextMenu={(e) => {
               e.preventDefault();
               setMenuOpen((v) => !v);

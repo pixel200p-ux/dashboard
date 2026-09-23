@@ -73,7 +73,6 @@ export function ProfilePage() {
   const [seasonTransitioning, setSeasonTransitioning] = useState(false);
   const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const [coverExpanded, setCoverExpanded] = useState(false);
-  const lastSeasonTapAt = React.useRef(0);
 
   useEffect(() => {
     if (previousSeason === null || previousSeason === season) return;
@@ -101,18 +100,6 @@ export function ProfilePage() {
     setPreviousSeason(season);
     useUiStore.getState().setLoginTheme(nextSeason);
     setSeasonMenuOpen(false);
-  };
-
-  const handleSeasonPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === "mouse") return;
-    const now = Date.now();
-    if (now - lastSeasonTapAt.current < 350) {
-      event.preventDefault();
-      setSeasonMenuOpen((open) => !open);
-      lastSeasonTapAt.current = 0;
-      return;
-    }
-    lastSeasonTapAt.current = now;
   };
 
   const { txStats, yearStats } = useMemo(() => {
@@ -221,15 +208,12 @@ export function ProfilePage() {
               aria-hidden
             />
             <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-background/30 via-background/0 to-black/10" />
-            <div
-              className="absolute right-3 top-3 z-10"
-              onDoubleClick={(event) => { event.preventDefault(); setSeasonMenuOpen((open) => !open); }}
-              onPointerUp={handleSeasonPointerUp}
-            >
+            <div className="absolute right-3 top-3 z-10">
               <button
                 type="button"
-                aria-label={`Mùa ${season}. Nhấn đúp để đổi mùa`}
+                aria-label={`Mùa ${season}. Nhấn để đổi mùa`}
                 aria-expanded={seasonMenuOpen}
+                onClick={() => setSeasonMenuOpen((open) => !open)}
                 className="h-10 w-10 rounded-full border-2 border-white/90 bg-cover bg-center shadow-lg ring-2 ring-black/10 transition hover:scale-105"
                 style={{ backgroundImage: `url(${PROFILE_SEASON_BG[season][theme]})` }}
               />
