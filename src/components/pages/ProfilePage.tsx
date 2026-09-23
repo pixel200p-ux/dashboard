@@ -10,6 +10,7 @@ import { useUiStore } from "@/lib/ui-store";
 import { UserRound, Activity, BarChart3, PlusCircle, ChevronDown, ChevronUp } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { FilterMenu } from "@/components/FilterMenu";
+import { saveSharedLoginTheme } from "@/lib/api/login-theme";
 
 async function readImage(file: File, maxEdge: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
@@ -99,6 +100,7 @@ export function ProfilePage() {
     if (nextSeason === season) return;
     setPreviousSeason(season);
     useUiStore.getState().setLoginTheme(nextSeason);
+    void saveSharedLoginTheme(nextSeason);
     setSeasonMenuOpen(false);
   };
 

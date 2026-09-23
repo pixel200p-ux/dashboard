@@ -3,17 +3,24 @@ import { useState, type ReactNode } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { useUiStore } from "@/lib/ui-store";
+import { fetchSharedLoginTheme } from "@/lib/api/login-theme";
 import { useEffect } from "react";
 
 function ThemeSync() {
   const theme = useUiStore((s) => s.theme);
   const syncLoginTheme = useUiStore((s) => s.syncLoginTheme);
+  const setLoginTheme = useUiStore((s) => s.setLoginTheme);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
   useEffect(() => {
     syncLoginTheme();
   }, [syncLoginTheme]);
+  useEffect(() => {
+    void fetchSharedLoginTheme().then((loginTheme) => {
+      if (loginTheme) setLoginTheme(loginTheme);
+    });
+  }, [setLoginTheme]);
   return null;
 }
 

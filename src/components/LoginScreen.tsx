@@ -6,6 +6,7 @@ import { BarChart3, Eye, EyeOff, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useUiStore, type LoginThemeId } from "@/lib/ui-store";
 import { PROFILE_SEASON_BG, type ProfileSeason } from "@/constants/seasons";
+import { saveSharedLoginTheme } from "@/lib/api/login-theme";
 
 const SEASONS: {
   id: LoginThemeId;
@@ -221,6 +222,7 @@ export function LoginScreen() {
                     type="button"
                     onClick={() => {
                       setLoginTheme(item);
+                      void saveSharedLoginTheme(item);
                       setMenuOpen(false);
                     }}
                     onPointerUp={(event) => event.stopPropagation()}

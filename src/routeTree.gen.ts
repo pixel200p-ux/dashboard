@@ -23,6 +23,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppStockRouteImport } from './routes/_app/stock'
 import { Route as AppTplusRouteImport } from './routes/_app/tplus'
 import { Route as ApiDcdsNavRouteImport } from './routes/api/dcds-nav'
+import { Route as ApiLoginThemeRouteImport } from './routes/api/login-theme'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const AppRoute = AppRouteImport.update({
@@ -94,6 +95,11 @@ const ApiDcdsNavRoute = ApiDcdsNavRouteImport.update({
   path: '/api/dcds-nav',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLoginThemeRoute = ApiLoginThemeRouteImport.update({
+  id: '/api/login-theme',
+  path: '/api/login-theme',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/stock': typeof AppStockRoute
   '/tplus': typeof AppTplusRoute
   '/api/dcds-nav': typeof ApiDcdsNavRoute
+  '/api/login-theme': typeof ApiLoginThemeRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/stock': typeof AppStockRoute
   '/tplus': typeof AppTplusRoute
   '/api/dcds-nav': typeof ApiDcdsNavRoute
+  '/api/login-theme': typeof ApiLoginThemeRoute
   '/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/_app/stock': typeof AppStockRoute
   '/_app/tplus': typeof AppTplusRoute
   '/api/dcds-nav': typeof ApiDcdsNavRoute
+  '/api/login-theme': typeof ApiLoginThemeRoute
   '/_app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/stock'
     | '/tplus'
     | '/api/dcds-nav'
+    | '/api/login-theme'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/stock'
     | '/tplus'
     | '/api/dcds-nav'
+    | '/api/login-theme'
     | '/'
     | '/api/auth/$'
   id:
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/_app/stock'
     | '/_app/tplus'
     | '/api/dcds-nav'
+    | '/api/login-theme'
     | '/_app/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiDcdsNavRoute: typeof ApiDcdsNavRoute
+  ApiLoginThemeRoute: typeof ApiLoginThemeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -309,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDcdsNavRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/login-theme': {
+      id: '/api/login-theme'
+      path: '/api/login-theme'
+      fullPath: '/api/login-theme'
+      preLoaderRoute: typeof ApiLoginThemeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -353,6 +373,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiDcdsNavRoute: ApiDcdsNavRoute,
+  ApiLoginThemeRoute: ApiLoginThemeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
