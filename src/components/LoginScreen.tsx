@@ -71,6 +71,7 @@ function resolveSeason(id: string): LoginThemeId {
 
 export function LoginScreen() {
   const [mode, setMode] = useState<"in" | "up">("in");
+  const [signupUnlocked, setSignupUnlocked] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -129,6 +130,8 @@ export function LoginScreen() {
           name: name || email,
         });
         if (err) throw new Error(err.message);
+        setSignupUnlocked(false);
+        setMode("in");
       } else {
         const { error: err } = await authClient.signIn.email({
           email: normalizedEmail,
@@ -289,7 +292,10 @@ export function LoginScreen() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">
                 Portfolio Manager
               </p>
-              <h1 className="mt-2 text-[1.85rem] font-semibold leading-snug tracking-tight">
+              <h1
+                className="mt-2 cursor-default text-[1.85rem] font-semibold leading-snug tracking-tight"
+                onDoubleClick={() => setSignupUnlocked((unlocked) => !unlocked)}
+              >
                 Xin chào!
               </h1>
               <p className="mt-1.5 text-[15px] text-white/70">
@@ -372,15 +378,15 @@ export function LoginScreen() {
                         : "Đăng nhập"}
                   </Button>
                 </form>
-                <button
-                  type="button"
-                  className="w-full text-center text-sm text-white/55 transition hover:text-white"
-                  onClick={() => setMode(mode === "up" ? "in" : "up")}
-                >
-                  {mode === "up"
-                    ? "Đã có tài khoản? Đăng nhập"
-                    : "Chưa có tài khoản? Đăng ký"}
-                </button>
+                {signupUnlocked && (
+                  <button
+                    type="button"
+                    className="w-full text-center text-sm text-white/55 transition hover:text-white"
+                    onClick={() => setMode(mode === "up" ? "in" : "up")}
+                  >
+                    {mode === "up" ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Đăng ký"}
+                  </button>
+                )}
               </>
             ) : (
               <p className="text-sm text-white/60">Đăng nhập đang tắt.</p>
