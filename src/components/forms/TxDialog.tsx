@@ -270,8 +270,18 @@ export function TxDialog() {
     });
 
     if (!validation.ok) {
-      toast.error(validation.message ?? "Bạn phải chọn lô T+ trước khi lưu giao dịch Sell.");
-      return;
+      if (validation.needsCoreSellConfirmation) {
+        const confirmed = window.confirm(
+          validation.message ?? "Số lượng chọn bán hiện tại chưa đủ. Có bán thêm cổ phiếu gốc không?",
+        );
+        if (!confirmed) {
+          toast.error(validation.message ?? "Số lượng chọn bán hiện tại chưa đủ.");
+          return;
+        }
+      } else {
+        toast.error(validation.message ?? "Bạn phải chọn lô T+ trước khi lưu giao dịch Sell.");
+        return;
+      }
     }
 
     const sym = symbol.trim().toUpperCase();

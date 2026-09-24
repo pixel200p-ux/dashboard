@@ -375,7 +375,17 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                     <Button size="icon" variant="outline" className="h-8 w-8 min-h-8 p-0" title="Sửa" aria-label="Sửa" onClick={() => editTx(t)}>
                       <Pencil />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 min-h-8 p-0" title="Xóa" aria-label="Xóa" onClick={() => del.mutate({ data: { id: t.id } })}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 min-h-8 p-0"
+                      title="Xóa"
+                      aria-label="Xóa"
+                      onClick={() => {
+                        if (!window.confirm("Có xoá không?")) return;
+                        del.mutate({ data: { id: t.id } });
+                      }}
+                    >
                       <Trash2 />
                     </Button>
                   </div>

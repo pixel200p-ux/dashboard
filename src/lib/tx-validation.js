@@ -22,13 +22,6 @@ export function validateTplusSellSelection({
     return { ok: true };
   }
 
-  if (selectedLotIds.length === 0) {
-    return {
-      ok: false,
-      message: 'Bạn phải chọn ít nhất 1 lô T+ trước khi lưu giao dịch Sell.',
-    };
-  }
-
   const selectedQty = selectedLotIds.reduce((sum, id) => {
     const lot = openLots.find((item) => item.buyTxId === id);
     return sum + (lot?.qtyRemaining ?? 0);
@@ -37,7 +30,9 @@ export function validateTplusSellSelection({
   if (parsedQty > 0 && selectedQty < parsedQty) {
     return {
       ok: false,
-      message: 'Số lượng lô T+ đã chọn chưa đủ cho khối lượng bán.',
+      needsCoreSellConfirmation: true,
+      message:
+        'Số lượng chọn bán hiện tại chưa đủ. Có bán thêm cổ phiếu gốc không?',
     };
   }
 

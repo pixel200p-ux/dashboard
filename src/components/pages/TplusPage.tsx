@@ -60,9 +60,13 @@ export function TplusPage() {
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const usd = data.state.usdVnd;
-  const cards = data.state.tplusCards;
-  const stockCards = cards.filter((c) => c.assetType === "STOCK");
-  const cryptoCards = cards.filter((c) => c.assetType === "CRYPTO");
+  const cards = data.state.tplusCards.filter((c) => (c.openTplusQty ?? 0) > 0);
+  const stockCards = [...cards.filter((c) => c.assetType === "STOCK")].sort(
+    (a, b) => (b.remainingUnrealized ?? 0) - (a.remainingUnrealized ?? 0),
+  );
+  const cryptoCards = [...cards.filter((c) => c.assetType === "CRYPTO")].sort(
+    (a, b) => (b.remainingUnrealized ?? 0) - (a.remainingUnrealized ?? 0),
+  );
   const vpsCards = stockCards.filter((c) => c.accountId === "vps");
   const ssiCards = stockCards.filter((c) => c.accountId === "ssi");
 
