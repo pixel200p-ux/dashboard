@@ -4,6 +4,7 @@ import { getSql } from "@/lib/db";
 import { replayPortfolio } from "@/engine/replay";
 import { todayVnYmd } from "@/engine/dates";
 import { resolveRefreshPrice } from "@/lib/market-refresh.js";
+import { buildMarketSourceStatus } from "@/lib/market-status.js";
 import { fetchFmarketDcdsNav } from "@/lib/api/fmarket";
 import { n } from "./map";
 import { mapAccount, mapAsset, mapBank, mapBankRate, mapCapital, mapFee, mapMatch, mapTx } from "./map";
@@ -203,16 +204,18 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
     const hasStocks = stockSyms.length > 0;
     const hasCrypto = cryptoSyms.length > 0;
 
-    status.stockEtf = {
-      ok: !hasStocks || stockEtfCount > 0,
+    status.stockEtf = buildMarketSourceStatus({
       label: "Stock/ETF",
-      detail: hasStocks ? `${stockEtfCount} mã cập nhật` : "không có mã cần cập nhật",
-    };
-    status.crypto = {
-      ok: !hasCrypto || cryptoCount > 0,
+      hasSymbols: hasStocks,
+      count: stockEtfCount,
+      fetchFailed: !hasStocks ? false : stockEtfCount === 0 && !stockPx,
+    });
+    status.crypto = buildMarketSourceStatus({
       label: "Crypto",
-      detail: hasCrypto ? `${cryptoCount} mã cập nhật` : "không có mã cần cập nhật",
-    };
+      hasSymbols: hasCrypto,
+      count: cryptoCount,
+      fetchFailed: !hasCrypto ? false : cryptoCount === 0 && !cryptoPx,
+    });
     status.dcds = {
       ok: dcdsNav.ok,
       label: "DCDS",

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { summarizeMarketStatus } from "../src/lib/market-status.js";
+import { buildMarketSourceStatus, summarizeMarketStatus } from "../src/lib/market-status.js";
 
 test("market status summary reports each source individually", () => {
   const result = summarizeMarketStatus({
@@ -14,4 +14,24 @@ test("market status summary reports each source individually", () => {
   assert.match(result, /DCDS: thất bại/);
   assert.match(result, /Stock\/ETF: thành công/);
   assert.match(result, /Crypto: thất bại/);
+});
+
+test("market source status treats zero symbols as success unless the source itself failed", () => {
+  const reachableZero = buildMarketSourceStatus({
+    label: "Stock/ETF",
+    hasSymbols: true,
+    count: 0,
+    fetchFailed: false,
+  });
+  const unreachableZero = buildMarketSourceStatus({
+    label: "Crypto",
+    hasSymbols: true,
+    count: 0,
+    fetchFailed: true,
+  });
+
+  assert.equal(reachableZero.ok, true);
+  assert.equal(reachableZero.detail, "0 mã cập nhật");
+  assert.equal(unreachableZero.ok, false);
+  assert.match(unreachableZero.detail, /lỗi/);
 });
