@@ -26,17 +26,19 @@ export function HoldingsTable({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const mut = usePortfolioMutation((d: Parameters<typeof setAssetPrice>[0]) => setAssetPrice(d), "Đã cập nhật giá");
 
-  if (rows.length === 0) {
+  const visibleRows = rows.filter((h) => (h.quantity ?? 0) > 1e-12);
+
+  if (visibleRows.length === 0) {
     return <p className="py-8 text-center text-sm text-muted-foreground">Chưa có vị thế. Ghi giao dịch Buy để mở sổ.</p>;
   }
 
-  const hasBrokerGroups = rows.some((h) => h.accountId === "vps" || h.accountId === "ssi");
+  const hasBrokerGroups = visibleRows.some((h) => h.accountId === "vps" || h.accountId === "ssi");
   const groups = hasBrokerGroups
     ? [
-        { key: "vps", label: "VPS", rows: rows.filter((h) => h.accountId === "vps") },
-        { key: "ssi", label: "SSI", rows: rows.filter((h) => h.accountId === "ssi") },
+        { key: "vps", label: "VPS", rows: visibleRows.filter((h) => h.accountId === "vps") },
+        { key: "ssi", label: "SSI", rows: visibleRows.filter((h) => h.accountId === "ssi") },
       ].filter((group) => group.rows.length > 0)
-    : [{ key: "all", label: rows[0]?.accountName?.toUpperCase() || "CRYPTO", rows }];
+    : [{ key: "all", label: visibleRows[0]?.accountName?.toUpperCase() || "CRYPTO", rows: visibleRows }];
 
   return (
     <div className="space-y-8">

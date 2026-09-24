@@ -15,7 +15,7 @@ import { displayMoney, displayPrice } from "@/lib/display";
 import type { AssetType, FeeProfile, TxType } from "@/engine/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { validateTplusSellSelection } from "@/lib/tx-validation.js";
+import { validateSellQuantity, validateTplusSellSelection } from "@/lib/tx-validation.js";
 import { defaultSymbolForKind } from "@/lib/tx-defaults.js";
 
 type FormKind = AssetType | "BANK";
@@ -61,11 +61,6 @@ export function TxDialog() {
   const [amount, setAmount] = useState("");
 
   function clampSellQty(next: string) {
-    const raw = parseDecimal(next);
-    if ((txType === "SELL" || prefill?.txType === "SELL") && (kind === "STOCK" || kind === "CRYPTO") && raw > maxSellQty) {
-      setQty(formatThousandsInput(String(maxSellQty)));
-      return;
-    }
     setQty(formatThousandsInput(next));
   }
   const [tplus, setTplus] = useState(false);
@@ -166,8 +161,11 @@ export function TxDialog() {
   const holding = data?.state.holdings.find(
     (h) => h.accountId === acc.id && h.symbol === symbol.trim().toUpperCase(),
   );
+  const coreQty = holding?.coreQty ?? 0;
+  const tplusQty = holding?.openTplusQty ?? 0;
+  const totalHeldQty = holding?.quantity ?? 0;
   const openLots = holding?.openLots ?? [];
-  const maxSellQty = holding?.quantity ?? 0;
+  const maxSellQty = totalHeldQty;
 
   const selectedRemaining = selectedLotIds.reduce((s, id) => {
     const lot = openLots.find((l) => l.buyTxId === id);
@@ -258,6 +256,17 @@ export function TxDialog() {
           },
         },
       );
+      return;
+    }
+
+    const sellQuantityValidation = validateSellQuantity({
+      txType,
+      qty: parsedQty,
+      maxQty: maxSellQty,
+    });
+
+    if (!sellQuantityValidation.ok) {
+      toast.error(sellQuantityValidation.message ?? "Số lượng bán vượt quá số lượng hiện có.");
       return;
     }
 
@@ -564,13 +573,18 @@ export function TxDialog() {
                     </label>
                   )}
                   {showTplusMatchPrompt && (
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={matchTplus}
-                        onCheckedChange={(v) => setMatchTplus(v === true)}
-                      />
-                      T+ — chọn lệnh BUY T+ đang OPEN để khớp
-                    </label>
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Hiện có: {formatQty(totalHeldQty, assetType)} ({formatQty(coreQty, assetType)} gốc + {formatQty(tplusQty, assetType)} T+)
+                      </p>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={matchTplus}
+                          onCheckedChange={(v) => setMatchTplus(v === true)}
+                        />
+                        T+ — chọn lệnh BUY T+ đang OPEN để khớp
+                      </label>
+                    </>
                   )}
 
                   {canMatch && (

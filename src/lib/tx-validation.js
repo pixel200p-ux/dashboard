@@ -3,6 +3,24 @@
  */
 
 /**
+ * @param {{ txType: string, qty?: number, maxQty?: number }} params
+ */
+export function validateSellQuantity({ txType, qty = 0, maxQty = 0 }) {
+  if (txType !== 'SELL') {
+    return { ok: true };
+  }
+
+  if (qty > maxQty) {
+    return {
+      ok: false,
+      message: `Số lượng bán vượt quá số lượng hiện có (${qty} > ${maxQty}).`,
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
  * @param {{
  *   txType: string,
  *   matchTplus: boolean,

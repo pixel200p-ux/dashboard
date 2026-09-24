@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateTplusSellSelection } from '../src/lib/tx-validation.js';
+import { validateSellQuantity, validateTplusSellSelection } from '../src/lib/tx-validation.js';
+
+test('rejects sell quantities above the currently held amount', () => {
+  const result = validateSellQuantity({
+    txType: 'SELL',
+    qty: 600,
+    maxQty: 500,
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /vượt quá số lượng hiện có/i);
+});
 
 test('prompts to sell additional core shares when selected T+ lots are insufficient', () => {
   const result = validateTplusSellSelection({
