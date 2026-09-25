@@ -43,10 +43,21 @@ async function readTheme() {
   return theme;
 }
 
+function fallbackTheme() {
+  return automaticTheme();
+}
+
 export const Route = createFileRoute("/api/login-theme")({
   server: {
     handlers: {
-      GET: async () => Response.json({ theme: await readTheme() }),
+      GET: async () => {
+        try {
+          return Response.json({ theme: await readTheme() });
+        } catch (error) {
+          console.error("[login-theme] database unavailable, using automatic theme", error);
+          return Response.json({ theme: fallbackTheme(), source: "fallback" });
+        }
+      },
       POST: async ({ request }) => {
         const body = (await request.json().catch(() => null)) as { theme?: unknown } | null;
         if (typeof body?.theme !== "string" || !VALID_THEMES.has(body.theme as LoginThemeId)) {

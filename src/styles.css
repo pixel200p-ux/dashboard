@@ -638,6 +638,75 @@ html.dark {
   will-change: opacity;
 }
 
+/* Settings keeps the existing navy/slate palette, with restrained glass surfaces. */
+.settings-page {
+  isolation: isolate;
+}
+
+.settings-page::before,
+.settings-page::after {
+  position: absolute;
+  z-index: -1;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 9999px;
+  pointer-events: none;
+  content: "";
+  filter: blur(48px);
+  opacity: 0.18;
+}
+
+.settings-page::before {
+  top: 1rem;
+  right: -7rem;
+  background: var(--app-accent);
+}
+
+.settings-page::after {
+  bottom: 10rem;
+  left: -9rem;
+  background: var(--app-chart-bank);
+}
+
+.settings-hero {
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--app-surface) 92%, transparent), color-mix(in oklab, var(--app-surface) 62%, transparent)),
+    radial-gradient(circle at 86% 18%, color-mix(in oklab, var(--app-accent) 18%, transparent), transparent 35%);
+  backdrop-filter: blur(18px) saturate(1.05);
+}
+
+.settings-panel {
+  background: color-mix(in oklab, var(--app-surface) 82%, transparent);
+  backdrop-filter: blur(14px) saturate(1.04);
+}
+
+.settings-fee-row {
+  transition: background-color 160ms ease;
+}
+
+.settings-fee-row:hover {
+  background: color-mix(in oklab, var(--app-muted) 35%, transparent);
+}
+
+.settings-danger {
+  background: color-mix(in oklab, var(--app-loss) 5%, var(--app-surface));
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 639px) {
+  .settings-page {
+    padding-bottom: 1rem;
+  }
+
+  .settings-hero {
+    border-radius: 1.25rem;
+  }
+
+  .settings-danger form {
+    width: 100%;
+  }
+}
+
 .dark .profile-cover-season {
   background-image: var(--profile-bg-dark);
 }
