@@ -5,7 +5,12 @@ import { Label } from "@/components/ui/label";
 import { saveFees } from "@/lib/api/portfolio";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { signOut } from "@/lib/auth/client";
-import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
+import { usePortfolio, usePortfolioMutation, PORTFOLIO_KEY } from "@/lib/use-portfolio";
+import { useProfile } from "@/lib/use-profile";
+import { resetApplication, setEditPin } from "@/lib/api/profile";
+import { CALENDAR_KEY } from "@/lib/use-calendar";
+import { PROFILE_KEY, MILESTONES_KEY } from "@/lib/use-profile";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/lib/ui-store";
 import { LogOut, Moon, Pencil, Sun } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,12 +29,39 @@ const PROFILES: { id: FeeProfile; label: string }[] = [
 export function SettingsPage() {
   const user = useCurrentUser();
   const { data, isPending } = usePortfolio();
+  const { data: profile } = useProfile();
+  const qc = useQueryClient();
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
   const feeMut = usePortfolioMutation((d: Parameters<typeof saveFees>[0]) => saveFees(d), "Đã lưu phí");
   const [draft, setDraft] = useState<Record<string, { buy: string; sell: string; tax: string }>>({});
   const [signingOut, setSigningOut] = useState(false);
   const [editFees, setEditFees] = useState(false);
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [resetPin, setResetPin] = useState("");
+  const pinMut = useMutation({
+    mutationFn: (input: Parameters<typeof setEditPin>[0]) => setEditPin(input),
+    onSuccess: (next) => {
+      qc.setQueryData(PROFILE_KEY, (old: typeof profile) => old ? { ...old, hasEditPin: next.hasEditPin } : old);
+      setCurrentPin(""); setNewPin(""); setConfirmPin("");
+    },
+  });
+  const resetMut = useMutation({
+    mutationFn: (input: Parameters<typeof resetApplication>[0]) => resetApplication(input),
+    onSuccess: () => {
+      localStorage.removeItem("pm-ui");
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: PORTFOLIO_KEY }),
+        qc.invalidateQueries({ queryKey: CALENDAR_KEY }),
+        qc.invalidateQueries({ queryKey: PROFILE_KEY }),
+        qc.invalidateQueries({ queryKey: MILESTONES_KEY }),
+      ]);
+      setResetPin("");
+      window.location.reload();
+    },
+  });
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const email = user?.primaryEmail ?? user?.displayName ?? "Account";
@@ -82,6 +114,44 @@ export function SettingsPage() {
               <Moon className="h-4 w-4" /> Tối
             </Button>
           </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle>Mã bảo vệ chỉnh sửa / xóa</CardTitle>
+          <CardDesc className="mt-1">Mã chung gồm đúng 6 chữ số, lưu dưới dạng hash trên server.</CardDesc>
+          <form
+            className="mt-3 space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (newPin !== confirmPin || newPin.length !== 6) return;
+              pinMut.mutate({ data: { currentPin: profile?.hasEditPin ? currentPin : undefined, newPin } });
+            }}
+          >
+            {profile?.hasEditPin && <Input value={currentPin} onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Mã hiện tại" type="password" />}
+            <Input value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Mã mới 6 số" type="password" required />
+            <Input value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Nhập lại mã mới" type="password" required />
+            <Button type="submit" disabled={pinMut.isPending || newPin.length !== 6 || newPin !== confirmPin}>
+              {profile?.hasEditPin ? "Đổi mã" : "Tạo mã"}
+            </Button>
+          </form>
+        </Card>
+
+        <Card className="border-destructive/50">
+          <CardTitle>Reset toàn bộ dữ liệu</CardTitle>
+          <CardDesc className="mt-1">Xóa vĩnh viễn dữ liệu portfolio, lịch, giá và hồ sơ. Tài khoản đăng nhập vẫn được giữ.</CardDesc>
+          <form
+            className="mt-3 space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!window.confirm("Xóa vĩnh viễn toàn bộ dữ liệu? Thao tác này không thể hoàn tác.")) return;
+              resetMut.mutate({ data: { pin: resetPin } });
+            }}
+          >
+            <Input value={resetPin} onChange={(e) => setResetPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Nhập mã 6 số để xác nhận" type="password" required />
+            <Button type="submit" variant="destructive" disabled={resetMut.isPending || resetPin.length !== 6}>Xóa sạch dữ liệu</Button>
+          </form>
         </Card>
       </div>
 

@@ -9,6 +9,7 @@ import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { parseDecimal, parseVndAmount, formatThousandsInput } from "@/engine/money";
 import { todayYmd } from "@/engine/dates";
 import { useEffect, useState } from "react";
+import { askEditPin } from "@/lib/edit-pin";
 
 const BANKS = ["VietinBank", "Vietcombank", "MB", "Techcombank", "BIDV", "Agribank", "ACB", "VPBank", "TPBank", "Khác"];
 
@@ -60,10 +61,14 @@ export function BankDialog() {
     if (!name || p <= 0 || !term.trim() || !Number.isFinite(parsedTerm) || parsedTerm <= 0) return;
     if (!rate.trim() || !Number.isFinite(parsedRate) || parsedRate < 0) return;
 
+    const pin = editId ? askEditPin() : null;
+    if (editId && !pin) return;
+
     mut.mutate(
       {
         data: {
           id: editId ?? undefined,
+          pin: editId ? pin ?? undefined : undefined,
           bankName: name,
           principal: p,
           startDate,

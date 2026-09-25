@@ -94,9 +94,10 @@ export const saveCapital = createServerFn({ method: "POST" })
 
 export const deleteCapital = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
+    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     await sql`update capital_movements set deleted_at = now() where id = ${data.id}`;
     const ledger = await loadSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
@@ -104,6 +105,7 @@ export const deleteCapital = createServerFn({ method: "POST" })
 
 const updateCapitalSchema = z.object({
   id: z.string(),
+  pin: z.string(),
   amount: z.number().positive(),
   movementDate: z.string(),
   notes: z.string().optional(),
@@ -116,6 +118,7 @@ export const updateCapital = createServerFn({ method: "POST" })
   .validator(updateCapitalSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
+    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     const notes = data.notes?.trim() ? data.notes.trim() : null;
     await sql`
       update capital_movements set
@@ -162,6 +165,7 @@ export const upsertAsset = createServerFn({ method: "POST" })
 
 const txSchema = z.object({
   id: z.string().optional(),
+  pin: z.string().optional(),
   accountId: z.string(),
   symbol: z.string().min(1),
   name: z.string().optional(),
@@ -190,6 +194,7 @@ export const saveTransaction = createServerFn({ method: "POST" })
   .validator(txSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
+    if (data.id) await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin ?? "");
     const symbol = data.symbol.trim().toUpperCase();
     const assetId = `${data.accountId}:${symbol}`;
     await sql`
@@ -249,9 +254,10 @@ export const saveTransaction = createServerFn({ method: "POST" })
 
 export const deleteTransaction = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
+    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     await sql`delete from tplus_matches where sell_tx_id = ${data.id}`;
     await sql`update transactions set deleted_at = now() where id = ${data.id}`;
     const ledger = await loadSnapshot();
@@ -260,6 +266,7 @@ export const deleteTransaction = createServerFn({ method: "POST" })
 
 const bankSchema = z.object({
   id: z.string().optional(),
+  pin: z.string().optional(),
   bankName: z.string().min(1),
   principal: z.number().positive(),
   startDate: z.string(),
@@ -274,6 +281,7 @@ export const saveBank = createServerFn({ method: "POST" })
   .validator(bankSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
+    if (data.id) await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin ?? "");
     const id = data.id ?? crypto.randomUUID();
     if (data.id) {
       await sql`
@@ -303,9 +311,10 @@ export const saveBank = createServerFn({ method: "POST" })
 
 export const confirmBankRate = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ depositId: z.string(), periodNumber: z.number().int(), interestRate: z.number() }))
+  .validator(z.object({ depositId: z.string(), periodNumber: z.number().int(), interestRate: z.number(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
+    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     await sql`
       insert into bank_rate_updates (id, deposit_id, period_number, interest_rate)
       values (${crypto.randomUUID()}, ${data.depositId}, ${data.periodNumber}, ${data.interestRate})
@@ -317,9 +326,10 @@ export const confirmBankRate = createServerFn({ method: "POST" })
 
 export const redeemBank = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
+    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     const ledger = await loadSnapshot();
     const dep = ledger.banks.find((b) => b.id === data.id);
     if (!dep) throw new Error("Không tìm thấy sổ");
@@ -342,9 +352,10 @@ export const redeemBank = createServerFn({ method: "POST" })
 
 export const deleteBank = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
+    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     await sql`update bank_deposits set deleted_at = now() where id = ${data.id}`;
     const ledger = await loadSnapshot();
     return { ledger, state: replayPortfolio(ledger) };

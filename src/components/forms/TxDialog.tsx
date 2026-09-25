@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { validateSellQuantity, validateTplusSellSelection } from "@/lib/tx-validation.js";
 import { defaultSymbolForKind } from "@/lib/tx-defaults.js";
+import { askEditPin } from "@/lib/edit-pin";
 
 type FormKind = AssetType | "BANK";
 
@@ -238,10 +239,15 @@ export function TxDialog() {
       if (!name || p <= 0 || !bankTerm.trim() || !Number.isFinite(parsedTerm) || parsedTerm <= 0) return;
       if (!bankRate.trim() || !Number.isFinite(parsedRate) || parsedRate < 0) return;
 
+      const pin = editing ? askEditPin() : null;
+      if (editing && !pin) return;
+
       bankMut.mutate(
         {
           data: {
             bankName: name,
+            id: prefill?.id,
+            pin: editing ? pin ?? undefined : undefined,
             principal: p,
             startDate: date,
             termMonths: parsedTerm,
@@ -307,10 +313,13 @@ export function TxDialog() {
       left -= take;
     }
 
+    const pin = editing ? askEditPin() : null;
+    if (editing && !pin) return;
     mut.mutate(
       {
         data: {
           id: prefill?.id,
+          pin: editing ? pin ?? undefined : undefined,
           accountId: acc.id,
           symbol: sym,
           name: name || sym,

@@ -15,6 +15,7 @@ import { deleteCapital } from "@/lib/api/portfolio";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FilterMenu } from "@/components/FilterMenu";
 import { Pencil, Trash2 } from "lucide-react";
+import { askEditPin } from "@/lib/edit-pin";
 
 const CAT_ORDER = ["DCDS", "ETF", "STOCK", "CRYPTO", "BANK"] as const;
 const CAT_LABEL: Record<string, string> = {
@@ -202,7 +203,8 @@ export function DashboardPage() {
                       disabled={delCapital.isPending}
                       onClick={() => {
                         if (!window.confirm("Bạn chắc chưa? Xóa dòng vốn gốc này?")) return;
-                        delCapital.mutate({ data: { id: c.id } });
+                        const pin = askEditPin();
+                        if (pin) delCapital.mutate({ data: { id: c.id, pin } });
                       }}
                     >
                       <Trash2 />

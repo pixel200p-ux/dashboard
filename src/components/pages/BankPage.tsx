@@ -14,6 +14,7 @@ import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { NavOriginalCard, PnlCard } from "@/components/NavOriginalCards";
 import { FilterMenu } from "@/components/FilterMenu";
+import { askEditPin } from "@/lib/edit-pin";
 
 type BankHistKind = "ALL" | "RENEWAL" | "REDEEM";
 
@@ -153,11 +154,14 @@ export function BankPage() {
                 className="flex gap-2"
                 onSubmit={(e) => {
                   e.preventDefault();
+                  const pin = askEditPin();
+                  if (!pin) return;
                   rateMut.mutate({
                     data: {
                       depositId: b.id,
                       periodNumber: b.rateUnconfirmed ? b.renewalCount : b.renewalCount + 1,
                       interestRate: Number(draft[b.id] ?? b.currentRate),
+                      pin,
                     },
                   });
                 }}
@@ -178,7 +182,8 @@ export function BankPage() {
                 variant="outline"
                 onClick={() => {
                   if (!window.confirm(`Tất toán sổ ${b.bankName}?`)) return;
-                  redeemMut.mutate({ data: { id: b.id } });
+                  const pin = askEditPin();
+                  if (pin) redeemMut.mutate({ data: { id: b.id, pin } });
                 }}
               >
                 Tất toán
@@ -199,7 +204,10 @@ export function BankPage() {
                 className="h-8 w-8 min-h-8 p-0"
                 title="Xóa"
                 aria-label="Xóa"
-                onClick={() => delMut.mutate({ data: { id: b.id } })}
+                onClick={() => {
+                  const pin = askEditPin();
+                  if (pin) delMut.mutate({ data: { id: b.id, pin } });
+                }}
               >
                 <Trash2 />
               </Button>

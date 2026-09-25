@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { FilterMenu } from "@/components/FilterMenu";
 import { Pencil, Trash2 } from "lucide-react";
+import { askEditPin } from "@/lib/edit-pin";
 
 const TITLE: Record<AssetType, { title: string; sub: string }> = {
   DCDS: { title: "DCDS", sub: "Quỹ mở · số CCQ = tiền / giá, làm tròn 4 số" },
@@ -383,7 +384,8 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                       aria-label="Xóa"
                       onClick={() => {
                         if (!window.confirm("Có xoá không?")) return;
-                        del.mutate({ data: { id: t.id } });
+                        const pin = askEditPin();
+                        if (pin) del.mutate({ data: { id: t.id, pin } });
                       }}
                     >
                       <Trash2 />

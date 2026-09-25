@@ -34,6 +34,7 @@ export const fetchCalendar = createServerFn({ method: "GET" })
 
 const saveSchema = z.object({
   id: z.string().optional(),
+  pin: z.string().optional(),
   title: z.string().min(1),
   eventDate: z.string(),
   yearly: z.boolean(),
@@ -45,6 +46,7 @@ export const saveCalendarEvent = createServerFn({ method: "POST" })
   .validator(saveSchema)
   .handler(async ({ data }): Promise<CalendarEvent[]> => {
     const sql = await getSql();
+    if (data.id) await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin ?? "");
     const title = data.title.trim();
     const notes = data.notes?.trim() ? data.notes.trim() : null;
     const id = data.id ?? crypto.randomUUID();
@@ -73,9 +75,10 @@ export const saveCalendarEvent = createServerFn({ method: "POST" })
 
 export const deleteCalendarEvent = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }): Promise<CalendarEvent[]> => {
     const sql = await getSql();
+    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     await sql`update calendar_events set deleted_at = now() where id = ${data.id}`;
     const rows = await sql`
       select * from calendar_events

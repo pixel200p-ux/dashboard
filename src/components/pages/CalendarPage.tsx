@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { addDays, addMonths, format, getDay, startOfMonth, subMonths } from "date-fns";
 import { CalendarDays, ChevronLeft, ChevronRight, History, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { askEditPin } from "@/lib/edit-pin";
 
 const WEEK = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
@@ -247,11 +248,14 @@ export function CalendarPage() {
     if (!title) return;
     const parsedEventDate = parseJumpDate(eventDateText);
     if (!parsedEventDate) return;
+    const pin = draft.id ? askEditPin() : null;
+    if (draft.id && !pin) return;
 
     saveMut.mutate(
       {
         data: {
           id: draft.id,
+          pin: draft.id ? pin ?? undefined : undefined,
           title,
           eventDate: parsedEventDate,
           yearly: draft.yearly,
@@ -495,7 +499,10 @@ export function CalendarPage() {
                         className="h-6 w-6 min-h-6 rounded-md p-0 text-[#64748B] transition hover:bg-red-500/10 hover:text-red-600 dark:text-[#94A3B8] dark:hover:bg-red-500/20 dark:hover:text-red-400"
                         title="Xóa"
                         aria-label="Xóa"
-                        onClick={() => delMut.mutate({ data: { id: ev.id } })}
+                        onClick={() => {
+                          const pin = askEditPin();
+                          if (pin) delMut.mutate({ data: { id: ev.id, pin } });
+                        }}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>

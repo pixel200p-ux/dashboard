@@ -10,6 +10,7 @@ import { parseVndAmount, formatThousandsInput } from "@/engine/money";
 import { todayYmd } from "@/engine/dates";
 import type { CapitalBucket } from "@/engine/types";
 import { useEffect, useState } from "react";
+import { askEditPin } from "@/lib/edit-pin";
 
 const BUCKETS: { value: CapitalBucket; label: string }[] = [
   { value: "DCDS", label: "DCDS" },
@@ -63,10 +64,13 @@ export function CapitalDialog() {
     if (v <= 0) return;
 
     if (isEdit && edit) {
+      const pin = askEditPin();
+      if (!pin) return;
       updateMut.mutate(
         {
           data: {
             id: edit.id,
+            pin,
             amount: v,
             movementDate: date,
             notes: notes || undefined,
