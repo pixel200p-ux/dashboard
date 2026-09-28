@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { calendarAlerts } from "@/engine/calendar";
 import { formatViDate, todayYmd } from "@/engine/dates";
 import { displayMoney } from "@/lib/display";
-import { confirmBankRate } from "@/lib/api/portfolio";
+import { confirmBankRateFromNotification } from "@/lib/api/portfolio";
 import { useCalendar } from "@/lib/use-calendar";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
@@ -58,7 +58,7 @@ export function NotificationFooter() {
   const currency = useUiStore((s) => s.currency);
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
   const rateMut = usePortfolioMutation(
-    (d: Parameters<typeof confirmBankRate>[0]) => confirmBankRate(d),
+    (d: Parameters<typeof confirmBankRateFromNotification>[0]) => confirmBankRateFromNotification(d),
     "Đã cập nhật lãi suất",
   );
 

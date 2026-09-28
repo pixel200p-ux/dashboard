@@ -344,6 +344,21 @@ export const confirmBankRate = createServerFn({ method: "POST" })
     return { ledger, state: replayPortfolio(ledger) };
   });
 
+/** Xác nhận lãi suất từ nhắc việc: đã đăng nhập nhưng không yêu cầu PIN. */
+export const confirmBankRateFromNotification = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ depositId: z.string(), periodNumber: z.number().int(), interestRate: z.number() }))
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    await sql`
+      insert into bank_rate_updates (id, deposit_id, period_number, interest_rate)
+      values (${crypto.randomUUID()}, ${data.depositId}, ${data.periodNumber}, ${data.interestRate})
+      on conflict (deposit_id, period_number) do update set interest_rate = excluded.interest_rate, confirmed_at = now()
+    `;
+    const ledger = await loadSnapshot();
+    return { ledger, state: replayPortfolio(ledger) };
+  });
+
 export const redeemBank = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({ id: z.string(), pin: z.string() }))
