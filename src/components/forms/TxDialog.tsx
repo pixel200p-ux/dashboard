@@ -80,6 +80,7 @@ export function TxDialog() {
   const [bankTerm, setBankTerm] = useState("");
   const [bankRate, setBankRate] = useState("");
   const [bankRollover, setBankRollover] = useState(true);
+  const [saveOriginal, setSaveOriginal] = useState(false);
 
     const editing = Boolean(prefill?.id);
       function setGrouped(setter: (v: string) => void) {
@@ -89,10 +90,10 @@ export function TxDialog() {
   useEffect(() => {
     if (!prefill) return;
     const shouldAutoMatchTplus = Boolean(prefill.tplusSell || prefill.matchAllOpen);
-    setKind(prefill.assetType ?? "STOCK");
+    setKind(prefill.formKind ?? prefill.assetType ?? "STOCK");
     setStockAccount(prefill.accountId === "ssi" ? "ssi" : "vps");
     setTxType(prefill.txType ?? "BUY");
-    setSymbol(defaultSymbolForKind(prefill.assetType ?? "STOCK", prefill.symbol ?? ""));
+    setSymbol(defaultSymbolForKind(prefill.formKind ?? prefill.assetType ?? "STOCK", prefill.symbol ?? ""));
     setName(prefill.name ?? "");
     setTplus(prefill.tradeTplus ?? false);
     setMatchTplus(shouldAutoMatchTplus);
@@ -103,8 +104,9 @@ export function TxDialog() {
     setDivTotal(prefill.txType === "CASH_DIVIDEND" && prefill.amount != null ? formatThousandsInput(String(prefill.amount)) : "");
     setStockDivQty(prefill.stockDivQty != null ? formatThousandsInput(String(prefill.stockDivQty)) : "");
     setBankPrincipal("");
+    setSaveOriginal(Boolean(prefill.createOriginalDeposit));
 
-    const at = prefill.assetType ?? "STOCK";
+    const at = prefill.formKind ?? prefill.assetType ?? "STOCK";
     if (prefill.id && (prefill.txType === "BUY" || prefill.txType === "SELL")) {
       if (at === "DCDS" || at === "CRYPTO") {
                 setAmount(prefill.amount != null ? formatThousandsInput(String(prefill.amount)) : "");
@@ -130,6 +132,7 @@ export function TxDialog() {
 
   const isBank = kind === "BANK";
   const assetType: AssetType = isBank ? "STOCK" : kind;
+  const canSaveOriginal = !editing && (isBank || ((kind === "DCDS" || kind === "ETF") && txType === "BUY"));
   const acc = accountFor(assetType, stockAccount);
   const feeRow = data?.ledger.fees.find((f) => f.profile === acc.profile);
   const usdVnd = data?.state.usdVnd ?? 25000;
@@ -230,6 +233,14 @@ export function TxDialog() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
 
+    let createOriginalDeposit = canSaveOriginal && saveOriginal;
+    if (canSaveOriginal && !createOriginalDeposit) {
+      const confirmed = window.confirm(
+        "Lệnh này chưa được lưu vào Original. Bạn có muốn cộng số tiền của lệnh vào Original không?",
+      );
+      createOriginalDeposit = confirmed;
+    }
+
     if (isBank) {
       const name = bankName === "Khác" ? bankCustom.trim() : bankName;
       const p = parseVndAmount(bankPrincipal);
@@ -253,6 +264,7 @@ export function TxDialog() {
             termMonths: parsedTerm,
             interestRate: parsedRate,
             autoRollover: bankRollover,
+            createOriginalDeposit,
           },
         },
         {
@@ -338,6 +350,7 @@ export function TxDialog() {
           stockDivQty: txType === "STOCK_DIVIDEND" ? parseDecimal(stockDivQty) : null,
           currentPrice: parsedPrice || undefined,
           matches: txType === "SELL" ? matches : undefined,
+          createOriginalDeposit,
         },
       },
       { onSuccess: () => close() },
@@ -371,6 +384,7 @@ export function TxDialog() {
                 type="button"
                                 onClick={() => {
                   setKind(t.value);
+                  setSaveOriginal(false);
                   if (t.value !== "STOCK" && (txType === "CASH_DIVIDEND" || txType === "STOCK_DIVIDEND")) setTxType("BUY");
                   if (t.value !== "STOCK" && t.value !== "CRYPTO") setTplus(false);
                   setSymbol(defaultSymbolForKind(t.value, ""));
@@ -428,6 +442,12 @@ export function TxDialog() {
                 <Label>Tự động tái tục</Label>
                 <Switch checked={bankRollover} onCheckedChange={setBankRollover} />
               </div>
+              {canSaveOriginal && (
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={saveOriginal} onCheckedChange={(v) => setSaveOriginal(v === true)} />
+                  Lưu vào Original
+                </label>
+              )}
             </>
           ) : (
             <>
@@ -645,6 +665,12 @@ export function TxDialog() {
                       <Input value={taxOverride} onChange={setGrouped(setTaxOverride)} placeholder={String(Math.round(autoTax * 100) / 100)} />
                     </div>
                   </div>
+                  {canSaveOriginal && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={saveOriginal} onCheckedChange={(v) => setSaveOriginal(v === true)} />
+                      Lưu vào Original
+                    </label>
+                  )}
                 </>
               ) : null}
             </>

@@ -21,6 +21,8 @@ export type TxPrefill = {
   symbol?: string;
   name?: string;
   assetType?: AssetType;
+  formKind?: AssetType | "BANK";
+  createOriginalDeposit?: boolean;
   txType?: TxType;
   tradeTplus?: boolean;
   price?: number;

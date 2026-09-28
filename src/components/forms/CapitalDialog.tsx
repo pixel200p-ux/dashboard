@@ -25,10 +25,11 @@ export function CapitalDialog() {
   const kind = useUiStore((s) => s.capitalOpen);
   const edit = useUiStore((s) => s.capitalEdit);
   const close = useUiStore((s) => s.closeCapital);
+  const openTx = useUiStore((s) => s.openTx);
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayYmd());
   const [notes, setNotes] = useState("");
-  const [bucket, setBucket] = useState<CapitalBucket>("DCDS");
+  const [bucket, setBucket] = useState<CapitalBucket | "">("");
 
   const isEdit = Boolean(edit?.id);
 
@@ -53,7 +54,7 @@ export function CapitalDialog() {
       setAmount("");
       setNotes("");
       setDate(todayYmd());
-      setBucket("DCDS");
+      setBucket("");
     }
   }, [kind, edit]);
 
@@ -63,6 +64,7 @@ export function CapitalDialog() {
     const v = parseVndAmount(amount);
     if (v <= 0) return;
 
+    if (!bucket) return;
     if (isEdit && edit) {
       const pin = askEditPin();
       if (!pin) return;
@@ -88,6 +90,15 @@ export function CapitalDialog() {
     );
   }
 
+  function selectBucket(next: CapitalBucket) {
+    if (!isEdit && kind === "DEPOSIT" && (next === "DCDS" || next === "ETF" || next === "BANK")) {
+      close();
+      openTx({ formKind: next, assetType: next === "BANK" ? undefined : next, txType: "BUY", createOriginalDeposit: true });
+      return;
+    }
+    setBucket(next);
+  }
+
   const title = isEdit
     ? kind === "WITHDRAW"
       ? "Sửa rút vốn gốc"
@@ -101,12 +112,12 @@ export function CapitalDialog() {
       <DialogContent title={title}>
         <form className="space-y-3" onSubmit={submit}>
           <p className="text-sm text-muted-foreground">
-            Original Capital = tổng Original 6 ô. Mua, bán, sổ Bank, cổ tức không đụng vốn gốc.
+            Original Capital = tổng Original 6 ô. Chọn DCDS, ETF hoặc Bank để mở lệnh mua/mở sổ; hệ thống sẽ ghi thêm Original bằng đúng số tiền của lệnh đó.
             {isEdit ? " · Đang sửa: không đổi loại Nạp/Rút." : null}
           </p>
           <div className="space-y-1">
             <Label>Danh mục</Label>
-            <Select value={bucket} onValueChange={(v) => setBucket(v as CapitalBucket)} options={BUCKETS} />
+            <Select value={bucket} onValueChange={(v) => selectBucket(v as CapitalBucket)} options={BUCKETS} placeholder="Chọn danh mục" />
           </div>
           <div className="space-y-1">
             <Label>Số tiền (VND)</Label>
