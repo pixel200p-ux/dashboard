@@ -132,7 +132,8 @@ export function TxDialog() {
 
   const isBank = kind === "BANK";
   const assetType: AssetType = isBank ? "STOCK" : kind;
-  const canSaveOriginal = !editing && (isBank || ((kind === "DCDS" || kind === "ETF") && txType === "BUY"));
+  const isOriginalEligible = isBank || ((kind === "DCDS" || kind === "ETF") && txType === "BUY");
+  const canSaveOriginal = isOriginalEligible;
   const acc = accountFor(assetType, stockAccount);
   const feeRow = data?.ledger.fees.find((f) => f.profile === acc.profile);
   const usdVnd = data?.state.usdVnd ?? 25000;
@@ -629,9 +630,10 @@ export function TxDialog() {
                       {openLots.map((l) => {
                         const checked = selectedLotIds.includes(l.buyTxId);
                         const locked = parsedQty <= 0 || (!checked && tplusCovered);
-                        const marketPrice = holding?.currentPrice ?? 0;
-                        const pnl = (marketPrice - l.buyPrice) * l.qtyRemaining;
-                        const pct = l.buyPrice > 0 ? ((marketPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
+                        // Đây là preview cho lệnh Sell đang nhập, không phải P/L theo giá thị trường.
+                        const previewSellPrice = parsedPrice > 0 ? parsedPrice : (holding?.currentPrice ?? 0);
+                        const pnl = (previewSellPrice - l.buyPrice) * l.qtyRemaining;
+                        const pct = l.buyPrice > 0 ? ((previewSellPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
                         return (
                           <label
                             key={l.buyTxId}

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useUiStore } from "@/lib/ui-store";
 import { saveBank } from "@/lib/api/portfolio";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
@@ -25,6 +26,7 @@ export function BankDialog() {
   const [term, setTerm] = useState("");
   const [rate, setRate] = useState("");
   const [rollover, setRollover] = useState(true);
+  const [saveOriginal, setSaveOriginal] = useState(false);
     useEffect(() => {
     if (!open) return;
     if (editId && data) {
@@ -38,6 +40,7 @@ export function BankDialog() {
       setTerm(String(b.termMonths));
       setRate(String(b.interestRate));
       setRollover(b.autoRollover);
+      setSaveOriginal(false);
       return;
     }
     setBankName("VietinBank");
@@ -47,6 +50,7 @@ export function BankDialog() {
     setTerm("");
     setRate("");
     setRollover(true);
+    setSaveOriginal(false);
   }, [open, editId, data]);
   const mut = usePortfolioMutation((d: Parameters<typeof saveBank>[0]) => saveBank(d), "Đã mở sổ tiết kiệm");
   
@@ -75,6 +79,7 @@ export function BankDialog() {
           termMonths: parsedTerm,
           interestRate: parsedRate,
           autoRollover: rollover,
+          createOriginalDeposit: saveOriginal,
         },
       },
       {
@@ -138,6 +143,10 @@ export function BankDialog() {
             <Label>Tự động tái tục</Label>
             <Switch checked={rollover} onCheckedChange={setRollover} />
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={saveOriginal} onCheckedChange={(v) => setSaveOriginal(v === true)} />
+            Lưu vào Original
+          </label>
           <Button type="submit" className="w-full" disabled={mut.isPending}>
           {mut.isPending ? "Đang lưu..." : editId ? "Lưu sửa" : "Lưu sổ"}
           </Button>

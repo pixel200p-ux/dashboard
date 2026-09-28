@@ -53,6 +53,8 @@ export function mapCapital(r: Record<string, unknown>): CapitalMovement {
     notes: r.notes ? String(r.notes) : null,
     deletedAt: r.deleted_at ? String(r.deleted_at) : null,
     createdAt: String(r.created_at),
+    sourceType: r.source_type === "TRANSACTION" || r.source_type === "BANK" ? r.source_type : null,
+    sourceId: r.source_id ? String(r.source_id) : null,
   };
 }
 

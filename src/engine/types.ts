@@ -34,6 +34,8 @@ export interface CapitalMovement {
   notes: string | null;
   deletedAt: string | null;
   createdAt: string;
+  sourceType: "TRANSACTION" | "BANK" | null;
+  sourceId: string | null;
 }
 
 export interface Transaction {

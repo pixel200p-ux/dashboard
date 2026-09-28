@@ -195,8 +195,8 @@ export const saveTransaction = createServerFn({ method: "POST" })
   .validator(txSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
-    if (data.createOriginalDeposit && (data.id || data.txType !== "BUY" || (data.assetType !== "DCDS" && data.assetType !== "ETF"))) {
-      throw new Error("Nạp vốn gốc chỉ áp dụng cho lệnh Buy DCDS hoặc ETF mới.");
+    if (data.createOriginalDeposit && (data.txType !== "BUY" || (data.assetType !== "DCDS" && data.assetType !== "ETF"))) {
+      throw new Error("Nạp vốn gốc chỉ áp dụng cho lệnh Buy DCDS hoặc ETF.");
     }
     if (data.id) await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin ?? "");
     const symbol = data.symbol.trim().toUpperCase();
@@ -292,9 +292,6 @@ export const saveBank = createServerFn({ method: "POST" })
   .validator(bankSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
-    if (data.createOriginalDeposit && data.id) {
-      throw new Error("Không thể tạo nạp vốn gốc khi sửa sổ tiết kiệm.");
-    }
     if (data.id) await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin ?? "");
     const id = data.id ?? crypto.randomUUID();
     if (data.id) {
@@ -318,12 +315,12 @@ export const saveBank = createServerFn({ method: "POST" })
           ${data.interestRate}, ${data.autoRollover}, ${data.notes ?? null}
         )
       `;
-      if (data.createOriginalDeposit) {
-        await sql`
-          insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
-          values (${crypto.randomUUID()}, 'DEPOSIT', ${data.principal}, ${data.startDate}, ${null}, 'BANK')
-        `;
-      }
+    }
+    if (data.createOriginalDeposit) {
+      await sql`
+        insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
+        values (${crypto.randomUUID()}, 'DEPOSIT', ${data.principal}, ${data.startDate}, ${null}, 'BANK')
+      `;
     }
     const ledger = await loadSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
