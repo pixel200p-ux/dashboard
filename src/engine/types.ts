@@ -164,9 +164,10 @@ export interface HoldingView {
   costBasis: number;
   unrealizedPnl: number;
   realizedTradePnl: number;
-  cashDividend: number;
+    cashDividend: number;
   stockDividendQty: number;
   tplusProfitCompleted: number;
+  totalInvested: number;
   openLots: OpenTplusLot[];
 }
 

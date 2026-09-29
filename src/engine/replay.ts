@@ -27,6 +27,7 @@ interface Pos {
   realizedTradePnl: number;
   cashDividend: number;
   stockDividendQty: number;
+  totalInvested: number;
   openLots: OpenTplusLot[];
   cycles: TplusCycleRecord[];
 }
@@ -90,6 +91,7 @@ function ensurePos(
     realizedTradePnl: 0,
     cashDividend: 0,
     stockDividendQty: 0,
+    totalInvested: 0,
     openLots: [],
     cycles: [],
   };
@@ -156,7 +158,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
 
   for (const tx of txs) {
     if (!tx.assetId) continue;
-    const asset = assets.get(tx.assetId);
+        const asset = assets.get(tx.assetId);
     if (!asset) continue;
     const p = ensurePos(positions, asset, ledger.accounts);
     const qty = num(tx.quantity);
@@ -165,6 +167,11 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     const tax = num(tx.tax);
 
     if (tx.txType === "BUY") {
+      const isCrypto = asset.assetType === "CRYPTO";
+      const fx = tx.fxRate ?? ledger.usdVnd;
+      const buyCost = isCrypto ? qty * price * fx + fee * fx : qty * price + fee;
+      p.totalInvested += buyCost;
+
       const allowTplus =
         tx.tradeTplus &&
         (asset.assetType === "STOCK" || asset.assetType === "CRYPTO") &&
@@ -296,12 +303,12 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     const adj = adjustedAvg(p);
     const orig = originalAvg(p);
 
-    for (const c of p.cycles) {
+        for (const c of p.cycles) {
       c.remainingUnrealized = unreal;
       tplusHistory.push(c);
     }
 
-    if (totalQty > 1e-12 || p.realizedTradePnl || p.cashDividend) {
+    if (totalQty > 1e-12 || p.realizedTradePnl !== 0 || p.tplusReduction !== 0 || p.cashDividend !== 0) {
       holdings.push({
         assetId: p.asset.id,
         accountId: p.accountId,
@@ -324,6 +331,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
         cashDividend: p.cashDividend,
         stockDividendQty: p.stockDividendQty,
         tplusProfitCompleted: p.tplusReduction,
+        totalInvested: p.totalInvested,
         openLots: p.openLots,
       });
     }

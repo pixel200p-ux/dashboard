@@ -571,9 +571,9 @@ export function TxDialog() {
                           placeholder="..."
                           required
                         />
-                        {txType === "SELL" && (
+                                                {txType === "SELL" && (
                           <p className="text-xs text-muted-foreground">
-                            tối đa {formatQty(maxSellQty, assetType)}
+                            tối đa {formatQty(maxSellQty, assetType)} ({formatQty(coreQty, assetType)} gốc + {formatQty(tplusQty, assetType)} T+)
                           </p>
                         )}
                       </div>
@@ -602,20 +602,50 @@ export function TxDialog() {
                       Trade T+ — lệnh này vào phân tích T+, không cộng vào giá vốn gốc
                     </label>
                   )}
-                  {showTplusMatchPrompt && (
+                                    {(kind === "STOCK" || kind === "CRYPTO") && txType === "SELL" && coreQty > 1e-12 && (
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-primary">Vị thế gốc (Core)</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatQty(coreQty, assetType)} {kind === "CRYPTO" ? "Unit" : "CP"} @ {displayPrice(holding?.adjustedAvgCost ?? 0, assetType, currency, usdVnd)}
+                        </span>
+                      </div>
+                      {(() => {
+                        const coreAvg = holding?.adjustedAvgCost ?? 0;
+                        const previewSellPrice = parsedPrice > 0 ? parsedPrice : (holding?.currentPrice ?? 0);
+                        const sellNotionalCore = coreQty * previewSellPrice;
+                        const estSellFeeCore = (sellNotionalCore * defaultFeePct) / 100;
+                        const estSellTaxCore = (sellNotionalCore * defaultTaxPct) / 100;
+                        const totalCostCore = coreQty * coreAvg;
+                        const pnlCore = sellNotionalCore - estSellFeeCore - estSellTaxCore - totalCostCore;
+                        const pctCore = totalCostCore > 0 ? (pnlCore / totalCostCore) * 100 : 0;
+
+                        return (
+                          <div className="flex justify-between items-baseline">
+                            <span className={`text-lg font-mono font-bold ${signedClass(pnlCore)}`}>
+                              {displayMoney(pnlCore, currency, usdVnd)}
+                            </span>
+                            <span className={`font-mono font-medium ${signedClass(pctCore)}`}>
+                              {formatPct(pctCore)}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                                    {showTplusMatchPrompt && (
                     <>
-                      <p className="text-xs text-muted-foreground">
-                        Hiện có: {formatQty(totalHeldQty, assetType)} ({formatQty(coreQty, assetType)} gốc + {formatQty(tplusQty, assetType)} T+)
-                      </p>
-                      <label className="flex items-center gap-2 text-sm">
+                      <label className="flex items-center gap-2 text-sm mt-1">
                         <Checkbox
                           checked={matchTplus}
                           onCheckedChange={(v) => setMatchTplus(v === true)}
                         />
-                        T+ — chọn lệnh BUY T+ đang OPEN để khớp
+                        Khớp lệnh T+ — chọn lô BUY T+ bên dưới
                       </label>
                     </>
                   )}
+
 
                   {canMatch && (
                     <div className="space-y-2 rounded-lg border border-border p-3">
@@ -630,10 +660,17 @@ export function TxDialog() {
                       {openLots.map((l) => {
                         const checked = selectedLotIds.includes(l.buyTxId);
                         const locked = parsedQty <= 0 || (!checked && tplusCovered);
-                        // Đây là preview cho lệnh Sell đang nhập, không phải P/L theo giá thị trường.
+                                                // Đây là preview cho lệnh Sell đang nhập, bao gồm thuế phí
                         const previewSellPrice = parsedPrice > 0 ? parsedPrice : (holding?.currentPrice ?? 0);
-                        const pnl = (previewSellPrice - l.buyPrice) * l.qtyRemaining;
-                        const pct = l.buyPrice > 0 ? ((previewSellPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
+                        const buyFeeAlloc = l.qtyOriginal > 0 ? (l.buyFee * l.qtyRemaining) / l.qtyOriginal : 0;
+                        const sellNotional = l.qtyRemaining * previewSellPrice;
+                        const estSellFee = (sellNotional * defaultFeePct) / 100;
+                        const estSellTax = (sellNotional * defaultTaxPct) / 100;
+
+                        const netGross = sellNotional - l.qtyRemaining * l.buyPrice;
+                        const pnl = netGross - buyFeeAlloc - estSellFee - estSellTax;
+                        const totalCost = l.qtyRemaining * l.buyPrice + buyFeeAlloc;
+                        const pct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
                         return (
                           <label
                             key={l.buyTxId}
@@ -648,7 +685,8 @@ export function TxDialog() {
                               {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, assetType)}/{formatQty(l.qtyOriginal, assetType)} @{" "}
                               {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
                               {" · "}
-                              {displayMoney(pnl, currency, usdVnd)}{" "}
+                              <span className={signedClass(pnl)}>{displayMoney(pnl, currency, usdVnd)}</span>
+                              {" "}
                               <span className={signedClass(pct)}>{formatPct(pct)}</span>
                             </span>
                           </label>
