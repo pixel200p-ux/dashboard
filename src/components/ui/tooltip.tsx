@@ -11,7 +11,7 @@ export function Tooltip({
   content,
   children,
 }: {
-  content: string;
+  content: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -20,7 +20,7 @@ export function Tooltip({
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Content
           sideOffset={6}
-          className="z-50 rounded-md bg-navy-deep px-2 py-1 text-xs text-primary-foreground"
+          className="z-50 max-w-[300px] whitespace-pre-wrap rounded-md bg-navy-deep px-2 py-1 text-xs text-primary-foreground"
         >
           {content}
         </TooltipPrimitive.Content>
