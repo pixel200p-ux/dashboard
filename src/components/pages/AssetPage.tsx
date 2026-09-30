@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card";
 import { formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
-import { formatQty } from "@/engine/money";
+import { formatPct, formatQty, signedClass } from "@/engine/money";
 import { deleteTransaction } from "@/lib/api/portfolio";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
@@ -14,6 +14,7 @@ import type { AssetType, Transaction } from "@/engine/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { FilterMenu } from "@/components/FilterMenu";
+import { useState, useMemo } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { askEditPin } from "@/lib/edit-pin";
 
@@ -31,6 +32,8 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   const setStockFilter = useUiStore((s) => s.setStockFilter);
   const openTx = useUiStore((s) => s.openTx);
   const del = usePortfolioMutation((d: Parameters<typeof deleteTransaction>[0]) => deleteTransaction(d), "Đã xóa lệnh");
+  const [txFilterSymbols, setTxFilterSymbols] = useState<string[]>([]);
+  const [showTxFilter, setShowTxFilter] = useState(false);
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const { state, ledger } = data;
@@ -146,8 +149,9 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
     return true;
   });
 
-  const totalMarketValue = holdings.reduce((s, x) => s + x.marketValue, 0);
-  const pie = [...holdings]
+  const activeHoldings = holdings.filter(h => (h.quantity ?? 0) > 1e-12);
+  const totalMarketValue = activeHoldings.reduce((s, x) => s + x.marketValue, 0);
+  const pie = [...activeHoldings]
     .sort((a, b) => b.marketValue - a.marketValue)
     .map((h) => ({
       key: h.assetId,
@@ -156,18 +160,18 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
       pct: totalMarketValue > 0 ? (h.marketValue / totalMarketValue) * 100 : 0,
     }));
 
-  const vpsPie = [...holdings]
+  const vpsPie = [...activeHoldings]
     .filter((h) => h.accountId === "vps")
     .sort((a, b) => b.marketValue - a.marketValue)
     .map((h) => {
-      const tot = holdings.filter((x) => x.accountId === "vps").reduce((s, x) => s + x.marketValue, 0);
+      const tot = activeHoldings.filter((x) => x.accountId === "vps").reduce((s, x) => s + x.marketValue, 0);
       return { key: h.assetId, label: h.symbol, value: h.marketValue, pct: tot ? (h.marketValue / tot) * 100 : 0 };
     });
-  const ssiPie = [...holdings]
+  const ssiPie = [...activeHoldings]
     .filter((h) => h.accountId === "ssi")
     .sort((a, b) => b.marketValue - a.marketValue)
     .map((h) => {
-      const tot = holdings.filter((x) => x.accountId === "ssi").reduce((s, x) => s + x.marketValue, 0);
+      const tot = activeHoldings.filter((x) => x.accountId === "ssi").reduce((s, x) => s + x.marketValue, 0);
       return { key: h.assetId, label: h.symbol, value: h.marketValue, pct: tot ? (h.marketValue / tot) * 100 : 0 };
     });
   const originalTotal = ob.VPS + ob.SSI;
@@ -274,13 +278,103 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
         </CollapsibleCard>
       )}
 
-      <CollapsibleCard
-        title="Vị thế"
-        description="Giá vốn đã gồm hạ vốn T+ đã COMPLETED"
-        defaultOpen
-      >
-        <HoldingsTable rows={holdings} usdVnd={usd} />
-      </CollapsibleCard>
+      {assetType === "DCDS" || assetType === "ETF" ? (() => {
+        const openLots = [];
+        for (const h of holdings) {
+          const assetTxs = txs
+            .filter((t) => t.assetId === h.assetId)
+            .sort((a, b) => a.txDate.localeCompare(b.txDate) || a.createdAt.localeCompare(b.createdAt));
+          const buys = assetTxs.filter((t) => t.txType === "BUY").map((t) => ({ ...t, remaining: t.quantity || 0 }));
+          const sells = assetTxs.filter((t) => t.txType === "SELL");
+
+          for (const sell of sells) {
+            let sellQty = sell.quantity || 0;
+            for (const buy of buys) {
+              if (sellQty <= 0) break;
+              if (buy.remaining > 0) {
+                const take = Math.min(buy.remaining, sellQty);
+                buy.remaining -= take;
+                sellQty -= take;
+              }
+            }
+          }
+
+          openLots.push(
+            ...buys
+              .filter((b) => b.remaining > 1e-12)
+              .map((b) => ({
+                ...b,
+                symbol: h.symbol,
+                currentPrice: h.currentPrice,
+              }))
+          );
+        }
+
+        const totalQty = openLots.reduce((s, b) => s + b.remaining, 0);
+        const totalCost = openLots.reduce((s, b) => s + b.remaining * (b.price || 0), 0);
+        const avgCost = totalQty > 0 ? totalCost / totalQty : 0;
+
+        return (
+          <CollapsibleCard
+            title="Vị thế"
+            description={`Tổng số lượng: ${formatQty(totalQty, assetType)} · Giá vốn TB: ${displayPrice(avgCost, assetType, currency, usd)}`}
+            defaultOpen
+          >
+            <div className="table-scroll">
+              <table className="w-full text-left text-xs">
+                <thead className="text-[10px] uppercase text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="px-2 py-2 font-medium">Ngày</th>
+                    <th className="px-2 py-2 font-medium text-right">SL</th>
+                    <th className="px-2 py-2 font-medium text-right">Giá mua</th>
+                    <th className="px-2 py-2 font-medium text-right">Lãi/lỗ</th>
+                    <th className="px-2 py-2 font-medium text-right">NAV</th>
+                    <th className="px-2 py-2 font-medium text-right">P&L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openLots.map((b) => {
+                    const price = b.price || 0;
+                    const navVal = b.remaining * b.currentPrice;
+                    const pnl = b.remaining * (b.currentPrice - price);
+                    const costBasis = b.remaining * price;
+                    const pct = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+                    return (
+                      <tr key={b.id} className="border-b border-border/70 hover:bg-muted/50">
+                        <td className="px-2 py-2 font-medium">{formatViDate(b.txDate)}</td>
+                        <td className="px-2 py-2 text-right font-mono tabular-nums">{formatQty(b.remaining, assetType)}</td>
+                        <td className="px-2 py-2 text-right font-mono tabular-nums">{displayPrice(price, assetType, currency, usd)}</td>
+                        <td className={`px-2 py-2 text-right font-mono tabular-nums ${signedClass(pnl)}`}>
+                          {formatPct(pct)}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono tabular-nums">{displayMoney(navVal, currency, usd)}</td>
+                        <td className={`px-2 py-2 text-right font-mono tabular-nums ${signedClass(pnl)}`}>
+                          {displayMoney(pnl, currency, usd)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {openLots.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                        Chưa có vị thế.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleCard>
+        );
+      })() : (
+        <CollapsibleCard
+          title="Vị thế"
+          description="Giá vốn đã gồm hạ vốn T+ đã COMPLETED"
+          defaultOpen
+        >
+          <HoldingsTable rows={holdings} usdVnd={usd} />
+        </CollapsibleCard>
+      )}
 
       {assetType === "STOCK" && (() => {
         const dividendRows = holdings
@@ -341,25 +435,82 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
         );
       })()}
 
-      <CollapsibleCard title="Lịch sử giao dịch" defaultOpen>
-        <div className="table-scroll">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-2 py-2">Ngày</th>
-                <th className="px-2 py-2">Mã</th>
-                <th className="px-2 py-2">Loại</th>
-                <th className="px-2 py-2 text-right">SL</th>
-                <th className="px-2 py-2 text-right">Giá</th>
-                <th className="px-2 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {txs
-                .slice()
-                .reverse()
-                .map((t) => {
-                  const a = ledger.assets.find((x) => x.id === t.assetId);
+      {(() => {
+        const txSymbols = Array.from(new Set(txs.map(t => ledger.assets.find(a => a.id === t.assetId)?.symbol).filter(Boolean) as string[])).sort();
+        const filteredTxs = txFilterSymbols.length > 0 
+          ? txs.filter(t => {
+              const a = ledger.assets.find(a => a.id === t.assetId);
+              return a && txFilterSymbols.includes(a.symbol);
+            }) 
+          : txs;
+
+        return (
+          <CollapsibleCard 
+            title="Lịch sử giao dịch" 
+            defaultOpen={false}
+            headerAction={
+              (assetType === "STOCK" || assetType === "CRYPTO") && txSymbols.length > 0 ? (
+                <Button
+                  size="sm"
+                  variant={txFilterSymbols.length > 0 ? "secondary" : "ghost"}
+                  className="h-8 text-xs px-3 font-medium"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowTxFilter(prev => !prev);
+                  }}
+                >
+                  {txFilterSymbols.length > 0 ? `Đã lọc (${txFilterSymbols.length})` : "Lọc mã"}
+                </Button>
+              ) : undefined
+            }
+          >
+            {showTxFilter && (assetType === "STOCK" || assetType === "CRYPTO") && txSymbols.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 p-3 border-b border-border bg-muted/20">
+                <span className="text-xs text-muted-foreground self-center mr-1">Lọc theo:</span>
+                {txSymbols.map((sym) => {
+                  const active = txFilterSymbols.includes(sym);
+                  return (
+                    <Button
+                      key={sym}
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      className="h-7 text-xs rounded-full px-3"
+                      onClick={() => setTxFilterSymbols(prev => prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym])}
+                    >
+                      {sym}
+                    </Button>
+                  );
+                })}
+                {txFilterSymbols.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs rounded-full px-3 text-muted-foreground hover:text-foreground"
+                    onClick={() => setTxFilterSymbols([])}
+                  >
+                    Bỏ lọc
+                  </Button>
+                )}
+              </div>
+            )}
+            <div className="table-scroll max-h-[500px] overflow-y-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase text-muted-foreground sticky top-0 bg-background/95 backdrop-blur z-10 shadow-[0_1px_0_hsl(var(--border))]">
+                  <tr>
+                    <th className="px-2 py-2">Ngày</th>
+                    <th className="px-2 py-2">Mã</th>
+                    <th className="px-2 py-2">Loại</th>
+                    <th className="px-2 py-2 text-right">SL</th>
+                    <th className="px-2 py-2 text-right">Giá</th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTxs
+                    .slice()
+                    .reverse()
+                    .map((t) => {
+                      const a = ledger.assets.find((x) => x.id === t.assetId);
                   return (
                     <tr key={t.id} className="border-b border-border/70">
                       <td className="px-2 py-2">{formatViDate(t.txDate)}</td>
@@ -397,9 +548,11 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                 })}
             </tbody>
           </table>
-          {txs.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Chưa có giao dịch.</p>}
+          {filteredTxs.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Chưa có giao dịch.</p>}
         </div>
       </CollapsibleCard>
+        );
+      })()}
     </div>
   );
 }

@@ -511,12 +511,26 @@ export function TxDialog() {
               </div>
 
               {txType === "CASH_DIVIDEND" && (
-                <div className="space-y-1">
-                  <Label>Tổng tiền thực nhận (VND)</Label>
-                  <Input value={divTotal} onChange={setGrouped(setDivTotal)} placeholder="1,000,000" />
-                  <p className="text-xs text-muted-foreground">
-                    Trừ khỏi vốn của mã (tử số). Original Capital không đổi. Nếu cổ tức lớn hơn vốn còn lại, giá vốn = 0, phần dư là lãi.
-                  </p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="space-y-1">
+                    <Label>Cổ tức trước thuế (VND)</Label>
+                    <Input value={divTotal} onChange={setGrouped(setDivTotal)} placeholder="1,000,000" />
+                    <p className="text-xs text-muted-foreground">
+                      Tổng tiền.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Thuế (VND)</Label>
+                    <Input value={taxOverride} onChange={setGrouped(setTaxOverride)} placeholder="50,000" />
+                    <p className="text-xs text-muted-foreground">
+                      Sẽ được trừ vào tổng tiền.
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground">
+                      Trừ khỏi vốn của mã (tử số). Original Capital không đổi. Nếu cổ tức lớn hơn vốn còn lại, giá vốn = 0, phần dư là lãi.
+                    </p>
+                  </div>
                 </div>
               )}
 
