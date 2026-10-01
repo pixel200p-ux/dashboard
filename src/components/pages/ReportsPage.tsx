@@ -9,8 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatViDate } from "@/engine/dates";
 import { formatPct, formatQty, signedClass } from "@/engine/money";
-import type { CapitalBucket, HoldingView } from "@/engine/types";
+import type { CapitalBucket, HoldingView, Transaction } from "@/engine/types";
 import { displayMoney, displayPrice } from "@/lib/display";
+import { SmartDeleteTransactionDialog } from "@/components/SmartDeleteTransactionDialog";
 import {
   buildReportRows,
   filterReportRows,
@@ -20,7 +21,7 @@ import {
 } from "@/lib/report-history";
 import { usePortfolio } from "@/lib/use-portfolio";
 import { usePortfolioMutation } from "@/lib/use-portfolio";
-import { deleteCapital, deleteBank, deleteTransaction } from "@/lib/api/portfolio";
+import { deleteCapital, deleteBank } from "@/lib/api/portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import { askEditPin } from "@/lib/edit-pin";
 import { Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
@@ -67,8 +68,8 @@ export function ReportsPage() {
   const openCapitalEdit = useUiStore((s) => s.openCapitalEdit);
   const openBank = useUiStore((s) => s.openBank);
   const deleteCapitalMut = usePortfolioMutation((d: Parameters<typeof deleteCapital>[0]) => deleteCapital(d), "Đã xóa dòng vốn");
-  const deleteTransactionMut = usePortfolioMutation((d: Parameters<typeof deleteTransaction>[0]) => deleteTransaction(d), "Đã xóa giao dịch");
   const deleteBankMut = usePortfolioMutation((d: Parameters<typeof deleteBank>[0]) => deleteBank(d), "Đã xóa sổ");
+  const [deleteTarget, setDeleteTarget] = useState<{ transaction: Transaction; symbol: string } | null>(null);
   const [bucket, setBucket] = useState<"ALL" | CapitalBucket>("ALL");
   const [kind, setKind] = useState<"ALL" | ReportKind>("ALL");
   const [from, setFrom] = useState("");
@@ -96,6 +97,11 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-5">
+      <SmartDeleteTransactionDialog
+        transaction={deleteTarget?.transaction ?? null}
+        symbol={deleteTarget?.symbol ?? ""}
+        onClose={() => setDeleteTarget(null)}
+      />
       <div>
         <h1 className="text-4xl font-semibold tracking-tight">Reports</h1>
         <p className="text-sm text-muted-foreground">Sổ lịch sử toàn danh mục · sửa/xóa cần mã bảo vệ 6 số</p>
@@ -209,9 +215,9 @@ export function ReportsPage() {
           </Button>
         </div>
 
-        <div className="table-scroll mt-3">
+        <div className="table-scroll mt-3 max-h-125 overflow-y-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-card text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="w-12 px-2 py-2">STT</th>
                 <th className="px-2 py-2">Ngày</th>
@@ -284,11 +290,16 @@ export function ReportsPage() {
                           className="grid h-9 w-9 place-items-center rounded-md text-destructive hover:bg-destructive/10"
                           aria-label="Xóa dòng lịch sử"
                           onClick={() => {
+                            if (r.kind !== "DEPOSIT" && r.kind !== "WITHDRAW" && r.kind !== "BANK_OPEN") {
+                              const transaction = data.ledger.transactions.find((item) => item.id === r.id);
+                              const asset = transaction ? data.ledger.assets.find((item) => item.id === transaction.assetId) : undefined;
+                              if (transaction) setDeleteTarget({ transaction, symbol: asset?.symbol ?? "" });
+                              return;
+                            }
                             const pin = askEditPin();
                             if (!pin) return;
                             if (r.kind === "DEPOSIT" || r.kind === "WITHDRAW") deleteCapitalMut.mutate({ data: { id: r.id, pin } });
-                            else if (r.kind === "BANK_OPEN") deleteBankMut.mutate({ data: { id: r.id.replace(/:open$/, ""), pin } });
-                            else deleteTransactionMut.mutate({ data: { id: r.id, pin } });
+                            else deleteBankMut.mutate({ data: { id: r.id.replace(/:open$/, ""), pin } });
                           }}
                         >
                           <Trash2 className="h-4 w-4" />

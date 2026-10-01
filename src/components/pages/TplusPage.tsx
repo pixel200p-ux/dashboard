@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle, CollapsibleCardGroup } from "@/components/ui/card";
 import { TplusOpenCard } from "@/components/TplusOpenCard";
 import { formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
@@ -101,10 +101,19 @@ export function TplusPage() {
     if (list.length === 0) {
       return <p className="text-sm text-muted-foreground">Không có lệnh T+ đang mở.</p>;
     }
+    const rows = Array.from({ length: Math.ceil(list.length / 2) }, (_, rowIndex) =>
+      list.slice(rowIndex * 2, rowIndex * 2 + 2),
+    );
     return (
-      <div className="grid gap-3 lg:grid-cols-2">
-        {list.map((c) => (
-          <TplusOpenCard key={c.assetId} card={c} usdVnd={usd} />
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <CollapsibleCardGroup key={row[0].assetId} defaultOpen={false}>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {row.map((card) => (
+                <TplusOpenCard key={card.assetId} card={card} usdVnd={usd} />
+              ))}
+            </div>
+          </CollapsibleCardGroup>
         ))}
       </div>
     );

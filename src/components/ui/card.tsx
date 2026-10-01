@@ -1,7 +1,25 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CollapsibleCardGroupContext } from "./collapsible-card-group-context";
+
+export function CollapsibleCardGroup({
+  children,
+  defaultOpen = true,
+}: {
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const groupState = { open, toggle: () => setOpen((previous) => !previous) };
+
+  return (
+    <CollapsibleCardGroupContext.Provider value={groupState}>
+      {children}
+    </CollapsibleCardGroupContext.Provider>
+  );
+}
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
@@ -38,14 +56,16 @@ export function CollapsibleCard({
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const group = useContext(CollapsibleCardGroupContext);
+  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const open = group?.open ?? localOpen;
 
   return (
     <div className={cn("rounded-xl border border-border bg-card p-4 text-card-foreground shadow-(--shadow-card) sm:p-5 min-w-0 overflow-hidden", className)}>
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 text-left"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => group ? group.toggle() : setLocalOpen((prev) => !prev)}
         aria-expanded={open}
       >
         <div className="min-w-0 flex-1">

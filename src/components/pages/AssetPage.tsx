@@ -7,16 +7,15 @@ import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card
 import { formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
 import { formatPct, formatQty, signedClass } from "@/engine/money";
-import { deleteTransaction } from "@/lib/api/portfolio";
-import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
+import { usePortfolio } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import type { AssetType, Transaction } from "@/engine/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SmartDeleteTransactionDialog } from "@/components/SmartDeleteTransactionDialog";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { FilterMenu } from "@/components/FilterMenu";
 import { useState, useMemo } from "react";
 import { Pencil, Trash2 } from "lucide-react";
-import { askEditPin } from "@/lib/edit-pin";
 
 const TITLE: Record<AssetType, { title: string; sub: string }> = {
   DCDS: { title: "DCDS", sub: "Quỹ mở · số CCQ = tiền / giá, làm tròn 4 số" },
@@ -31,9 +30,10 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   const stockFilter = useUiStore((s) => s.stockFilter);
   const setStockFilter = useUiStore((s) => s.setStockFilter);
   const openTx = useUiStore((s) => s.openTx);
-  const del = usePortfolioMutation((d: Parameters<typeof deleteTransaction>[0]) => deleteTransaction(d), "Đã xóa lệnh");
+  const [deleteTarget, setDeleteTarget] = useState<{ transaction: Transaction; symbol: string } | null>(null);
   const [txFilterSymbols, setTxFilterSymbols] = useState<string[]>([]);
   const [showTxFilter, setShowTxFilter] = useState(false);
+  const [collapsedTxYears, setCollapsedTxYears] = useState<Record<string, boolean>>({});
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const { state, ledger } = data;
@@ -187,6 +187,11 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
 
   return (
     <div className="space-y-5">
+      <SmartDeleteTransactionDialog
+        transaction={deleteTarget?.transaction ?? null}
+        symbol={deleteTarget?.symbol ?? ""}
+        onClose={() => setDeleteTarget(null)}
+      />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-4xl font-semibold">{meta.title}</h1>
@@ -443,6 +448,16 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
               return a && txFilterSymbols.includes(a.symbol);
             }) 
           : txs;
+        const sortedTxs = filteredTxs
+          .slice()
+          .sort((a, b) => b.txDate.localeCompare(a.txDate) || b.createdAt.localeCompare(a.createdAt));
+        const transactionYears: { year: string; items: Transaction[] }[] = [];
+        for (const transaction of sortedTxs) {
+          const year = transaction.txDate.slice(0, 4);
+          const last = transactionYears[transactionYears.length - 1];
+          if (last?.year === year) last.items.push(transaction);
+          else transactionYears.push({ year, items: [transaction] });
+        }
 
         return (
           <CollapsibleCard 
@@ -493,63 +508,120 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                 )}
               </div>
             )}
-            <div className="table-scroll max-h-[500px] overflow-y-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-muted-foreground sticky top-0 bg-background/95 backdrop-blur z-10 shadow-[0_1px_0_hsl(var(--border))]">
-                  <tr>
-                    <th className="px-2 py-2">Ngày</th>
-                    <th className="px-2 py-2">Mã</th>
-                    <th className="px-2 py-2">Loại</th>
-                    <th className="px-2 py-2 text-right">SL</th>
-                    <th className="px-2 py-2 text-right">Giá</th>
-                    <th className="px-2 py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTxs
-                    .slice()
-                    .reverse()
-                    .map((t) => {
-                      const a = ledger.assets.find((x) => x.id === t.assetId);
-                  return (
-                    <tr key={t.id} className="border-b border-border/70">
-                      <td className="px-2 py-2">{formatViDate(t.txDate)}</td>
-                      <td className="px-2 py-2 font-medium">
-                        {a?.symbol} {t.tradeTplus && <Badge tone="navy">T+</Badge>}
-                      </td>
-                      <td className="px-2 py-2">{t.txType}</td>
-                      <td className="px-2 py-2 text-right font-mono">{t.quantity != null ? formatQty(t.quantity, assetType) : "—"}</td>
-                      <td className="px-2 py-2 text-right font-mono">
-                        {t.price != null ? displayPrice(t.price, assetType, currency, usd) : displayMoney(t.amount, currency, usd)}
-                      </td>
-                      <td className="px-2 py-2 text-right">
-                                <div className="flex justify-end gap-0.5">
-                    <Button size="icon" variant="outline" className="h-8 w-8 min-h-8 p-0" title="Sửa" aria-label="Sửa" onClick={() => editTx(t)}>
-                      <Pencil />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 min-h-8 p-0"
-                      title="Xóa"
-                      aria-label="Xóa"
-                      onClick={() => {
-                        if (!window.confirm("Có xoá không?")) return;
-                        const pin = askEditPin();
-                        if (pin) del.mutate({ data: { id: t.id, pin } });
-                      }}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-            </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-          {filteredTxs.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Chưa có giao dịch.</p>}
-        </div>
+            <div className="table-scroll max-h-125 overflow-y-auto p-4">
+              {transactionYears.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-[#94A3B8] bg-[#CDD5DF] px-3 py-6 text-center text-sm text-[#64748B] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]">
+                  Chưa có giao dịch.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {transactionYears.map((group) => {
+                    const byDate = group.items.reduce<Record<string, Transaction[]>>((acc, transaction) => {
+                      acc[transaction.txDate] ??= [];
+                      acc[transaction.txDate].push(transaction);
+                      return acc;
+                    }, {});
+                    const isCollapsed = !!collapsedTxYears[group.year];
+
+                    return (
+                      <section key={group.year} className="relative last:mb-0">
+                        <div className="relative flex items-center gap-2 pl-1">
+                          <div className="absolute left-0 top-1/2 h-px w-5 -translate-y-1/2 bg-[#CBD5E1] dark:bg-[#334155]" />
+                          <div className="absolute left-[calc(100%-0.2rem)] top-1/2 h-px w-4 -translate-y-1/2 bg-[#CBD5E1] dark:bg-[#334155]" />
+                          <button
+                            type="button"
+                            aria-expanded={!isCollapsed}
+                            onClick={() => setCollapsedTxYears((prev) => ({ ...prev, [group.year]: !prev[group.year] }))}
+                            className="relative z-10 flex items-center rounded-xl border border-[#0F172A] bg-[#0F172A] px-3 py-2 text-left shadow-sm transition hover:bg-[#1E293B] dark:border-[#94A3B8] dark:bg-[#354969] dark:hover:bg-[#475569]"
+                          >
+                            <span className="text-[11px] font-bold tabular-nums tracking-[0.14em] text-white">
+                              {group.year}
+                            </span>
+                          </button>
+                        </div>
+
+                        {!isCollapsed && (
+                          <div className="relative mt-2 ml-4 border-l border-[#CBD5E1] pl-3 dark:border-[#334155]">
+                            {Object.entries(byDate).map(([date, transactions]) => (
+                              <div key={date} className="pb-6 last:pb-0">
+                                <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums tracking-[0.08em] text-[#475569] dark:text-[#94A3B8]">
+                                  <span className="inline-block h-2 w-2 rounded-full bg-[#94A3B8] dark:bg-[#64748B]" />
+                                  <span>{date.slice(5).replace("-", "/")}</span>
+                                </div>
+
+                                <div className="mt-1 ml-4 border-l border-[#E2E8F0] pl-3 dark:border-[#334155]">
+                                  {transactions.map((transaction) => {
+                                    const asset = ledger.assets.find((item) => item.id === transaction.assetId);
+                                    const typeLabel = transaction.txType === "BUY"
+                                      ? "MUA"
+                                      : transaction.txType === "SELL"
+                                        ? "BÁN"
+                                        : transaction.txType === "CASH_DIVIDEND"
+                                          ? "CỔ TỨC TIỀN"
+                                          : "CỔ TỨC CỔ PHIẾU";
+                                    const tone = transaction.txType === "BUY"
+                                      ? "profit"
+                                      : transaction.txType === "SELL"
+                                        ? "loss"
+                                        : "muted";
+
+                                    return (
+                                      <div key={transaction.id} className="relative py-1 pl-3.5">
+                                        <span className="absolute left-0 top-[0.8rem] h-1 w-1 rounded-full bg-[#64748B] dark:bg-[#94A3B8]" />
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                              <Badge tone={tone}>{typeLabel}</Badge>
+                                              <span className="text-xs font-semibold text-[#0F172A] dark:text-white">
+                                                {asset?.symbol ?? "—"}
+                                              </span>
+                                              {transaction.tradeTplus && <Badge tone="navy">T+</Badge>}
+                                            </div>
+                                            <p className="mt-1 text-xs leading-5 text-[#475569] dark:text-[#CBD5E1]">
+                                              SL {transaction.quantity != null ? formatQty(transaction.quantity, assetType) : "—"}
+                                              {" · "}
+                                              {transaction.price != null
+                                                ? displayPrice(transaction.price, assetType, currency, usd)
+                                                : displayMoney(transaction.amount, currency, usd)}
+                                            </p>
+                                          </div>
+                                          <div className="flex shrink-0 gap-1">
+                                            <Button
+                                              size="icon"
+                                              variant="outline"
+                                              className="h-8 w-8 min-h-8 p-0"
+                                              title="Sửa"
+                                              aria-label="Sửa"
+                                              onClick={() => editTx(transaction)}
+                                            >
+                                              <Pencil />
+                                            </Button>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-8 w-8 min-h-8 p-0"
+                                              title="Xóa"
+                                              aria-label="Xóa"
+                                              onClick={() => setDeleteTarget({ transaction, symbol: asset?.symbol ?? "" })}
+                                            >
+                                              <Trash2 />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
       </CollapsibleCard>
         );
       })()}

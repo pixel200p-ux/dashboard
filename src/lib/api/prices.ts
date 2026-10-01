@@ -100,11 +100,11 @@ async function fetchVnStocks(symbols: string[]): Promise<Record<string, number>>
     const url = `https://bgapidatafeed.vps.com.vn/getliststockdata/${symbols.join(",")}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return {};
-    const json = (await res.json()) as Array<{ stock_code?: string; code?: string; lastPrice?: number; last_price?: number; price?: number }>;
+    const json = (await res.json()) as Array<{ stock_code?: string; code?: string; sym?: string; lastPrice?: number; last_price?: number; price?: number }>;
     const out: Record<string, number> = {};
     if (!Array.isArray(json)) return out;
     for (const row of json) {
-      const code = String(row.stock_code || row.code || "").toUpperCase();
+      const code = String(row.stock_code || row.code || row.sym || "").toUpperCase();
       const raw = n(row.lastPrice ?? row.last_price ?? row.price);
       if (!code || !raw) continue;
       // VPS feed is typically in thousands (13.5) or full. If < 1000 treat as broker.

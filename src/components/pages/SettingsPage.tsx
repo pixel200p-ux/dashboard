@@ -1,9 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card";
+import { CollapsibleCard, CollapsibleCardGroup } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { formatViDate } from "@/engine/dates";
 import { saveFees } from "@/lib/api/portfolio";
+import { fetchTrash, permanentlyDeleteTrashItem, restoreTrashItem } from "@/lib/api/trash";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { signOut } from "@/lib/auth/client";
 import { usePortfolio, usePortfolioMutation, PORTFOLIO_KEY } from "@/lib/use-portfolio";
@@ -13,11 +16,66 @@ import { CALENDAR_KEY } from "@/lib/use-calendar";
 import { PROFILE_KEY, MILESTONES_KEY } from "@/lib/use-profile";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/lib/ui-store";
-import { Check, Database, KeyRound, LogOut, Moon, Pencil, RotateCcw, ShieldCheck, Sun, WalletCards } from "lucide-react";
+import { Check, KeyRound, LogOut, Moon, Pencil, RotateCcw, ShieldCheck, Sun, Trash2, WalletCards } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
-import { Tooltip } from "@/components/ui/tooltip";
 import type { FeeProfile } from "@/engine/types";
+import { toast } from "sonner";
+
+type TrashKind = "TRANSACTION" | "CAPITAL" | "BANK";
+type TrashPayload = Awaited<ReturnType<typeof fetchTrash>>;
+
+type TrashRow = {
+  id: string;
+  kind: TrashKind;
+  type: string;
+  title: string;
+  details: string;
+  deletedAt: string;
+};
+
+function formatTrashNumber(value: number | null, digits = 4) {
+  return value == null ? "—" : value.toLocaleString("vi-VN", { maximumFractionDigits: digits });
+}
+
+function getTrashRows(trash: TrashPayload): TrashRow[] {
+  return [
+    ...trash.transactions.map((transaction) => ({
+      id: transaction.id,
+      kind: "TRANSACTION" as const,
+      type: transaction.txType === "BUY" ? "Lệnh MUA" : transaction.txType === "SELL" ? "Lệnh BÁN" : "Giao dịch",
+      title: transaction.symbol ?? "Không rõ mã tài sản",
+      details: `Ngày giao dịch ${formatViDate(transaction.txDate)} · SL ${formatTrashNumber(transaction.quantity)} · Giá ${formatTrashNumber(transaction.price)}`,
+      deletedAt: transaction.deletedAt ?? transaction.createdAt,
+    })),
+    ...trash.capitalMovements.map((movement) => ({
+      id: movement.id,
+      kind: "CAPITAL" as const,
+      type: movement.kind === "DEPOSIT" ? "Nạp vốn" : "Rút vốn",
+      title: `${formatTrashNumber(movement.amount, 0)} ₫ · ${movement.bucket}`,
+      details: `Ngày ghi nhận ${formatViDate(movement.movementDate)}${movement.notes ? ` · ${movement.notes}` : ""}`,
+      deletedAt: movement.deletedAt ?? movement.createdAt,
+    })),
+    ...trash.bankDeposits.map((deposit) => ({
+      id: deposit.id,
+      kind: "BANK" as const,
+      type: "Sổ tiết kiệm",
+      title: deposit.bankName,
+      details: `${formatTrashNumber(deposit.principal, 0)} ₫ · Mở ngày ${formatViDate(deposit.startDate)} · ${deposit.termMonths} tháng`,
+      deletedAt: deposit.deletedAt ?? deposit.createdAt,
+    })),
+  ].sort((a, b) => Date.parse(b.deletedAt) - Date.parse(a.deletedAt));
+}
+
+function removeTrashRow(trash: TrashPayload, kind: TrashKind, id: string): TrashPayload {
+  if (kind === "TRANSACTION") {
+    return { ...trash, transactions: trash.transactions.filter((item) => item.id !== id) };
+  }
+  if (kind === "CAPITAL") {
+    return { ...trash, capitalMovements: trash.capitalMovements.filter((item) => item.id !== id) };
+  }
+  return { ...trash, bankDeposits: trash.bankDeposits.filter((item) => item.id !== id) };
+}
 
 const PROFILES: { id: FeeProfile; label: string }[] = [
   { id: "STOCK_VPS", label: "VPS Stock" },
@@ -42,6 +100,10 @@ export function SettingsPage() {
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [resetPin, setResetPin] = useState("");
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashPin, setTrashPin] = useState("");
+  const [trashData, setTrashData] = useState<TrashPayload | null>(null);
+  const [emptyingTrash, setEmptyingTrash] = useState(false);
 
   const pinMut = useMutation({
     mutationFn: (input: Parameters<typeof setEditPin>[0]) => setEditPin(input),
@@ -64,9 +126,72 @@ export function SettingsPage() {
       window.location.reload();
     },
   });
+  const trashReadMut = useMutation({
+    mutationFn: (pin: string) => fetchTrash({ data: { pin } }),
+    onSuccess: (next) => setTrashData(next),
+    onError: (error: Error) => toast.error(error.message || "Không mở được thùng rác"),
+  });
+  const trashRestoreMut = useMutation({
+    mutationFn: (input: Parameters<typeof restoreTrashItem>[0]) => restoreTrashItem(input),
+    onSuccess: (_result, input) => {
+      setTrashData((current) => current ? removeTrashRow(current, input.data.kind, input.data.id) : current);
+      void qc.invalidateQueries({ queryKey: PORTFOLIO_KEY });
+      toast.success("Đã khôi phục mục đã chọn");
+    },
+    onError: (error: Error) => toast.error(error.message || "Không khôi phục được"),
+  });
+  const trashDeleteMut = useMutation({
+    mutationFn: (input: Parameters<typeof permanentlyDeleteTrashItem>[0]) => permanentlyDeleteTrashItem(input),
+    onSuccess: (_result, input) => {
+      setTrashData((current) => current ? removeTrashRow(current, input.data.kind, input.data.id) : current);
+      toast.success("Đã xóa vĩnh viễn mục đã chọn");
+    },
+    onError: (error: Error) => toast.error(error.message || "Không xóa vĩnh viễn được"),
+  });
+
+  function closeTrash() {
+    setTrashOpen(false);
+    setTrashPin("");
+    setTrashData(null);
+    trashReadMut.reset();
+    trashRestoreMut.reset();
+    trashDeleteMut.reset();
+  }
+
+  async function emptyTrash() {
+    if (!trashData || !trashPin) return;
+    const rows = getTrashRows(trashData);
+    if (rows.length === 0 || !window.confirm(`Xóa vĩnh viễn toàn bộ ${rows.length} mục trong thùng rác? Thao tác này không thể hoàn tác.`)) return;
+
+    setEmptyingTrash(true);
+    try {
+      const results = await Promise.allSettled(rows.map((row) =>
+        permanentlyDeleteTrashItem({ data: { id: row.id, kind: row.kind, pin: trashPin } }),
+      ));
+      const successfulRows = rows.filter((_row, index) => results[index]?.status === "fulfilled");
+      const failedCount = rows.length - successfulRows.length;
+      setTrashData((current) => current
+        ? successfulRows.reduce((next, row) => removeTrashRow(next, row.kind, row.id), current)
+        : current);
+
+      if (failedCount > 0) {
+        try {
+          setTrashData(await fetchTrash({ data: { pin: trashPin } }));
+        } catch {
+          toast.error("Một số mục chưa xóa được; danh sách hiện lại những mục đã xác nhận xóa thành công.");
+        }
+        toast.error(`Đã xóa ${successfulRows.length}/${rows.length} mục; còn ${failedCount} mục.`);
+      } else {
+        toast.success(`Đã làm sạch ${successfulRows.length} mục trong thùng rác`);
+      }
+    } finally {
+      setEmptyingTrash(false);
+    }
+  }
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const email = user?.primaryEmail ?? user?.displayName ?? "Account";
+  const trashRows = trashData ? getTrashRows(trashData) : [];
 
   return (
     <div className="settings-page relative mx-auto w-full max-w-6xl space-y-6 pb-8">
@@ -85,6 +210,7 @@ export function SettingsPage() {
       </header>
 
       <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+        <CollapsibleCardGroup defaultOpen={false}>
         <CollapsibleCard
           title="Tài khoản hiện tại"
           defaultOpen={false}
@@ -116,9 +242,11 @@ export function SettingsPage() {
             <p className="text-xs text-muted-foreground">USD / VND · cập nhật từ header</p>
           </div>
         </CollapsibleCard>
+        </CollapsibleCardGroup>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        <CollapsibleCardGroup defaultOpen={false}>
         <CollapsibleCard
           title="Giao diện"
           defaultOpen={false}
@@ -155,6 +283,7 @@ export function SettingsPage() {
             <Button type="submit" size="sm" disabled={pinMut.isPending || newPin.length !== 6 || newPin !== confirmPin}><KeyRound className="h-4 w-4" /> {profile?.hasEditPin ? "Đổi mã bảo vệ" : "Tạo mã bảo vệ"}</Button>
           </form>
         </CollapsibleCard>
+        </CollapsibleCardGroup>
       </section>
 
       <CollapsibleCard
@@ -189,6 +318,30 @@ export function SettingsPage() {
         </div>
       </CollapsibleCard>
 
+      <CollapsibleCard title="Thùng rác" defaultOpen={false} className="settings-panel">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-medium">Các mục đã xóa</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {profile?.hasEditPin
+                ? "Khôi phục từng mục hoặc xóa vĩnh viễn khỏi sổ cái."
+                : "Hãy thiết lập mã bảo vệ 6 số trước khi mở thùng rác."}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setTrashPin("");
+              setTrashData(null);
+              setTrashOpen(true);
+            }}
+            disabled={!profile?.hasEditPin}
+          >
+            <Trash2 /> Mở thùng rác
+          </Button>
+        </div>
+      </CollapsibleCard>
+
       <CollapsibleCard
         title="Vùng nguy hiểm"
         defaultOpen={false}
@@ -202,6 +355,124 @@ export function SettingsPage() {
           </form>
         </div>
       </CollapsibleCard>
+
+      <Dialog open={trashOpen} onOpenChange={(open) => { if (!open) closeTrash(); else setTrashOpen(true); }}>
+        <DialogContent title="Thùng rác" className="max-w-5xl">
+          {!trashData ? (
+            <form
+              className="mx-auto max-w-sm space-y-4 py-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                trashReadMut.mutate(trashPin);
+              }}
+            >
+              <div className="text-center">
+                <ShieldCheck className="mx-auto h-8 w-8 text-primary" />
+                <p className="mt-3 font-medium">Nhập mã bảo vệ</p>
+                <p className="mt-1 text-sm text-muted-foreground">Mã PIN gồm 6 chữ số</p>
+              </div>
+              <Input
+                autoFocus
+                aria-label="Mã PIN thùng rác"
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="••••••"
+                type="password"
+                value={trashPin}
+                onChange={(event) => setTrashPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={closeTrash}>
+                  Đóng
+                </Button>
+                <Button type="submit" disabled={trashPin.length !== 6 || trashReadMut.isPending}>
+                  {trashReadMut.isPending ? "Đang xác minh..." : "Mở thùng rác"}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                  {trashRows.length} mục trong thùng rác
+                </p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => void emptyTrash()}
+                  disabled={trashRows.length === 0 || emptyingTrash || trashDeleteMut.isPending || trashRestoreMut.isPending}
+                >
+                  <Trash2 /> {emptyingTrash ? "Đang làm sạch..." : "Làm sạch thùng rác"}
+                </Button>
+              </div>
+
+              <div className="max-h-[60dvh] overflow-auto rounded-md border border-border">
+                <table className="w-full min-w-184 text-left text-sm">
+                  <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Loại</th>
+                      <th className="px-3 py-2 font-medium">Nội dung</th>
+                      <th className="px-3 py-2 font-medium">Ngày xóa</th>
+                      <th className="px-3 py-2 text-right font-medium">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {trashRows.map((row) => (
+                      <tr key={`${row.kind}:${row.id}`}>
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <Badge tone={row.kind === "TRANSACTION" ? "navy" : row.kind === "CAPITAL" ? "warn" : "muted"}>
+                            {row.type}
+                          </Badge>
+                        </td>
+                        <td className="min-w-64 px-3 py-3">
+                          <p className="font-medium">{row.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{row.details}</p>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">
+                          {formatViDate(row.deletedAt.slice(0, 10))}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={emptyingTrash || trashRestoreMut.isPending || trashDeleteMut.isPending}
+                              onClick={() => trashRestoreMut.mutate({ data: { id: row.id, kind: row.kind, pin: trashPin } })}
+                            >
+                              <RotateCcw /> Khôi phục
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              title="Xóa vĩnh viễn"
+                              aria-label={`Xóa vĩnh viễn ${row.type}: ${row.title}`}
+                              disabled={emptyingTrash || trashDeleteMut.isPending || trashRestoreMut.isPending}
+                              onClick={() => {
+                                if (!window.confirm(`Xóa vĩnh viễn “${row.title}”? Thao tác này không thể hoàn tác.`)) return;
+                                trashDeleteMut.mutate({ data: { id: row.id, kind: row.kind, pin: trashPin } });
+                              }}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {trashRows.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-12 text-center text-muted-foreground">
+                          Thùng rác đang trống
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

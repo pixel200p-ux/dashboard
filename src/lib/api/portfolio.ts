@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { getSql } from "@/lib/db";
+import { getSql, type Sql } from "@/lib/db";
 import { replayOriginalByBucket, replayPortfolio } from "@/engine/replay";
 import { formatVnd } from "@/engine/money";
 import { replayBank } from "@/engine/bank";
@@ -51,6 +51,29 @@ export type PortfolioPayload = {
   ledger: LedgerSnapshot;
   state: PortfolioState;
 };
+
+async function getTransactionMatchGroup(sql: Sql, transactionId: string): Promise<string[]> {
+  const matches = await sql<{ buy_tx_id: string; sell_tx_id: string }>`
+    select buy_tx_id, sell_tx_id from tplus_matches
+  `;
+  const linkedById = new Map<string, Set<string>>();
+  for (const match of matches) {
+    linkedById.set(match.buy_tx_id, (linkedById.get(match.buy_tx_id) ?? new Set()).add(match.sell_tx_id));
+    linkedById.set(match.sell_tx_id, (linkedById.get(match.sell_tx_id) ?? new Set()).add(match.buy_tx_id));
+  }
+
+  const group = new Set([transactionId]);
+  const pending = [transactionId];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    for (const linkedId of linkedById.get(current) ?? []) {
+      if (group.has(linkedId)) continue;
+      group.add(linkedId);
+      pending.push(linkedId);
+    }
+  }
+  return [...group];
+}
 
 export const fetchPortfolio = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -264,14 +287,57 @@ export const saveTransaction = createServerFn({ method: "POST" })
 
 export const deleteTransaction = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string(), pin: z.string() }))
+  .validator(z.object({ id: z.string(), pin: z.string(), cascade: z.boolean().optional() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
     await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
-    await sql`delete from tplus_matches where sell_tx_id = ${data.id}`;
-    await sql`update transactions set deleted_at = now() where id = ${data.id}`;
+
+    const matchGroup = data.cascade ? await getTransactionMatchGroup(sql, data.id) : [data.id];
+    await sql.query(
+      "delete from tplus_matches where sell_tx_id = any($1::text[]) or buy_tx_id = any($1::text[])",
+      [matchGroup],
+    );
+    await sql.query(
+      "update transactions set deleted_at = now() where id = any($1::text[]) and deleted_at is null",
+      [matchGroup],
+    );
+
     const ledger = await loadSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
+  });
+
+export const checkTxLinks = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ id: z.string() }))
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const matchGroup = await getTransactionMatchGroup(sql, data.id);
+    const linkedIds = matchGroup.filter((id) => id !== data.id);
+    if (linkedIds.length === 0) return { linkedCount: 0, linkedTransactions: [] };
+
+    const linkedTransactions = await sql.query<{
+      id: string;
+      tx_type: string;
+      tx_date: string;
+      quantity: number | string | null;
+      symbol: string | null;
+    }>(`
+      select t.id, t.tx_type, t.tx_date::text as tx_date, t.quantity, a.symbol
+      from transactions t
+      left join assets a on a.id = t.asset_id
+      where t.id = any($1::text[]) and t.deleted_at is null
+      order by t.tx_date, t.created_at
+    `, [linkedIds]);
+    return {
+      linkedCount: linkedTransactions.length,
+      linkedTransactions: linkedTransactions.map((transaction) => ({
+        id: transaction.id,
+        txType: transaction.tx_type,
+        txDate: transaction.tx_date,
+        quantity: transaction.quantity == null ? null : Number(transaction.quantity),
+        symbol: transaction.symbol,
+      })),
+    };
   });
 
 const bankSchema = z.object({

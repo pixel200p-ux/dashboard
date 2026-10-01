@@ -4,7 +4,7 @@ import { HoldingsTable } from "@/components/HoldingsTable";
 import { NavCapitalChart } from "@/components/NavCapitalChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card";
+import { CollapsibleCard, CollapsibleCardGroup } from "@/components/ui/card";
 import { formatViDate } from "@/engine/dates";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { signedClass } from "@/engine/money";
@@ -109,23 +109,25 @@ export function DashboardPage() {
         />
       </div>
             {/* Hàng biểu đồ: Phân bổ (cột ngang) + NAV/Vốn gốc 6 tháng */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <CollapsibleCard
-          title="Phân bổ danh mục"
-          description="DCDS → ETF → Stock → Crypto → Bank · hiển thị % và giá trị"
-          defaultOpen
-        >
-          <AllocChart data={alloc} usdVnd={usd} />
-        </CollapsibleCard>
+      <CollapsibleCardGroup defaultOpen>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CollapsibleCard
+            title="Phân bổ danh mục"
+            description="DCDS → ETF → Stock → Crypto → Bank · hiển thị % và giá trị"
+            defaultOpen
+          >
+            <AllocChart data={alloc} usdVnd={usd} />
+          </CollapsibleCard>
 
-        <CollapsibleCard
-          title="NAV & Original Capital"
-          description="6 tháng gần nhất · chỉ các mốc có thay đổi (nạp/rút hoặc giao dịch)"
-          defaultOpen
-        >
-          <NavCapitalChart ledger={ledger} usdVnd={usd} />
-        </CollapsibleCard>
-      </div>
+          <CollapsibleCard
+            title="NAV & Original Capital"
+            description="6 tháng gần nhất · chỉ các mốc có thay đổi (nạp/rút hoặc giao dịch)"
+            defaultOpen
+          >
+            <NavCapitalChart ledger={ledger} usdVnd={usd} />
+          </CollapsibleCard>
+        </div>
+      </CollapsibleCardGroup>
 
       {/* Bảng Holdings full chiều ngang */}
       <CollapsibleCard
@@ -149,12 +151,13 @@ export function DashboardPage() {
         <HoldingsTable rows={holdings} usdVnd={usd} />
       </CollapsibleCard>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <CollapsibleCard
-          title="Vốn gốc"
-          description="Nạp / Rút · Sửa số tiền, ngày, danh mục, ghi chú"
-          defaultOpen
-        >
+      <CollapsibleCardGroup defaultOpen>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CollapsibleCard
+            title="Vốn gốc"
+            description="Nạp / Rút · Sửa số tiền, ngày, danh mục, ghi chú"
+            defaultOpen
+          >
           <ul className="max-h-[13.5rem] space-y-2 overflow-y-auto pr-1 text-sm">
             {ledger.capital.length === 0 && (
               <li className="text-muted-foreground">Chưa nạp vốn. Bấm Nạp vốn gốc.</li>
@@ -213,9 +216,9 @@ export function DashboardPage() {
                 </li>
               ))}
           </ul>
-        </CollapsibleCard>
-        <CollapsibleCard title="Giao dịch gần đây" defaultOpen>
-          <ul className="max-h-[13.5rem] space-y-2 overflow-y-auto pr-2 text-sm">
+          </CollapsibleCard>
+          <CollapsibleCard title="Giao dịch gần đây" defaultOpen>
+            <ul className="max-h-[13.5rem] space-y-2 overflow-y-auto pr-2 text-sm">
             {recent.length === 0 && <li className="text-muted-foreground">Chưa có lệnh. Sổ cái đang trống.</li>}
             {recent.map((t) => {
               const asset = ledger.assets.find((a) => a.id === t.assetId);
@@ -230,9 +233,10 @@ export function DashboardPage() {
                 </li>
               );
             })}
-          </ul>
-        </CollapsibleCard>
-      </div>
+            </ul>
+          </CollapsibleCard>
+        </div>
+      </CollapsibleCardGroup>
     </div>
   );
 }
