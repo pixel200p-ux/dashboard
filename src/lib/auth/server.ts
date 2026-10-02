@@ -35,6 +35,7 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
+import { resolveDatabaseUrl } from "../../../scripts/db-config.mjs";
 import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GROK_PROVIDERS } from "./providers";
@@ -140,7 +141,7 @@ const trustedOrigins: string[] = explicitBaseURL
       ...LOCAL_DEV_ORIGINS,
     ];
 
-const databaseUrl = env("DATABASE_URL");
+const databaseUrl = resolveDatabaseUrl();
 const databaseSslRejectUnauthorized =
   process.env.NODE_ENV === "production" &&
   env("DATABASE_SSL_REJECT_UNAUTHORIZED") !== "false";

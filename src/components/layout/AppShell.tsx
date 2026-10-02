@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { TxDialog } from "@/components/forms/TxDialog";
 import { CapitalDialog } from "@/components/forms/CapitalDialog";
 import { BankDialog } from "@/components/forms/BankDialog";
+import { PixelAssistant } from "@/components/PixelAssistant";
 import { NotificationFooter, NotifyBell } from "@/components/NotificationFooter";
 import { cn } from "@/lib/utils";
 
@@ -320,6 +321,8 @@ export function AppShell() {
         </main>
         <NotificationFooter />
       </div>
+
+      <PixelAssistant portfolio={portfolio} />
 
       <TxDialog />
       <CapitalDialog />

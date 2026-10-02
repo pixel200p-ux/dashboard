@@ -16,6 +16,7 @@ import { CALENDAR_KEY } from "@/lib/use-calendar";
 import { PROFILE_KEY, MILESTONES_KEY } from "@/lib/use-profile";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/lib/ui-store";
+import { PixelSettings } from "@/components/pages/PixelSettings";
 import { Check, KeyRound, LogOut, Moon, Pencil, RotateCcw, ShieldCheck, Sun, Trash2, WalletCards } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
@@ -285,6 +286,8 @@ export function SettingsPage() {
         </CollapsibleCard>
         </CollapsibleCardGroup>
       </section>
+
+      <PixelSettings />
 
       <CollapsibleCard
         title="Phí & thuế mặc định"

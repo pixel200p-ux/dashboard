@@ -1,4 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
+import { isDatabaseConfiguredForRuntime } from "../../../scripts/db-config.mjs";
 import { auth, authConfigured } from "./server";
 
 /**
@@ -12,7 +13,7 @@ import { auth, authConfigured } from "./server";
  */
 
 /** True when a real database is configured server-side. */
-const databaseConfigured = Boolean(process.env.DATABASE_URL?.trim());
+const databaseConfigured = isDatabaseConfiguredForRuntime();
 
 /** Re-export so callers can branch on it without importing `server.ts`. */
 export { authConfigured };
