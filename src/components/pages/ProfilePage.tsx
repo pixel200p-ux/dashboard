@@ -7,10 +7,11 @@ import { useMilestones, useProfile, useSaveProfile } from "@/lib/use-profile";
 import { usePortfolio } from "@/lib/use-portfolio";
 import { PROFILE_SEASON_BG, resolveProfileSeason, type ProfileSeason } from "@/constants/seasons";
 import { useUiStore } from "@/lib/ui-store";
-import { UserRound, Activity, BarChart3, PlusCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { UserRound, Activity, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { FilterMenu } from "@/components/FilterMenu";
 import { saveSharedLoginTheme } from "@/lib/api/login-theme";
+import { PetHome } from "@/components/InteractiveDragon";
 
 async function readImage(file: File, maxEdge: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
@@ -74,6 +75,9 @@ export function ProfilePage() {
   const [seasonTransitioning, setSeasonTransitioning] = useState(false);
   const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const [coverExpanded, setCoverExpanded] = useState(false);
+  const [petExpanded, setPetExpanded] = useState(false);
+  const dragonFacingUp = useUiStore((state) => state.dragonFacingUp);
+  const setDragonFacingUp = useUiStore((state) => state.setDragonFacingUp);
 
   useEffect(() => {
     if (previousSeason === null || previousSeason === season) return;
@@ -185,7 +189,7 @@ export function ProfilePage() {
   };
 
   return (
-    <div className="relative min-h-dvh w-full bg-background text-foreground">
+    <div className="relative min-h-dvh w-full bg-transparent text-foreground">
       <div className="mx-auto w-full px-3 pb-6 pt-4 md:px-6 md:pt-6 xl:px-8">
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-[#3d4d41] shadow-sm">
           <div
@@ -485,19 +489,45 @@ export function ProfilePage() {
             </div>
           </Card>
 
-          <Card className="lg:col-span-12 flex h-auto min-h-0 flex-col overflow-hidden border-border bg-card p-4 shadow-(--shadow-card)">
-            <div className="flex items-center justify-between">
+          <Card
+            data-pet-home=""
+            className={`relative lg:col-span-12 flex h-auto min-h-40 flex-col overflow-hidden border-border bg-card p-4 shadow-(--shadow-card) ${petExpanded ? "min-h-[50dvh]" : ""}`}
+          >
+            <div className="relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <PlusCircle className="h-4 w-4 text-muted-foreground" />
+                <button
+                  type="button"
+                  aria-label={
+                    dragonFacingUp
+                      ? "Hướng đầu rồng lên; nhấn để bật bám chuột"
+                      : "Hướng đầu rồng xuống; nhấn để tắt bám chuột"
+                  }
+                  aria-pressed={!dragonFacingUp}
+                  onClick={() => setDragonFacingUp(!dragonFacingUp)}
+                  className="text-foreground"
+                >
+                  <svg
+                    viewBox="-32 -18 46 36"
+                    className="h-7 w-7"
+                    aria-hidden="true"
+                    style={{
+                      transform: `rotate(${dragonFacingUp ? -90 : 90}deg)`,
+                    }}
+                  >
+                    <use href="/dragon.svg#Cabeza" />
+                  </svg>
+                </button>
                 <div>
                   <CardTitle className="text-sm font-semibold text-foreground">
-                    Ghi chú bổ sung
+                    PET
                   </CardTitle>
-                  <CardDesc className="text-xs">Khu vực mở rộng tính năng trong tương lai</CardDesc>
                 </div>
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Sẵn sàng</span>
             </div>
+            <PetHome
+              expanded={petExpanded}
+              onExpandedChange={setPetExpanded}
+            />
           </Card>
         </div>
       </div>

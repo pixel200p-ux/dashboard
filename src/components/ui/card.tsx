@@ -24,8 +24,9 @@ export function CollapsibleCardGroup({
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      data-dragon-block=""
       className={cn(
-        "rounded-xl border border-border bg-card p-4 text-card-foreground shadow-(--shadow-card) sm:p-5 min-w-0 overflow-hidden",
+        "rounded-xl border border-border bg-card p-4 text-card-foreground shadow-(--shadow-card) backdrop-blur-[14px] sm:p-5 min-w-0 overflow-hidden",
         className,
       )}
       {...props}
@@ -61,7 +62,7 @@ export function CollapsibleCard({
   const open = group?.open ?? localOpen;
 
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-4 text-card-foreground shadow-(--shadow-card) sm:p-5 min-w-0 overflow-hidden", className)}>
+    <div data-dragon-block="" className={cn("rounded-xl border border-border bg-card p-4 text-card-foreground shadow-(--shadow-card) backdrop-blur-[14px] sm:p-5 min-w-0 overflow-hidden", className)}>
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 text-left"

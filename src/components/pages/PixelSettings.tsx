@@ -1,20 +1,11 @@
 import { useState } from "react";
 import { Check, CircleAlert, CircleCheck, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { PROFILE_SEASON_BG, type ProfileSeason } from "@/constants/seasons";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { checkGeminiKey } from "@/lib/pixel-ai";
 import { maskGeminiKey, usePixelStore, type GeminiKey } from "@/lib/pixel-store";
-import { useUiStore } from "@/lib/ui-store";
-
-const SEASONS: { id: ProfileSeason; label: string }[] = [
-  { id: "spring", label: "Xuân" },
-  { id: "summer", label: "Hạ" },
-  { id: "autumn", label: "Thu" },
-  { id: "winter", label: "Đông" },
-];
 
 function KeyEditor({
   initialName,
@@ -111,31 +102,12 @@ function KeyRow({ item }: { item: GeminiKey }) {
 }
 
 export function PixelSettings() {
-  const season = useUiStore((state) => state.loginTheme === "default" ? "spring" : state.loginTheme);
-  const setLoginTheme = useUiStore((state) => state.setLoginTheme);
   const keys = usePixelStore((state) => state.keys);
   const addKey = usePixelStore((state) => state.addKey);
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <CollapsibleCard title="Mùa giao diện" defaultOpen={false} className="settings-panel">
-        <p className="mt-1 text-xs text-muted-foreground">Chọn phong cảnh theo mùa cho màn hình hồ sơ và đăng nhập.</p>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {SEASONS.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={season === id}
-              onClick={() => setLoginTheme(id)}
-              className={`group overflow-hidden rounded-xl border text-left transition ${season === id ? "border-primary ring-2 ring-primary/20" : "border-border/70 hover:border-primary/45"}`}
-            >
-              <span className="block h-16 bg-cover bg-center" style={{ backgroundImage: `url(${PROFILE_SEASON_BG[id].light})` }} />
-              <span className="flex items-center justify-between px-3 py-2 text-sm font-medium">{label}{season === id && <Check className="h-4 w-4 text-profit" />}</span>
-            </button>
-          ))}
-        </div>
-      </CollapsibleCard>
+    <div className="grid gap-4">
 
       <CollapsibleCard
         title="Pixel · Gemini API keys"

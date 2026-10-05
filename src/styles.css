@@ -11,7 +11,7 @@
 
   --color-background: var(--app-bg);
   --color-foreground: var(--app-fg);
-  --color-card: var(--app-surface);
+  --color-card: color-mix(in oklab, var(--app-surface) var(--app-card-opacity, 82%), transparent);
   --color-card-foreground: var(--app-fg);
   --color-popover: var(--app-surface);
   --color-popover-foreground: var(--app-fg);
@@ -676,7 +676,11 @@ html.dark {
 }
 
 .settings-panel {
-  background: color-mix(in oklab, var(--app-surface) 82%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--app-surface) var(--app-card-opacity, 82%),
+    transparent
+  );
   backdrop-filter: blur(14px) saturate(1.04);
 }
 

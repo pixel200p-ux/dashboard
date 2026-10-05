@@ -44,6 +44,10 @@ type UiState = {
   loginThemeOverrideMonth: string | null;
   currency: DisplayCurrency;
   stockFilter: "ALL" | "vps" | "ssi";
+  cardOpacity: number;
+  dragonAtHome: boolean;
+  dragonSize: number;
+  dragonFacingUp: boolean;
   txOpen: TxPrefill | null;
   capitalOpen: "DEPOSIT" | "WITHDRAW" | null;
   capitalEdit: CapitalPrefill | null;
@@ -55,6 +59,10 @@ type UiState = {
   syncLoginTheme: () => void;
   toggleTheme: () => void;
   toggleCurrency: () => void;
+  setCardOpacity: (opacity: number) => void;
+  setDragonAtHome: (atHome: boolean) => void;
+  setDragonSize: (size: number) => void;
+  setDragonFacingUp: (facingUp: boolean) => void;
   setStockFilter: (f: UiState["stockFilter"]) => void;
   openTx: (p?: TxPrefill) => void;
   closeTx: () => void;
@@ -75,6 +83,10 @@ export const useUiStore = create<UiState>()(
       loginThemeOverrideMonth: null,
       currency: "VND",
       stockFilter: "ALL",
+      cardOpacity: 82,
+      dragonAtHome: false,
+      dragonSize: 1,
+      dragonFacingUp: false,
       txOpen: null,
       capitalOpen: null,
       capitalEdit: null,
@@ -100,6 +112,11 @@ export const useUiStore = create<UiState>()(
       },
       toggleTheme: () => set({ theme: get().theme === "light" ? "dark" : "light" }),
       toggleCurrency: () => set({ currency: get().currency === "VND" ? "USD" : "VND" }),
+      setCardOpacity: (cardOpacity) =>
+        set({ cardOpacity: Math.min(100, Math.max(0, Math.round(cardOpacity))) }),
+      setDragonAtHome: (dragonAtHome) => set({ dragonAtHome }),
+      setDragonSize: (dragonSize) => set({ dragonSize }),
+      setDragonFacingUp: (dragonFacingUp) => set({ dragonFacingUp }),
       setStockFilter: (stockFilter) => set({ stockFilter }),
       openTx: (p) => set({ txOpen: p ?? {} }),
       closeTx: () => set({ txOpen: null }),
@@ -123,6 +140,10 @@ export const useUiStore = create<UiState>()(
         loginThemeOverrideMonth: s.loginThemeOverrideMonth,
         currency: s.currency,
         stockFilter: s.stockFilter,
+        cardOpacity: s.cardOpacity,
+        dragonAtHome: s.dragonAtHome,
+        dragonSize: s.dragonSize,
+        dragonFacingUp: s.dragonFacingUp,
       }),
     },
   ),

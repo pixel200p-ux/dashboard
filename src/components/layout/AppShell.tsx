@@ -36,6 +36,7 @@ import { BankDialog } from "@/components/forms/BankDialog";
 import { PixelAssistant } from "@/components/PixelAssistant";
 import { NotificationFooter, NotifyBell } from "@/components/NotificationFooter";
 import { cn } from "@/lib/utils";
+import { InteractiveDragon } from "@/components/InteractiveDragon";
 
 const NAV_HOME = [{ to: "/", label: "Dashboard", icon: LayoutDashboard }] as const;
 
@@ -76,6 +77,7 @@ export function AppShell() {
   const [mobile, setMobile] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
   const theme = useUiStore((s) => s.theme);
+  const cardOpacity = useUiStore((s) => s.cardOpacity);
   const currency = useUiStore((s) => s.currency);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const toggleCurrency = useUiStore((s) => s.toggleCurrency);
@@ -103,6 +105,13 @@ export function AppShell() {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--app-card-opacity",
+      `${cardOpacity}%`,
+    );
+  }, [cardOpacity]);
 
   if (isPending) return <LoginScreen />;
   if (!user) return <RedirectToSignIn />;
@@ -164,7 +173,8 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
+    <div className="relative isolate min-h-dvh bg-background text-foreground">
+      <InteractiveDragon />
       {mobile && (
         <button
           className="fixed inset-0 z-120 bg-black/50 md:hidden"
@@ -236,7 +246,7 @@ export function AppShell() {
         </nav>
       </aside>
 
-      <div className="md:pl-68 [--sidebar-w:0px] md:[--sidebar-w:17rem]">
+      <div className="relative z-10 md:pl-68 [--sidebar-w:0px] md:[--sidebar-w:17rem]">
         <header className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur">
           <div className="mx-auto flex h-14 w-full items-center justify-between gap-2 px-3 md:px-5">
             <div className="flex items-center gap-2">

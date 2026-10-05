@@ -8,7 +8,6 @@ import { formatViDate } from "@/engine/dates";
 import { saveFees } from "@/lib/api/portfolio";
 import { fetchTrash, permanentlyDeleteTrashItem, restoreTrashItem } from "@/lib/api/trash";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { signOut } from "@/lib/auth/client";
 import { usePortfolio, usePortfolioMutation, PORTFOLIO_KEY } from "@/lib/use-portfolio";
 import { useProfile } from "@/lib/use-profile";
 import { resetApplication, setEditPin } from "@/lib/api/profile";
@@ -17,7 +16,7 @@ import { PROFILE_KEY, MILESTONES_KEY } from "@/lib/use-profile";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/lib/ui-store";
 import { PixelSettings } from "@/components/pages/PixelSettings";
-import { Check, KeyRound, LogOut, Moon, Pencil, RotateCcw, ShieldCheck, Sun, Trash2, WalletCards } from "lucide-react";
+import { KeyRound, Pencil, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import type { FeeProfile } from "@/engine/types";
@@ -91,11 +90,10 @@ export function SettingsPage() {
   const { data, isPending } = usePortfolio();
   const { data: profile } = useProfile();
   const qc = useQueryClient();
-  const theme = useUiStore((s) => s.theme);
-  const setTheme = useUiStore((s) => s.setTheme);
+  const cardOpacity = useUiStore((s) => s.cardOpacity);
+  const setCardOpacity = useUiStore((s) => s.setCardOpacity);
   const feeMut = usePortfolioMutation((d: Parameters<typeof saveFees>[0]) => saveFees(d), "Đã lưu phí");
   const [draft, setDraft] = useState<Record<string, { buy: string; sell: string; tax: string }>>({});
-  const [signingOut, setSigningOut] = useState(false);
   const [editFees, setEditFees] = useState(false);
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
@@ -191,79 +189,32 @@ export function SettingsPage() {
   }
 
   if (isPending || !data) return <Skeleton className="h-64" />;
-  const email = user?.primaryEmail ?? user?.displayName ?? "Account";
+  const accountName = (user?.primaryEmail ?? user?.displayName ?? "Account").split("@")[0];
   const trashRows = trashData ? getTrashRows(trashData) : [];
 
   return (
     <div className="settings-page relative mx-auto w-full max-w-6xl space-y-6 pb-8">
       <header className="settings-hero relative overflow-hidden rounded-2xl border border-border/70 p-5 shadow-(--shadow-card) sm:p-7">
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workspace preferences</p>
+          <div className="min-w-0 flex-1">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workspace preferences</p>
+              <p className="whitespace-nowrap text-right font-mono text-sm font-semibold tabular-nums">
+                {data.state.usdVnd.toLocaleString("vi-VN")} VND
+              </p>
+            </div>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Quản lý tài khoản, giao diện và các quy tắc tính toán của sổ cái.</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/45 px-3 py-2 text-xs font-medium backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-profit shadow-[0_0_0_4px_color-mix(in_oklab,var(--app-profit)_15%,transparent)]" />
-            Hệ thống đang hoạt động
+            {accountName}
           </div>
         </div>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+      <section>
         <CollapsibleCardGroup defaultOpen={false}>
-        <CollapsibleCard
-          title="Tài khoản hiện tại"
-          defaultOpen={false}
-          className="settings-panel p-0"
-          headerAction={
-            <Button variant="outline" size="sm" disabled={signingOut} onClick={(e) => { e.stopPropagation(); setSigningOut(true); void signOut().catch(() => setSigningOut(false)); }}>
-              <LogOut className="h-4 w-4" /> Đăng xuất
-            </Button>
-          }
-        >
-          <div className="flex items-center gap-4 p-5 sm:p-6">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/15">
-              <WalletCards className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="mt-1 truncate text-base font-semibold">{email}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Sổ cái dùng chung cho workspace này</p>
-            </div>
-          </div>
-        </CollapsibleCard>
-
-        <CollapsibleCard
-          title="Tỷ giá tham chiếu"
-          defaultOpen={false}
-          className="settings-panel"
-        >
-          <div className="mt-2 space-y-2">
-            <p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">{data.state.usdVnd.toLocaleString("vi-VN")}</p>
-            <p className="text-xs text-muted-foreground">USD / VND · cập nhật từ header</p>
-          </div>
-        </CollapsibleCard>
-        </CollapsibleCardGroup>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <CollapsibleCardGroup defaultOpen={false}>
-        <CollapsibleCard
-          title="Giao diện"
-          defaultOpen={false}
-          className="settings-panel"
-        >
-          <p className="mt-1 text-xs text-muted-foreground">Chọn chế độ hiển thị cho workspace.</p>
-          <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-background/35 p-1.5">
-            <button type="button" aria-pressed={theme === "light"} onClick={() => setTheme("light")} className={`flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm font-medium transition ${theme === "light" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/60"}`}>
-              <Sun className="h-4 w-4" /> Sáng {theme === "light" && <Check className="h-4 w-4 text-profit" />}
-            </button>
-            <button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")} className={`flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm font-medium transition ${theme === "dark" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/60"}`}>
-              <Moon className="h-4 w-4" /> Tối {theme === "dark" && <Check className="h-4 w-4 text-profit" />}
-            </button>
-          </div>
-        </CollapsibleCard>
-
         <CollapsibleCard
           title="Mã bảo vệ"
           defaultOpen={false}
@@ -321,43 +272,64 @@ export function SettingsPage() {
         </div>
       </CollapsibleCard>
 
-      <CollapsibleCard title="Thùng rác" defaultOpen={false} className="settings-panel">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-medium">Các mục đã xóa</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {profile?.hasEditPin
-                ? "Khôi phục từng mục hoặc xóa vĩnh viễn khỏi sổ cái."
-                : "Hãy thiết lập mã bảo vệ 6 số trước khi mở thùng rác."}
-            </p>
+      <section className="grid gap-4 lg:grid-cols-3">
+        <CollapsibleCard title="Độ mờ card" defaultOpen={false} className="settings-panel">
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="app-card-opacity" className="text-sm text-muted-foreground">Độ mờ</label>
+            <output htmlFor="app-card-opacity" className="font-mono text-sm font-semibold">{cardOpacity}%</output>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setTrashPin("");
-              setTrashData(null);
-              setTrashOpen(true);
-            }}
-            disabled={!profile?.hasEditPin}
-          >
-            <Trash2 /> Mở thùng rác
-          </Button>
-        </div>
-      </CollapsibleCard>
+          <input
+            id="app-card-opacity"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={cardOpacity}
+            onChange={(event) => setCardOpacity(Number(event.currentTarget.value))}
+            aria-label="Độ mờ của các card"
+            className="mt-3 w-full accent-primary"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">Mặc định 82%.</p>
+        </CollapsibleCard>
 
-      <CollapsibleCard
-        title="Vùng nguy hiểm"
-        defaultOpen={false}
-        className="settings-danger rounded-2xl border border-destructive/30"
-      >
-        <div className="space-y-4 pt-2">
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">Reset sẽ xóa vĩnh viễn portfolio, lịch, giá, hồ sơ và mã bảo vệ. Tài khoản đăng nhập vẫn được giữ.</p>
-          <form className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto" onSubmit={(event) => { event.preventDefault(); if (!window.confirm("Xóa vĩnh viễn toàn bộ dữ liệu? Thao tác này không thể hoàn tác.")) return; resetMut.mutate({ data: { pin: resetPin } }); }}>
-            <Input className="sm:w-52" aria-label="Mã xác nhận reset" value={resetPin} onChange={(e) => setResetPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Mã 6 số" type="password" required />
-            <Button type="submit" variant="destructive" disabled={resetMut.isPending || resetPin.length !== 6}><RotateCcw className="h-4 w-4" /> Reset dữ liệu</Button>
-          </form>
-        </div>
-      </CollapsibleCard>
+        <CollapsibleCard title="Thùng rác" defaultOpen={false} className="settings-panel">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">Các mục đã xóa</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {profile?.hasEditPin
+                  ? "Khôi phục từng mục hoặc xóa vĩnh viễn khỏi sổ cái."
+                  : "Hãy thiết lập mã bảo vệ 6 số trước khi mở thùng rác."}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTrashPin("");
+                setTrashData(null);
+                setTrashOpen(true);
+              }}
+              disabled={!profile?.hasEditPin}
+            >
+              <Trash2 /> Mở thùng rác
+            </Button>
+          </div>
+        </CollapsibleCard>
+
+        <CollapsibleCard
+          title="Vùng nguy hiểm"
+          defaultOpen={false}
+          className="settings-danger rounded-2xl border border-destructive/30"
+        >
+          <div className="space-y-4 pt-2">
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">Reset sẽ xóa vĩnh viễn portfolio, lịch, giá, hồ sơ và mã bảo vệ. Tài khoản đăng nhập vẫn được giữ.</p>
+            <form className="flex w-full flex-col gap-2" onSubmit={(event) => { event.preventDefault(); if (!window.confirm("Xóa vĩnh viễn toàn bộ dữ liệu? Thao tác này không thể hoàn tác.")) return; resetMut.mutate({ data: { pin: resetPin } }); }}>
+              <Input className="w-full" aria-label="Mã xác nhận reset" value={resetPin} onChange={(e) => setResetPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Mã 6 số" type="password" required />
+              <Button type="submit" variant="destructive" disabled={resetMut.isPending || resetPin.length !== 6}><RotateCcw className="h-4 w-4" /> Reset dữ liệu</Button>
+            </form>
+          </div>
+        </CollapsibleCard>
+      </section>
 
       <Dialog open={trashOpen} onOpenChange={(open) => { if (!open) closeTrash(); else setTrashOpen(true); }}>
         <DialogContent title="Thùng rác" className="max-w-5xl">
