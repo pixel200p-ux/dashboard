@@ -221,6 +221,34 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   }, [open]);
 
   useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const isBacktick =
+        event.code === "Backquote" || event.key === "`" || event.key === "~";
+      if (!isBacktick) return;
+      event.preventDefault();
+      dismissNotification();
+      setOpen((current) => {
+        const next = !current;
+        openRef.current = next;
+        if (next) {
+          window.setTimeout(() => {
+            document
+              .querySelector<HTMLInputElement>('input[aria-label="Tin nhắn cho Pixel"]')
+              ?.focus();
+          }, 0);
+        }
+        return next;
+      });
+      setUnread(false);
+      resetDockTimer();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dismissNotification]);
+
+  useEffect(() => {
     const resize = () => {
       setViewport({ width: window.innerWidth, height: window.innerHeight });
       setPosition((current) => {
