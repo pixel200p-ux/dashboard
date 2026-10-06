@@ -4,6 +4,7 @@ import { Check, CircleAlert, CircleCheck, LoaderCircle, Pencil, Plus, Trash2, X 
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
@@ -16,7 +17,10 @@ import {
   type PixelKeyMetadata,
   type PixelSettingsPayload,
 } from "@/lib/api/pixel";
+import { verifyEditPinFn } from "@/lib/api/profile";
+import { askEditPin } from "@/lib/edit-pin";
 import { PIXEL_KEY_PROVIDERS, usePixelStore, type PixelKeyProvider } from "@/lib/pixel-store";
+import { useProfile } from "@/lib/use-profile";
 
 function isPixelKeyProvider(value: string): value is PixelKeyProvider {
   return PIXEL_KEY_PROVIDERS.some((item) => item.value === value);
@@ -158,6 +162,7 @@ function KeyRow({
 
 export function PixelSettings() {
   const qc = useQueryClient();
+  const { data: profile } = useProfile();
   const { data, isPending } = useQuery({
     queryKey: PIXEL_SETTINGS_QUERY_KEY,
     queryFn: () => fetchPixelSettings(),
@@ -166,14 +171,12 @@ export function PixelSettings() {
   const legacyKeys = usePixelStore((state) => state.keys);
   const removeLegacyKey = usePixelStore((state) => state.removeKey);
   const migrationStarted = useRef(false);
-  const preferenceDraft = useRef({ mandatoryRules: "", memories: "" });
-  const savedPreferences = useRef({ mandatoryRules: "", memories: "" });
-  const saveQueue = useRef(Promise.resolve());
-  const preferencesReady = useRef(false);
   const [mandatoryRules, setMandatoryRules] = useState("");
   const [memories, setMemories] = useState("");
   const [preferenceStatus, setPreferenceStatus] = useState<"saved" | "saving" | "error">("saved");
   const [adding, setAdding] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [editingSection, setEditingSection] = useState<"api" | "rules" | null>(null);
   const saveKeyMut = useMutation({
     mutationFn: (input: Parameters<typeof savePixelKey>[0]) => savePixelKey(input),
     onSuccess: (key) => {
@@ -194,26 +197,24 @@ export function PixelSettings() {
     },
     onError: (error: Error) => toast.error(error.message || "Không xóa được API key"),
   });
+  const savePrefMut = useMutation({
+    mutationFn: (input: Parameters<typeof savePixelPreferences>[0]) => savePixelPreferences(input),
+    onSuccess: (updated) => {
+      qc.setQueryData(PIXEL_SETTINGS_QUERY_KEY, updated);
+      setPreferenceStatus("saved");
+      toast.success("Đã lưu quy tắc Pixel");
+    },
+    onError: (error: Error) => {
+      setPreferenceStatus("error");
+      toast.error(error.message || "Không lưu được quy tắc Pixel");
+    },
+  });
+
   useEffect(() => {
     if (!data) return;
-    if (!preferencesReady.current) {
-      setMandatoryRules(data.mandatoryRules);
-      setMemories(data.memories);
-      preferenceDraft.current = { mandatoryRules: data.mandatoryRules, memories: data.memories };
-      savedPreferences.current = preferenceDraft.current;
-      preferencesReady.current = true;
-      return;
-    }
-    if (
-      mandatoryRules === savedPreferences.current.mandatoryRules &&
-      memories === savedPreferences.current.memories
-    ) {
-      setMandatoryRules(data.mandatoryRules);
-      setMemories(data.memories);
-      preferenceDraft.current = { mandatoryRules: data.mandatoryRules, memories: data.memories };
-      savedPreferences.current = preferenceDraft.current;
-    }
-  }, [data, mandatoryRules, memories]);
+    setMandatoryRules(data.mandatoryRules);
+    setMemories(data.memories);
+  }, [data]);
 
   useEffect(() => {
     if (!data || migrationStarted.current || legacyKeys.length === 0) return;
@@ -240,31 +241,6 @@ export function PixelSettings() {
     })();
   }, [data, legacyKeys, removeLegacyKey, saveLegacyKey]);
 
-  useEffect(() => {
-    preferenceDraft.current = { mandatoryRules, memories };
-    if (!preferencesReady.current) return;
-    const timer = window.setTimeout(() => {
-      saveQueue.current = saveQueue.current.then(async () => {
-        const next = preferenceDraft.current;
-        if (
-          next.mandatoryRules === savedPreferences.current.mandatoryRules &&
-          next.memories === savedPreferences.current.memories
-        ) return;
-        setPreferenceStatus("saving");
-        try {
-          const updated = await savePixelPreferences({ data: next });
-          qc.setQueryData(PIXEL_SETTINGS_QUERY_KEY, updated);
-          savedPreferences.current = next;
-          setPreferenceStatus("saved");
-        } catch (error) {
-          setPreferenceStatus("error");
-          toast.error(error instanceof Error ? error.message : "Không đồng bộ được cài đặt Pixel");
-        }
-      });
-    }, 600);
-    return () => window.clearTimeout(timer);
-  }, [mandatoryRules, memories, qc]);
-
   async function testKey(id: string) {
     try {
       const result = await testPixelKey({ data: { id } });
@@ -281,95 +257,171 @@ export function PixelSettings() {
     deleteKeyMut.mutate({ data: { id } });
   }
 
+  async function openSection(section: "api" | "rules") {
+    if (!unlocked) {
+      if (!profile?.hasEditPin) {
+        toast.error("Hãy tạo mã bảo vệ ở mục Mã bảo vệ trước");
+        return;
+      }
+      const pin = await askEditPin();
+      if (!pin) return;
+      try {
+        const result = await verifyEditPinFn({ data: { pin } });
+        if (!result.valid) {
+          toast.error("Mã bảo vệ không đúng");
+          return;
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Không xác minh được mã bảo vệ");
+        return;
+      }
+      setUnlocked(true);
+    }
+    setEditingSection(section);
+  }
+
+  function closeEditor() {
+    setEditingSection(null);
+    setAdding(false);
+  }
+
   const keys = data?.keys ?? [];
 
   return (
     <div className="grid gap-4">
-      <CollapsibleCard
-        title="Pixel · API keys"
-        defaultOpen={false}
-        className="settings-panel"
-        headerAction={
-          <Button type="button" size="sm" variant="outline" onClick={() => setAdding((current) => !current)}>
-            {adding ? <X /> : <Plus />}{adding ? "Đóng" : "Thêm key"}
-          </Button>
-        }
-      >
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          API key AI, Tavily và Jina được mã hóa trên server, dùng chung bởi mọi tài khoản đăng nhập; thao tác sửa hoặc xóa áp dụng cho tất cả.
-        </p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Khi cần tin mới, mỗi lượt tra cứu dùng Tavily Search và có thể dùng Jina đọc tối đa 2 trang; hạn mức/chi phí theo tài khoản nhà cung cấp.
-        </p>
-        <div className="mt-4 space-y-2">
-          {adding && (
-            <KeyEditor
-              initialName={`AI ${keys.length + 1}`}
-              initialValue=""
-              initialProvider=""
-              requireKey
-              savingLabel="Thêm"
-              onCancel={() => setAdding(false)}
-              onSave={(name, value, provider) => {
-                if (!value) return;
-                saveKeyMut.mutate(
-                  { data: { provider, name, key: value } },
-                  { onSuccess: () => { setAdding(false); toast.success("Đã mã hóa và chia sẻ API key cho các tài khoản"); } },
-                );
-              }}
-            />
-          )}
-          {isPending && <p className="text-sm text-muted-foreground">Đang tải API key…</p>}
-          {keys.map((item) => (
-            <KeyRow
-              key={item.id}
-              item={item}
-              onUpdate={(id, name, value, provider) => saveKeyMut.mutate({ data: { id, name, key: value, provider } })}
-              onDelete={deleteKey}
-              onTest={testKey}
-            />
-          ))}
-          {!isPending && keys.length === 0 && !adding && (
-            <p className="rounded-xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-              Chưa có key. Thêm Gemini/Groq/OpenRouter để chat và Tavily/Jina để Pixel tra cứu web khi cần.
-            </p>
-          )}
+      <CollapsibleCard title="Pixel Assistant" defaultOpen={false} className="settings-panel">
+        <div className="divide-y divide-border/70">
+          <div className="flex flex-wrap items-end justify-between gap-3 py-4 first:pt-1">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">API</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isPending
+                  ? "Đang tải…"
+                  : keys.length > 0
+                    ? `${keys.length} API key đã lưu`
+                    : "Chưa có API key"}
+              </p>
+            </div>
+            <Button type="button" size="sm" onClick={() => void openSection("api")}>
+              <Pencil className="h-3.5 w-3.5" /> Chỉnh sửa
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-end justify-between gap-3 py-4 last:pb-1">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Quy tắc</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Quy tắc bắt buộc và thông tin lưu trữ
+              </p>
+            </div>
+            <Button type="button" size="sm" onClick={() => void openSection("rules")}>
+              <Pencil className="h-3.5 w-3.5" /> Chỉnh sửa
+            </Button>
+          </div>
         </div>
       </CollapsibleCard>
 
-      <CollapsibleCard title="Pixel · Quy tắc bắt buộc (dùng chung)" defaultOpen={false} className="settings-panel">
-        <label className="block space-y-2">
-          <span className="text-sm text-muted-foreground">Quy tắc được gửi kèm mỗi lần hỏi Pixel</span>
-          <textarea
-            value={mandatoryRules}
-            onChange={(event) => setMandatoryRules(event.target.value)}
-            maxLength={12000}
-            rows={5}
-            className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            placeholder="Ví dụ: Trả lời bằng tiếng Việt, nêu rõ khi thiếu dữ liệu…"
-          />
-        </label>
-        <p className="mt-2 text-right text-xs text-muted-foreground" aria-live="polite">
-          {preferenceStatus === "saving" ? "Đang đồng bộ…" : preferenceStatus === "error" ? "Chưa đồng bộ được" : "Đã đồng bộ"}
-        </p>
-      </CollapsibleCard>
-
-      <CollapsibleCard title="Pixel · Thông tin cần nhớ (dùng chung)" defaultOpen={false} className="settings-panel">
-        <label className="block space-y-2">
-          <span className="text-sm text-muted-foreground">Pixel chỉ dùng phần này khi câu hỏi liên quan hoặc bạn hỏi về ghi nhớ</span>
-          <textarea
-            value={memories}
-            onChange={(event) => setMemories(event.target.value)}
-            maxLength={12000}
-            rows={5}
-            className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            placeholder="Thông tin bạn muốn Pixel ghi nhớ…"
-          />
-        </label>
-        <p className="mt-2 text-right text-xs text-muted-foreground" aria-live="polite">
-          {preferenceStatus === "saving" ? "Đang đồng bộ…" : preferenceStatus === "error" ? "Chưa đồng bộ được" : "Đã đồng bộ"}
-        </p>
-      </CollapsibleCard>
+      <Dialog
+        open={editingSection !== null}
+        onOpenChange={(open) => {
+          if (!open) closeEditor();
+        }}
+      >
+        <DialogContent
+          title={editingSection === "api" ? "API" : "Quy tắc"}
+          className="max-w-3xl"
+        >
+          {editingSection === "api" ? (
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <Button type="button" size="sm" variant="outline" onClick={() => setAdding((current) => !current)}>
+                  {adding ? <X /> : <Plus />}{adding ? "Đóng" : "Thêm key"}
+                </Button>
+              </div>
+              {adding && (
+                <KeyEditor
+                  initialName={`AI ${keys.length + 1}`}
+                  initialValue=""
+                  initialProvider=""
+                  requireKey
+                  savingLabel="Thêm"
+                  onCancel={() => setAdding(false)}
+                  onSave={(name, value, provider) => {
+                    if (!value) return;
+                    saveKeyMut.mutate(
+                      { data: { provider, name, key: value } },
+                      { onSuccess: () => { setAdding(false); toast.success("Đã mã hóa và chia sẻ API key cho các tài khoản"); } },
+                    );
+                  }}
+                />
+              )}
+              {isPending && <p className="text-sm text-muted-foreground">Đang tải API key…</p>}
+              {keys.map((item) => (
+                <KeyRow
+                  key={item.id}
+                  item={item}
+                  onUpdate={(id, name, value, provider) => saveKeyMut.mutate({ data: { id, name, key: value, provider } })}
+                  onDelete={deleteKey}
+                  onTest={testKey}
+                />
+              ))}
+              {!isPending && keys.length === 0 && !adding && (
+                <p className="rounded-xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+                  Chưa có key. Thêm Gemini/Groq/OpenRouter để chat và Tavily/Jina để Pixel tra cứu web khi cần.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">Quy tắc bắt buộc</span>
+                <span className="block text-xs text-muted-foreground">Gửi kèm mỗi lần hỏi Pixel</span>
+                <textarea
+                  value={mandatoryRules}
+                  onChange={(event) => {
+                    setMandatoryRules(event.target.value);
+                    setPreferenceStatus("saved");
+                  }}
+                  maxLength={12000}
+                  rows={5}
+                  className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Ví dụ: Trả lời bằng tiếng Việt, nêu rõ khi thiếu dữ liệu…"
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">Thông tin lưu trữ</span>
+                <span className="block text-xs text-muted-foreground">Pixel dùng khi câu hỏi liên quan hoặc bạn hỏi về ghi nhớ</span>
+                <textarea
+                  value={memories}
+                  onChange={(event) => {
+                    setMemories(event.target.value);
+                    setPreferenceStatus("saved");
+                  }}
+                  maxLength={12000}
+                  rows={5}
+                  className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Thông tin bạn muốn Pixel ghi nhớ…"
+                />
+              </label>
+              <div className="flex items-center justify-end gap-2">
+                <p className="mr-auto text-xs text-muted-foreground" aria-live="polite">
+                  {preferenceStatus === "saving" ? "Đang lưu…" : preferenceStatus === "error" ? "Chưa lưu được" : "Có thể lưu lại"}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={savePrefMut.isPending}
+                  onClick={() => {
+                    setPreferenceStatus("saving");
+                    savePrefMut.mutate({ data: { mandatoryRules, memories } });
+                  }}
+                >
+                  {savePrefMut.isPending ? <LoaderCircle className="animate-spin" /> : <Check />} Lưu
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
