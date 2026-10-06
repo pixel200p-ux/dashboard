@@ -56,21 +56,30 @@ function PetScene({
         `0 0 ${Math.max(1, rect.width)} ${Math.max(1, rect.height)}`,
       );
     };
-    let following = false;
+
     const onPointerMove = (event: PointerEvent) => {
+      if (facingUpRef.current) return;
+
+      if (home) {
+        const el = document.querySelector("[data-pet-home]");
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const inside =
+          event.clientX >= rect.left &&
+          event.clientX <= rect.right &&
+          event.clientY >= rect.top &&
+          event.clientY <= rect.bottom;
+        if (!inside) return;
+        point.x = event.clientX - rect.left;
+        point.y = event.clientY - rect.top;
+        rad = 0;
+        return;
+      }
+
       const target = event.target;
       if (!(target instanceof Element)) return;
-      const inHome = Boolean(target.closest("[data-pet-home]"));
-      if (home ? !inHome : inHome) {
-        if (home) following = false;
-        return;
-      }
-      if (facingUpRef.current) {
-        following = false;
-        return;
-      }
+      if (target.closest("[data-pet-home]")) return;
       if (
-        !home &&
         target.closest(
           '[data-dragon-block], [class*="bg-card"], aside, header, [role="dialog"]',
         )
@@ -81,7 +90,6 @@ function PetScene({
       point.x = event.clientX - rect.left;
       point.y = event.clientY - rect.top;
       rad = 0;
-      following = true;
     };
 
     const observer = new ResizeObserver(resize);
@@ -121,9 +129,19 @@ function PetScene({
         );
       }
 
-      if (rad < Math.min(point.x, point.y) - 20) rad++;
+      if (home) {
+        const extraBelow = height * 0.4;
+        const side = width * 0.08;
+        point.x = Math.min(width + side, Math.max(-side, point.x));
+        point.y = Math.min(height + extraBelow, Math.max(-height * 0.08, point.y));
+      }
+
+      const radm = home
+        ? Math.min(width, height) / 2 - 20
+        : Math.min(point.x, point.y) - 20;
+      if (rad < radm) rad++;
       frm += 0.003;
-      if ((!home && rad > 60) || (home && !following)) {
+      if (rad > 60) {
         point.x += (width / 2 - point.x) * 0.05;
         point.y += (height / 2 - point.y) * 0.05;
       }
@@ -144,7 +162,7 @@ function PetScene({
       ref={svgRef}
       className={
         home
-          ? "pointer-events-none absolute inset-0 h-full w-full"
+          ? "pointer-events-none absolute inset-0 h-full w-full overflow-hidden"
           : "pointer-events-none fixed inset-0 z-0 h-full w-full"
       }
       aria-hidden="true"
