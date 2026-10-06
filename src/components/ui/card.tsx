@@ -12,7 +12,11 @@ export function CollapsibleCardGroup({
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const groupState = { open, toggle: () => setOpen((previous) => !previous) };
+  const groupState = {
+    open,
+    toggle: () => setOpen((previous) => !previous),
+    openAll: () => setOpen(true),
+  };
 
   return (
     <CollapsibleCardGroupContext.Provider value={groupState}>
@@ -63,28 +67,31 @@ export function CollapsibleCard({
 
   return (
     <div data-dragon-block="" className={cn("rounded-xl border border-border bg-card p-4 text-card-foreground shadow-(--shadow-card) backdrop-blur-[14px] sm:p-5 min-w-0 overflow-hidden", className)}>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-3 text-left"
-        onClick={() => group ? group.toggle() : setLocalOpen((prev) => !prev)}
-        aria-expanded={open}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="text-base font-semibold tracking-tight text-foreground">{title}</div>
-          {description ? <div className="mt-1 text-sm text-muted-foreground">{description}</div> : null}
-        </div>
-        <div className="flex items-center gap-2">
-          {headerAction ? (
-            <span
-              className="shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {headerAction}
-            </span>
-          ) : null}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+          onClick={() => group ? group.toggle() : setLocalOpen((prev) => !prev)}
+          aria-expanded={open}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-semibold tracking-tight text-foreground">{title}</div>
+            {description ? <div className="mt-1 text-sm text-muted-foreground">{description}</div> : null}
+          </div>
           <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
-        </div>
-      </button>
+        </button>
+        {headerAction ? (
+          <span
+            className="shrink-0"
+            onClickCapture={() => {
+              if (group) group.openAll();
+              else setLocalOpen(true);
+            }}
+          >
+            {headerAction}
+          </span>
+        ) : null}
+      </div>
       {open && <div className="mt-4">{children}</div>}
     </div>
   );

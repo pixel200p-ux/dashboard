@@ -55,7 +55,7 @@ export function BankDialog() {
   const mut = usePortfolioMutation((d: Parameters<typeof saveBank>[0]) => saveBank(d), "Đã mở sổ tiết kiệm");
   
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const name = bankName === "Khác" ? custom.trim() : bankName;
     const p = parseVndAmount(principal);
@@ -65,7 +65,7 @@ export function BankDialog() {
     if (!name || p <= 0 || !term.trim() || !Number.isFinite(parsedTerm) || parsedTerm <= 0) return;
     if (!rate.trim() || !Number.isFinite(parsedRate) || parsedRate < 0) return;
 
-    const pin = editId ? askEditPin() : null;
+    const pin = editId ? await askEditPin() : null;
     if (editId && !pin) return;
 
     mut.mutate(

@@ -204,9 +204,9 @@ export function DashboardPage() {
                       title="Xóa"
                       aria-label="Xóa"
                       disabled={delCapital.isPending}
-                      onClick={() => {
+                      onClick={async () => {
                         if (!window.confirm("Bạn chắc chưa? Xóa dòng vốn gốc này?")) return;
-                        const pin = askEditPin();
+                        const pin = await askEditPin();
                         if (pin) delCapital.mutate({ data: { id: c.id, pin } });
                       }}
                     >

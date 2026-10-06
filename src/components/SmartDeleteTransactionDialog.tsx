@@ -55,7 +55,7 @@ export function SmartDeleteTransactionDialog({
 
   async function remove(cascade: boolean) {
     if (!transaction) return;
-    const pin = askEditPin();
+    const pin = await askEditPin();
     if (!pin) return;
     try {
       await deleteMutation.mutateAsync({ data: { id: transaction.id, pin, cascade } });

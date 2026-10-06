@@ -58,7 +58,7 @@ export function CapitalDialog() {
     }
   }, [kind, edit]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!kind) return;
     const v = parseVndAmount(amount);
@@ -66,7 +66,7 @@ export function CapitalDialog() {
 
     if (!bucket) return;
     if (isEdit && edit) {
-      const pin = askEditPin();
+      const pin = await askEditPin();
       if (!pin) return;
       updateMut.mutate(
         {

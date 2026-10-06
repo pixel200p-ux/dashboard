@@ -189,7 +189,7 @@ export function ProfilePage() {
   };
 
   return (
-    <div className="relative min-h-dvh w-full bg-transparent text-foreground">
+    <div className="profile-page relative min-h-dvh w-full bg-transparent text-foreground">
       <div className="mx-auto w-full px-3 pb-6 pt-4 md:px-6 md:pt-6 xl:px-8">
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-[#3d4d41] shadow-sm">
           <div
@@ -318,8 +318,8 @@ export function ProfilePage() {
           }}
         />
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-12 lg:gap-3">
-          <Card className="lg:col-span-5 flex h-auto min-h-0 flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
+        <div className="mt-4 grid gap-2.5 lg:grid-cols-12 lg:gap-3">
+          <Card className="profile-card lg:col-span-5 flex h-auto min-h-0 flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
             <div className="mb-3 flex items-center justify-between border-b border-border/70 pb-2">
               <div>
                 <CardTitle className="flex items-center gap-2 text-foreground">
@@ -430,7 +430,7 @@ export function ProfilePage() {
             </div>
           </Card>
 
-          <Card className="lg:col-span-7 flex h-auto min-h-0 flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
+          <Card className="profile-card lg:col-span-7 flex h-auto min-h-0 flex-col overflow-hidden border-border bg-card shadow-(--shadow-card)">
             <div className="mb-3 shrink-0 border-b border-border/70 pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-foreground">
@@ -491,7 +491,7 @@ export function ProfilePage() {
 
           <Card
             data-pet-home=""
-            className={`relative lg:col-span-12 flex h-auto min-h-40 flex-col overflow-hidden border-border bg-card p-4 shadow-(--shadow-card) ${petExpanded ? "min-h-[50dvh]" : ""}`}
+            className={`profile-card relative lg:col-span-12 flex h-auto min-h-40 flex-col overflow-hidden border-border bg-card p-4 shadow-(--shadow-card) ${petExpanded ? "min-h-[50dvh]" : ""}`}
           >
             <div className="relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-2">

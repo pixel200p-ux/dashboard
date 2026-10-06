@@ -18,7 +18,7 @@ import { useUiStore } from "@/lib/ui-store";
 import { PixelSettings } from "@/components/pages/PixelSettings";
 import { KeyRound, Pencil, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FeeProfile } from "@/engine/types";
 import { toast } from "sonner";
 
@@ -92,6 +92,7 @@ export function SettingsPage() {
   const qc = useQueryClient();
   const cardOpacity = useUiStore((s) => s.cardOpacity);
   const setCardOpacity = useUiStore((s) => s.setCardOpacity);
+  const [opacityDraft, setOpacityDraft] = useState(String(cardOpacity));
   const feeMut = usePortfolioMutation((d: Parameters<typeof saveFees>[0]) => saveFees(d), "Đã lưu phí");
   const [draft, setDraft] = useState<Record<string, { buy: string; sell: string; tax: string }>>({});
   const [editFees, setEditFees] = useState(false);
@@ -103,6 +104,10 @@ export function SettingsPage() {
   const [trashPin, setTrashPin] = useState("");
   const [trashData, setTrashData] = useState<TrashPayload | null>(null);
   const [emptyingTrash, setEmptyingTrash] = useState(false);
+
+  useEffect(() => {
+    setOpacityDraft(String(cardOpacity));
+  }, [cardOpacity]);
 
   const pinMut = useMutation({
     mutationFn: (input: Parameters<typeof setEditPin>[0]) => setEditPin(input),
@@ -243,7 +248,7 @@ export function SettingsPage() {
       <CollapsibleCard
         title="Phí & thuế mặc định"
         defaultOpen={false}
-        className="settings-panel p-0"
+        className="settings-panel w-full p-0"
         headerAction={
           <Button size="sm" variant={editFees ? "outline" : "default"} onClick={(e) => { e.stopPropagation(); setEditFees((v) => !v); }}>{editFees ? "Đóng chỉnh sửa" : <><Pencil className="h-3.5 w-3.5" /> Chỉnh sửa</>}</Button>
         }
@@ -272,25 +277,51 @@ export function SettingsPage() {
         </div>
       </CollapsibleCard>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <CollapsibleCard title="Độ mờ card" defaultOpen={false} className="settings-panel">
-          <div className="flex items-center justify-between gap-4">
-            <label htmlFor="app-card-opacity" className="text-sm text-muted-foreground">Độ mờ</label>
-            <output htmlFor="app-card-opacity" className="font-mono text-sm font-semibold">{cardOpacity}%</output>
-          </div>
-          <input
-            id="app-card-opacity"
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            value={cardOpacity}
-            onChange={(event) => setCardOpacity(Number(event.currentTarget.value))}
-            aria-label="Độ mờ của các card"
-            className="mt-3 w-full accent-primary"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">Mặc định 82%.</p>
-        </CollapsibleCard>
+      <CollapsibleCardGroup defaultOpen={false}>
+        <section className="grid gap-4 lg:grid-cols-3">
+          <CollapsibleCard title="Độ mờ card" defaultOpen={false} className="settings-panel">
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const value = Number(opacityDraft);
+                if (Number.isFinite(value) && value >= 0 && value <= 100) {
+                  setCardOpacity(value);
+                }
+              }}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <label htmlFor="app-card-opacity" className="text-sm text-muted-foreground">Độ mờ</label>
+                <output htmlFor="app-card-opacity" className="font-mono text-sm font-semibold">{opacityDraft}%</output>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={opacityDraft || "0"}
+                onChange={(event) => setOpacityDraft(event.currentTarget.value)}
+                aria-label="Độ mờ của các card"
+                className="w-full accent-primary"
+              />
+              <div className="flex items-center gap-2">
+                <Input
+                  id="app-card-opacity"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  required
+                  value={opacityDraft}
+                  onChange={(event) => setOpacityDraft(event.currentTarget.value)}
+                  aria-label="Nhập độ mờ của card"
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+                <Button type="submit" size="sm" className="ml-auto">Lưu</Button>
+              </div>
+            </form>
+          </CollapsibleCard>
 
         <CollapsibleCard title="Thùng rác" defaultOpen={false} className="settings-panel">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -329,7 +360,8 @@ export function SettingsPage() {
             </form>
           </div>
         </CollapsibleCard>
-      </section>
+        </section>
+      </CollapsibleCardGroup>
 
       <Dialog open={trashOpen} onOpenChange={(open) => { if (!open) closeTrash(); else setTrashOpen(true); }}>
         <DialogContent title="Thùng rác" className="max-w-5xl">

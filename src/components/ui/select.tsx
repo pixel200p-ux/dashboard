@@ -27,7 +27,7 @@ export function Select({
         <ChevronDown className="h-4 w-4 opacity-60" />
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
-        <SelectPrimitive.Content className="z-50 overflow-hidden rounded-md border border-border bg-card shadow-[var(--shadow-card)]">
+        <SelectPrimitive.Content className="fixed-surface z-50 overflow-hidden rounded-md border border-border shadow-[var(--shadow-card)]">
           <SelectPrimitive.Viewport className="p-1">
             {options.map((o) => (
               <SelectPrimitive.Item

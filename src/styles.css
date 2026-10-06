@@ -11,7 +11,7 @@
 
   --color-background: var(--app-bg);
   --color-foreground: var(--app-fg);
-  --color-card: color-mix(in oklab, var(--app-surface) var(--app-card-opacity, 82%), transparent);
+  --color-card: color-mix(in oklab, var(--app-surface) var(--app-card-opacity, 80%), transparent);
   --color-card-foreground: var(--app-fg);
   --color-popover: var(--app-surface);
   --color-popover-foreground: var(--app-fg);
@@ -684,6 +684,21 @@ html.dark {
   backdrop-filter: blur(14px) saturate(1.04);
 }
 
+.app-page-content {
+  --color-card: color-mix(
+    in oklab,
+    var(--app-surface) var(--app-card-opacity, 82%),
+    transparent
+  );
+}
+
+.fixed-surface {
+  --app-card-opacity: 90%;
+  --color-card: color-mix(in oklab, var(--app-surface) 90%, transparent);
+  background: var(--color-card);
+  backdrop-filter: blur(14px) saturate(1.04);
+}
+
 .settings-fee-row {
   transition: background-color 160ms ease;
 }
@@ -722,5 +737,37 @@ html.dark {
 @media (max-width: 767px) {
   .profile-hero-name {
     max-width: min(14rem, 52vw);
+  }
+}
+
+@media (max-width: 639px) {
+  .profile-card {
+    padding: 0.75rem;
+    border-radius: 1rem;
+  }
+
+  .profile-card :is([class~="text-xs"], [class~="text-[11px]"]) {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+
+  .profile-card [class~="text-sm"] {
+    font-size: 0.8125rem;
+    line-height: 1.2rem;
+  }
+
+  .profile-card [class~="text-base"] {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .profile-card [class~="text-lg"] {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .profile-card [class~="text-2xl"] {
+    font-size: 1.3125rem;
+    line-height: 1.75rem;
   }
 }

@@ -231,7 +231,7 @@ export function TxDialog() {
     if (autoTplusSellMatch) setMatchTplus(true);
   }, [autoTplusSellMatch]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
 
     let createOriginalDeposit = canSaveOriginal && saveOriginal;
@@ -251,7 +251,7 @@ export function TxDialog() {
       if (!name || p <= 0 || !bankTerm.trim() || !Number.isFinite(parsedTerm) || parsedTerm <= 0) return;
       if (!bankRate.trim() || !Number.isFinite(parsedRate) || parsedRate < 0) return;
 
-      const pin = editing ? askEditPin() : null;
+      const pin = editing ? await askEditPin() : null;
       if (editing && !pin) return;
 
       bankMut.mutate(
@@ -326,7 +326,7 @@ export function TxDialog() {
       left -= take;
     }
 
-    const pin = editing ? askEditPin() : null;
+    const pin = editing ? await askEditPin() : null;
     if (editing && !pin) return;
     mut.mutate(
       {

@@ -241,14 +241,14 @@ export function CalendarPage() {
     setEventDateText("");
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!draft) return;
     const title = draft.title.trim();
     if (!title) return;
     const parsedEventDate = parseJumpDate(eventDateText);
     if (!parsedEventDate) return;
-    const pin = draft.id ? askEditPin() : null;
+    const pin = draft.id ? await askEditPin() : null;
     if (draft.id && !pin) return;
 
     saveMut.mutate(
@@ -499,8 +499,8 @@ export function CalendarPage() {
                         className="h-6 w-6 min-h-6 rounded-md p-0 text-[#64748B] transition hover:bg-red-500/10 hover:text-red-600 dark:text-[#94A3B8] dark:hover:bg-red-500/20 dark:hover:text-red-400"
                         title="Xóa"
                         aria-label="Xóa"
-                        onClick={() => {
-                          const pin = askEditPin();
+                        onClick={async () => {
+                          const pin = await askEditPin();
                           if (pin) delMut.mutate({ data: { id: ev.id, pin } });
                         }}
                       >

@@ -103,10 +103,10 @@ export function DepositCapitalButton({
           <div
             ref={panel}
             style={{ top: pos.top, left: pos.left, width: 260 }}
-            className="fixed z-[80] rounded-lg border border-border bg-card p-3 shadow-[var(--shadow-card)]"
+            className="fixed-surface fixed z-[80] rounded-lg border border-border p-3 shadow-[var(--shadow-card)]"
           >
             <span
-              className="absolute -top-1.5 h-3 w-3 border-l border-t border-border bg-card"
+              className="fixed-surface absolute -top-1.5 h-3 w-3 border-l border-t border-border"
               style={{ left: pos.caret, transform: "translateX(-50%) rotate(45deg)" }}
             />
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">

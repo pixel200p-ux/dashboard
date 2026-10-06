@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -37,6 +38,7 @@ import { PixelAssistant } from "@/components/PixelAssistant";
 import { NotificationFooter, NotifyBell } from "@/components/NotificationFooter";
 import { cn } from "@/lib/utils";
 import { InteractiveDragon } from "@/components/InteractiveDragon";
+import { EditPinDialog } from "@/components/EditPinDialog";
 
 const NAV_HOME = [{ to: "/", label: "Dashboard", icon: LayoutDashboard }] as const;
 
@@ -105,13 +107,6 @@ export function AppShell() {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
-
-  useEffect(() => {
-    document.documentElement.style.setProperty(
-      "--app-card-opacity",
-      `${cardOpacity}%`,
-    );
-  }, [cardOpacity]);
 
   if (isPending) return <LoginScreen />;
   if (!user) return <RedirectToSignIn />;
@@ -325,7 +320,10 @@ export function AppShell() {
                 : "overflow-x-hidden p-3 pb-4 md:p-6",
           )}
         >
-          <div className="w-full">
+          <div
+            className="app-page-content w-full"
+            style={{ "--app-card-opacity": `${cardOpacity}%` } as CSSProperties}
+          >
             <Outlet />
           </div>
         </main>
@@ -337,6 +335,7 @@ export function AppShell() {
       <TxDialog />
       <CapitalDialog />
       <BankDialog />
+      <EditPinDialog />
     </div>
   );
 }

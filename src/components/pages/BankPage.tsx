@@ -152,9 +152,9 @@ export function BankPage() {
             {(b.remainingDays <= 5 || b.rateUnconfirmed) && (
               <form
                 className="flex gap-2"
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
-                  const pin = askEditPin();
+                  const pin = await askEditPin();
                   if (!pin) return;
                   rateMut.mutate({
                     data: {
@@ -180,9 +180,9 @@ export function BankPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
                   if (!window.confirm(`Tất toán sổ ${b.bankName}?`)) return;
-                  const pin = askEditPin();
+                  const pin = await askEditPin();
                   if (pin) redeemMut.mutate({ data: { id: b.id, pin } });
                 }}
               >
@@ -204,8 +204,8 @@ export function BankPage() {
                 className="h-8 w-8 min-h-8 p-0"
                 title="Xóa"
                 aria-label="Xóa"
-                onClick={() => {
-                  const pin = askEditPin();
+                onClick={async () => {
+                  const pin = await askEditPin();
                   if (pin) delMut.mutate({ data: { id: b.id, pin } });
                 }}
               >

@@ -84,7 +84,7 @@ export function NotificationFooter() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-border bg-card shadow-[var(--shadow-card)] transition-transform duration-300 ease-out sm:w-1/3 sm:min-w-[22rem]",
+          "fixed-surface fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-border shadow-[var(--shadow-card)] transition-transform duration-300 ease-out sm:w-1/3 sm:min-w-[22rem]",
           open ? "translate-x-0" : "translate-x-full",
         )}
         aria-hidden={!open}

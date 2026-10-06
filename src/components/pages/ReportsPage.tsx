@@ -289,14 +289,14 @@ export function ReportsPage() {
                           type="button"
                           className="grid h-9 w-9 place-items-center rounded-md text-destructive hover:bg-destructive/10"
                           aria-label="Xóa dòng lịch sử"
-                          onClick={() => {
+                          onClick={async () => {
                             if (r.kind !== "DEPOSIT" && r.kind !== "WITHDRAW" && r.kind !== "BANK_OPEN") {
                               const transaction = data.ledger.transactions.find((item) => item.id === r.id);
                               const asset = transaction ? data.ledger.assets.find((item) => item.id === transaction.assetId) : undefined;
                               if (transaction) setDeleteTarget({ transaction, symbol: asset?.symbol ?? "" });
                               return;
                             }
-                            const pin = askEditPin();
+                            const pin = await askEditPin();
                             if (!pin) return;
                             if (r.kind === "DEPOSIT" || r.kind === "WITHDRAW") deleteCapitalMut.mutate({ data: { id: r.id, pin } });
                             else deleteBankMut.mutate({ data: { id: r.id.replace(/:open$/, ""), pin } });

@@ -2,9 +2,21 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export type GeminiKeyStatus = "untested" | "active" | "inactive";
+export type AIKeyProvider = "gemini" | "groq" | "openrouter";
+export type SearchKeyProvider = "tavily" | "jina";
+export type PixelKeyProvider = AIKeyProvider | SearchKeyProvider;
+
+export const PIXEL_KEY_PROVIDERS: { value: PixelKeyProvider; label: string }[] = [
+  { value: "gemini", label: "Gemini" },
+  { value: "groq", label: "Groq" },
+  { value: "openrouter", label: "OpenRouter" },
+  { value: "tavily", label: "Tavily Search" },
+  { value: "jina", label: "Jina Reader" },
+];
 
 export type GeminiKey = {
   id: string;
+  provider?: AIKeyProvider;
   name: string;
   value: string;
   status: GeminiKeyStatus;
@@ -13,8 +25,6 @@ export type GeminiKey = {
 
 type PixelState = {
   keys: GeminiKey[];
-  addKey: (name: string, value: string) => void;
-  updateKey: (id: string, update: Partial<Pick<GeminiKey, "name" | "value" | "status" | "checkedAt">>) => void;
   removeKey: (id: string) => void;
 };
 
@@ -22,23 +32,6 @@ export const usePixelStore = create<PixelState>()(
   persist(
     (set) => ({
       keys: [],
-      addKey: (name, value) =>
-        set((state) => ({
-          keys: [
-            ...state.keys,
-            {
-              id: crypto.randomUUID(),
-              name,
-              value,
-              status: "untested",
-              checkedAt: null,
-            },
-          ],
-        })),
-      updateKey: (id, update) =>
-        set((state) => ({
-          keys: state.keys.map((key) => (key.id === id ? { ...key, ...update } : key)),
-        })),
       removeKey: (id) => set((state) => ({ keys: state.keys.filter((key) => key.id !== id) })),
     }),
     {
@@ -47,8 +40,3 @@ export const usePixelStore = create<PixelState>()(
     },
   ),
 );
-
-export function maskGeminiKey(value: string): string {
-  if (value.length <= 6) return `${value.slice(0, 3)}${"•".repeat(Math.max(0, value.length - 3))}`;
-  return `${value.slice(0, 3)}${"•".repeat(Math.min(12, value.length - 6))}${value.slice(-3)}`;
-}

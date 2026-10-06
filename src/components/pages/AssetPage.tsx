@@ -409,8 +409,8 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
               {groups.map((group) => (
                 <div key={group.key} className="space-y-2">
                   <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0F172A] dark:text-white">{group.label}</div>
-                  <div className="table-scroll">
-                    <table className="w-full text-left text-xs">
+                  <div className="hidden sm:block">
+                    <table className="w-full table-fixed text-left text-xs">
                       <thead className="text-[10px] uppercase text-muted-foreground">
                         <tr className="border-b border-border">
                           <th className="px-2 py-2 font-medium">Mã</th>
@@ -432,6 +432,28 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="space-y-2 sm:hidden">
+                    {group.rows.map((h) => (
+                      <div
+                        key={`${group.key}-${h.assetId}`}
+                        className="grid grid-cols-[minmax(0,0.55fr)_minmax(0,1fr)_minmax(0,0.85fr)] items-center gap-1.5 border-b border-border/70 py-2 text-[11px] last:border-0"
+                      >
+                        <span className="min-w-0 truncate font-semibold">{h.symbol}</span>
+                        <span className="min-w-0 text-right">
+                          <span className="block text-[9px] text-muted-foreground">Tiền mặt</span>
+                          <span className="break-words font-mono tabular-nums">
+                            {h.cashDividend > 0 ? displayMoney(h.cashDividend, currency, usd) : "—"}
+                          </span>
+                        </span>
+                        <span className="min-w-0 text-right">
+                          <span className="block text-[9px] text-muted-foreground">CP thưởng</span>
+                          <span className="break-words font-mono tabular-nums">
+                            {h.stockDividendQty > 0 ? formatQty(h.stockDividendQty, "STOCK") : "—"}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
