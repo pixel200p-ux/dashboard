@@ -52,14 +52,14 @@ function KeyEditor({
 
   return (
     <form
-      className="grid gap-2 rounded-xl border border-border/70 bg-background/50 p-3 sm:grid-cols-[1fr_1.2fr_1.5fr_auto_auto]"
+      className="grid gap-3 rounded-xl border border-border/70 bg-background/50 p-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-end"
       onSubmit={(event) => {
         event.preventDefault();
         if (!provider || !name.trim() || (requireKey && !value.trim())) return;
         onSave(name.trim(), value.trim() || undefined, provider);
       }}
     >
-      <label className="space-y-1 text-xs text-muted-foreground">
+      <label className="grid gap-1 text-xs text-muted-foreground">
         Nhà cung cấp
         <Select
           value={provider}
@@ -70,29 +70,37 @@ function KeyEditor({
           options={PIXEL_KEY_PROVIDERS}
         />
       </label>
-      <Input
-        aria-label="Tên API key"
-        autoComplete="off"
-        placeholder="Tên dễ nhớ"
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        required
-      />
-      <Input
-        aria-label={`${provider || "AI"} API key`}
-        autoComplete="new-password"
-        placeholder={provider ? (requireKey ? `Dán ${provider} API key` : "Để trống nếu giữ key hiện tại") : "Chọn nhà cung cấp trước"}
-        type="password"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        required={requireKey}
-      />
-      <Button type="submit" size="sm" disabled={!canSave}>
-        <Check /> {savingLabel}
-      </Button>
-      <Button type="button" size="icon" variant="ghost" aria-label="Hủy" onClick={onCancel}>
-        <X />
-      </Button>
+      <label className="grid gap-1 text-xs text-muted-foreground">
+        Tên
+        <Input
+          aria-label="Tên API key"
+          autoComplete="off"
+          placeholder="Tên dễ nhớ"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          required
+        />
+      </label>
+      <label className="grid gap-1 text-xs text-muted-foreground">
+        API key
+        <Input
+          aria-label={`${provider || "AI"} API key`}
+          autoComplete="new-password"
+          placeholder={provider ? (requireKey ? `Dán ${provider} API key` : "Để trống nếu giữ key hiện tại") : "Chọn nhà cung cấp trước"}
+          type="password"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          required={requireKey}
+        />
+      </label>
+      <div className="flex h-10 items-center gap-1">
+        <Button type="submit" disabled={!canSave}>
+          <Check /> {savingLabel}
+        </Button>
+        <Button type="button" size="icon" variant="ghost" aria-label="Hủy" onClick={onCancel}>
+          <X />
+        </Button>
+      </div>
     </form>
   );
 }
