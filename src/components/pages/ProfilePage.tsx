@@ -504,7 +504,7 @@ export function ProfilePage() {
                   }
                   aria-pressed={!dragonFacingUp}
                   onClick={() => setDragonFacingUp(!dragonFacingUp)}
-                  className="text-foreground"
+                  className="text-[#0a2540] dark:text-white"
                 >
                   <svg
                     viewBox="-32 -18 46 36"
@@ -514,11 +514,18 @@ export function ProfilePage() {
                       transform: `rotate(${dragonFacingUp ? -90 : 90}deg)`,
                     }}
                   >
-                    <use href="/dragon.svg#Cabeza" />
+                    <path
+                      fill={theme === "dark" ? "#ffffff" : "#0a2540"}
+                      d="M-21.05,-8.25Q-13.6 -15.95 -1.3 -12.1Q-7.85 -8.5 -5.85 -4.35Q-2.3 -4.85 10.5 0.15Q0 4.35 -5.85 3.65Q-7.85 7.75 -1.25 12.45Q-13.6 15.2 -21.05 7.5Q-29.55 4.05 -30.2 -0.35Q-29.55 -4.8 -21.05 -8.25"
+                    />
+                    <path
+                      fill={theme === "dark" ? "#0a2540" : "#ffffff"}
+                      d="M-28.9,-1.1L-28.55 -1.95Q-28.1 -3.1 -27.25 -2.95L-26.7 -2.95Q-27.7 -1.65 -28.9 -1.1M-18.35,-1.8Q-15.1 -10.3 -9.6 -6.05Q-15.1 -6.2 -18.35 -1.8M-18.35,1.1Q-15.1 5.45 -9.6 5.35Q-15.1 9.55 -18.35 1.1M-26.7,2.2L-27.25 2.25Q-28.1 2.4 -28.55 1.2L-28.9 0.35Q-27.7 0.9 -26.7 2.2"
+                    />
                   </svg>
                 </button>
                 <div>
-                  <CardTitle className="text-sm font-semibold text-foreground">
+                  <CardTitle className="text-sm font-semibold text-[#0a2540] dark:text-white">
                     PET
                   </CardTitle>
                 </div>

@@ -56,12 +56,19 @@ function PetScene({
         `0 0 ${Math.max(1, rect.width)} ${Math.max(1, rect.height)}`,
       );
     };
+    let following = false;
     const onPointerMove = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const inHome = Boolean(target.closest("[data-pet-home]"));
-      if (home ? !inHome : inHome) return;
-      if (facingUpRef.current) return;
+      if (home ? !inHome : inHome) {
+        if (home) following = false;
+        return;
+      }
+      if (facingUpRef.current) {
+        following = false;
+        return;
+      }
       if (
         !home &&
         target.closest(
@@ -74,6 +81,7 @@ function PetScene({
       point.x = event.clientX - rect.left;
       point.y = event.clientY - rect.top;
       rad = 0;
+      following = true;
     };
 
     const observer = new ResizeObserver(resize);
@@ -115,7 +123,7 @@ function PetScene({
 
       if (rad < Math.min(point.x, point.y) - 20) rad++;
       frm += 0.003;
-      if (!home && rad > 60) {
+      if ((!home && rad > 60) || (home && !following)) {
         point.x += (width / 2 - point.x) * 0.05;
         point.y += (height / 2 - point.y) * 0.05;
       }
