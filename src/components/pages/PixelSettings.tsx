@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CircleAlert, CircleCheck, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, CircleAlert, CircleCheck, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import {
   PIXEL_SETTINGS_QUERY_KEY,
   savePixelKey,
   savePixelPreferences,
-  testPixelKey,
+  testAllPixelKeys,
   type PixelKeyMetadata,
   type PixelSettingsPayload,
 } from "@/lib/api/pixel";
@@ -32,9 +32,40 @@ type KeyEditorProps = {
   initialProvider: PixelKeyProvider | "";
   requireKey: boolean;
   savingLabel: string;
+  existingKeys?: PixelKeyMetadata[];
   onSave: (name: string, value: string | undefined, provider: PixelKeyProvider) => void;
   onCancel: () => void;
 };
+
+function suggestKeyName(provider: PixelKeyProvider, existingKeys: PixelKeyMetadata[]): string {
+  const providerLabel = PIXEL_KEY_PROVIDERS.find((item) => item.value === provider)?.label ?? provider;
+  const count = existingKeys.filter((k) => k.provider === provider).length;
+  return `${providerLabel} ${count + 1}`;
+}
+
+function ProviderGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="overflow-hidden rounded-xl border border-border/70">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-muted/50"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{label}</span>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="space-y-2 border-t border-border/70 p-3">{children}</div>}
+    </section>
+  );
+}
 
 function KeyEditor({
   initialName,
@@ -42,20 +73,22 @@ function KeyEditor({
   initialProvider,
   requireKey,
   savingLabel,
+  existingKeys = [],
   onSave,
   onCancel,
 }: KeyEditorProps) {
   const [name, setName] = useState(initialName);
   const [value, setValue] = useState(initialValue);
   const [provider, setProvider] = useState<PixelKeyProvider | "">(initialProvider);
-  const canSave = Boolean(provider && name.trim() && (value.trim() || !requireKey));
+  const needsKey = requireKey || (initialProvider !== "" && provider !== initialProvider);
+  const canSave = Boolean(provider && name.trim() && (value.trim() || !needsKey));
 
   return (
     <form
       className="grid gap-3 rounded-xl border border-border/70 bg-background/50 p-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-end"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!provider || !name.trim() || (requireKey && !value.trim())) return;
+        if (!provider || !name.trim() || (needsKey && !value.trim())) return;
         onSave(name.trim(), value.trim() || undefined, provider);
       }}
     >
@@ -65,7 +98,10 @@ function KeyEditor({
           value={provider}
           placeholder="Chọn nhà cung cấp"
           onValueChange={(next) => {
-            if (isPixelKeyProvider(next)) setProvider(next);
+            if (isPixelKeyProvider(next)) {
+              setProvider(next);
+              setName(suggestKeyName(next, existingKeys));
+            }
           }}
           options={PIXEL_KEY_PROVIDERS}
         />
@@ -86,11 +122,11 @@ function KeyEditor({
         <Input
           aria-label={`${provider || "AI"} API key`}
           autoComplete="new-password"
-          placeholder={provider ? (requireKey ? `Dán ${provider} API key` : "Để trống nếu giữ key hiện tại") : "Chọn nhà cung cấp trước"}
+          placeholder={provider ? (needsKey ? `Dán ${provider} API key` : "Để trống nếu giữ key hiện tại") : "Chọn nhà cung cấp trước"}
           type="password"
           value={value}
           onChange={(event) => setValue(event.target.value)}
-          required={requireKey}
+          required={needsKey}
         />
       </label>
       <div className="flex h-10 items-center gap-1">
@@ -107,23 +143,21 @@ function KeyEditor({
 
 function KeyRow({
   item,
+  allKeys,
   onUpdate,
   onDelete,
-  onTest,
 }: {
   item: PixelKeyMetadata;
+  allKeys: PixelKeyMetadata[];
   onUpdate: (id: string, name: string, value: string | undefined, provider: PixelKeyProvider) => void;
   onDelete: (id: string) => void;
-  onTest: (id: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [checking, setChecking] = useState(false);
   const status = item.status === "active"
     ? { label: "Đang hoạt động", className: "text-profit", icon: <CircleCheck className="h-3.5 w-3.5" /> }
     : item.status === "inactive"
       ? { label: "Không hoạt động", className: "text-loss", icon: <CircleAlert className="h-3.5 w-3.5" /> }
       : { label: "Chưa kiểm tra", className: "text-muted-foreground", icon: <span className="h-2 w-2 rounded-full bg-muted-foreground/50" /> };
-  const provider = PIXEL_KEY_PROVIDERS.find((option) => option.value === item.provider)?.label ?? item.provider;
 
   if (editing) {
     return (
@@ -133,6 +167,7 @@ function KeyRow({
         initialProvider={item.provider}
         requireKey={false}
         savingLabel="Lưu"
+        existingKeys={allKeys}
         onCancel={() => setEditing(false)}
         onSave={(name, value, nextProvider) => {
           onUpdate(item.id, name, value, nextProvider);
@@ -143,21 +178,14 @@ function KeyRow({
   }
 
   return (
-    <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-background/45 p-3 ${item.status === "active" ? "border-l-2 border-l-profit" : item.status === "inactive" ? "border-l-2 border-l-loss" : ""}`}>
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/50 bg-background/30 px-3 py-2 ${item.status === "active" ? "border-l-2 border-l-profit" : item.status === "inactive" ? "border-l-2 border-l-loss" : ""}`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium">{item.name}</span>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">{provider}</span>
           <span className={`inline-flex items-center gap-1 text-[11px] ${status.className}`}>{status.icon}{status.label}</span>
         </div>
-        <p className="mt-1 font-mono text-xs text-muted-foreground">•••••••• · API key đã mã hóa</p>
+        <p className="mt-0.5 font-mono text-xs text-muted-foreground">{item.hint}</p>
       </div>
-      <Button type="button" size="sm" variant="outline" disabled={checking} onClick={() => {
-        setChecking(true);
-        void onTest(item.id).finally(() => setChecking(false));
-      }}>
-        {checking ? <LoaderCircle className="animate-spin" /> : <CircleCheck />} Kiểm tra
-      </Button>
       <Button type="button" size="icon" variant="ghost" aria-label={`Sửa ${item.name}`} onClick={() => setEditing(true)}>
         <Pencil />
       </Button>
@@ -183,6 +211,7 @@ export function PixelSettings() {
   const [memories, setMemories] = useState("");
   const [preferenceStatus, setPreferenceStatus] = useState<"saved" | "saving" | "error">("saved");
   const [adding, setAdding] = useState(false);
+  const [testingAll, setTestingAll] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [editingSection, setEditingSection] = useState<"api" | "rules" | null>(null);
   const saveKeyMut = useMutation({
@@ -248,17 +277,6 @@ export function PixelSettings() {
       if (moved > 0) toast.success(`Đã mã hóa và đồng bộ ${moved} API key cũ`);
     })();
   }, [data, legacyKeys, removeLegacyKey, saveLegacyKey]);
-
-  async function testKey(id: string) {
-    try {
-      const result = await testPixelKey({ data: { id } });
-      await qc.invalidateQueries({ queryKey: PIXEL_SETTINGS_QUERY_KEY });
-      if (result.status === "active") toast.success("API key đang hoạt động");
-      else toast.error("API key không hợp lệ hoặc không hoạt động");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể kiểm tra API key");
-    }
-  }
 
   function deleteKey(id: string) {
     if (!window.confirm("Xóa vĩnh viễn API key dùng chung này? Các tài khoản khác cũng sẽ mất key này.")) return;
@@ -338,20 +356,62 @@ export function PixelSettings() {
           title={editingSection === "api" ? "API" : "Quy tắc"}
           className="max-w-3xl"
         >
-          {editingSection === "api" ? (
+          {editingSection === "api" ? (() => {
+            const grouped = PIXEL_KEY_PROVIDERS.reduce<Record<string, PixelKeyMetadata[]>>((acc, p) => {
+              const providerKeys = keys.filter((k) => k.provider === p.value);
+              if (providerKeys.length > 0) acc[p.value] = providerKeys;
+              return acc;
+            }, {});
+            return (
             <div className="space-y-3">
-              <div className="flex justify-end">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <Button type="button" size="sm" variant="outline" onClick={() => setAdding((current) => !current)}>
                   {adding ? <X /> : <Plus />}{adding ? "Đóng" : "Thêm key"}
                 </Button>
+                {keys.length > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={testingAll}
+                    onClick={async () => {
+                      setTestingAll(true);
+                      try {
+                        const { results } = await testAllPixelKeys();
+                        await qc.invalidateQueries({ queryKey: PIXEL_SETTINGS_QUERY_KEY });
+                        const active = results.filter((r) => r.status === "active").length;
+                        const inactive = results.filter((r) => r.status === "inactive").length;
+                        const failed = results.filter((r) => r.status === null);
+                        if (active === results.length) toast.success(`Tất cả ${active} key đều hoạt động`);
+                        else {
+                          const failedNames = failed.map((result) => {
+                            const keyName = keys.find((key) => key.id === result.id)?.name ?? result.id;
+                            return `${keyName}: ${result.error ?? "không xác định được nguyên nhân"}`;
+                          });
+                          toast.error(
+                            `${active} hoạt động, ${inactive} không hoạt động, ${failed.length} chưa kiểm tra được`,
+                            failedNames.length ? { description: failedNames.join(" · ") } : undefined,
+                          );
+                        }
+                      } catch (error) {
+                        toast.error(error instanceof Error ? error.message : "Không thể kiểm tra");
+                      } finally {
+                        setTestingAll(false);
+                      }
+                    }}
+                  >
+                    {testingAll ? <LoaderCircle className="animate-spin" /> : <CircleCheck />} Kiểm tra
+                  </Button>
+                )}
               </div>
               {adding && (
                 <KeyEditor
-                  initialName={`AI ${keys.length + 1}`}
+                  initialName=""
                   initialValue=""
                   initialProvider=""
                   requireKey
                   savingLabel="Thêm"
+                  existingKeys={keys}
                   onCancel={() => setAdding(false)}
                   onSave={(name, value, provider) => {
                     if (!value) return;
@@ -363,22 +423,30 @@ export function PixelSettings() {
                 />
               )}
               {isPending && <p className="text-sm text-muted-foreground">Đang tải API key…</p>}
-              {keys.map((item) => (
-                <KeyRow
-                  key={item.id}
-                  item={item}
-                  onUpdate={(id, name, value, provider) => saveKeyMut.mutate({ data: { id, name, key: value, provider } })}
-                  onDelete={deleteKey}
-                  onTest={testKey}
-                />
-              ))}
+              {Object.entries(grouped).map(([providerValue, providerKeys]) => {
+                const providerLabel = PIXEL_KEY_PROVIDERS.find((p) => p.value === providerValue)?.label ?? providerValue;
+                return (
+                  <ProviderGroup key={providerValue} label={providerLabel}>
+                    {providerKeys.map((item) => (
+                      <KeyRow
+                        key={item.id}
+                        item={item}
+                        allKeys={keys}
+                        onUpdate={(id, name, value, provider) => saveKeyMut.mutate({ data: { id, name, key: value, provider } })}
+                        onDelete={deleteKey}
+                      />
+                    ))}
+                  </ProviderGroup>
+                );
+              })}
               {!isPending && keys.length === 0 && !adding && (
                 <p className="rounded-xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
                   Chưa có key. Thêm Gemini/Groq/OpenRouter để chat và Tavily/Jina để Pixel tra cứu web khi cần.
                 </p>
               )}
             </div>
-          ) : (
+            );
+          })() : (
             <div className="space-y-4">
               <label className="block space-y-2">
                 <span className="text-sm font-medium">Quy tắc bắt buộc</span>

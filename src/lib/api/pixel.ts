@@ -18,6 +18,7 @@ export type PixelKeyMetadata = {
   name: string;
   status: GeminiKeyStatus;
   checkedAt: string | null;
+  hint: string;
 };
 
 export type PixelSettingsPayload = {
@@ -40,13 +41,33 @@ export type PixelConversationMessage = {
   createdAt: string;
 };
 
-function mapKey(row: Record<string, unknown>): PixelKeyMetadata {
+function maskKey(value: string) {
+  const text = value.trim();
+  if (text.length <= 8) return "••••••••";
+  return `${text.slice(0, 4)}••••${text.slice(-4)}`;
+}
+
+async function hintFromRow(row: Record<string, unknown>, rawKey?: string) {
+  if (rawKey) return maskKey(rawKey);
+  if (!row.key_ciphertext || !row.key_nonce || !row.key_auth_tag) return "••••••••";
+  const { decryptSecret } = await import("@/lib/pixel-encryption.server");
+  return maskKey(
+    decryptSecret({
+      ciphertext: String(row.key_ciphertext),
+      nonce: String(row.key_nonce),
+      authTag: String(row.key_auth_tag),
+    }),
+  );
+}
+
+async function mapKey(row: Record<string, unknown>, rawKey?: string): Promise<PixelKeyMetadata> {
   return {
     id: String(row.id),
     provider: String(row.provider) as PixelKeyProvider,
     name: String(row.name),
     status: String(row.status) as GeminiKeyStatus,
     checkedAt: row.checked_at == null ? null : String(row.checked_at),
+    hint: await hintFromRow(row, rawKey),
   };
 }
 
@@ -55,11 +76,11 @@ export const fetchPixelSettings = createServerFn({ method: "GET" })
   .handler(async (): Promise<PixelSettingsPayload> => {
     const sql = await getSql();
     const [keys, preferences] = await Promise.all([
-      sql`select id, provider, name, status, checked_at from pixel_ai_keys where user_id = ${SHARED_OWNER} order by created_at`,
+      sql`select id, provider, name, status, checked_at, key_ciphertext, key_nonce, key_auth_tag from pixel_ai_keys where user_id = ${SHARED_OWNER} order by created_at`,
       sql`select mandatory_rules, memories from pixel_preferences where user_id = ${SHARED_OWNER}`,
     ]);
     return {
-      keys: keys.map((row) => mapKey(row as Record<string, unknown>)),
+      keys: await Promise.all(keys.map((row) => mapKey(row as Record<string, unknown>))),
       mandatoryRules: String(preferences[0]?.mandatory_rules ?? ""),
       memories: String(preferences[0]?.memories ?? ""),
     };
@@ -91,9 +112,9 @@ export const savePixelKey = createServerFn({ method: "POST" })
       const rows = await sql`
         update pixel_ai_keys set name = ${data.name}, updated_at = now()
         where id = ${id} and user_id = ${SHARED_OWNER}
-        returning id, provider, name, status, checked_at
+        returning id, provider, name, status, checked_at, key_ciphertext, key_nonce, key_auth_tag
       `;
-      return mapKey(rows[0] as Record<string, unknown>);
+      return await mapKey(rows[0] as Record<string, unknown>);
     }
     if (!data.key) throw new Error("Hãy nhập API key.");
 
@@ -107,7 +128,7 @@ export const savePixelKey = createServerFn({ method: "POST" })
               key_auth_tag = ${encrypted.authTag}, status = 'untested',
               checked_at = null, updated_at = now()
           where id = ${id} and user_id = ${SHARED_OWNER}
-          returning id, provider, name, status, checked_at
+          returning id, provider, name, status, checked_at, key_ciphertext, key_nonce, key_auth_tag
         `
       : await sql`
           insert into pixel_ai_keys
@@ -115,9 +136,9 @@ export const savePixelKey = createServerFn({ method: "POST" })
           values
             (${id}, ${SHARED_OWNER}, ${data.provider}, ${data.name},
              ${encrypted.ciphertext}, ${encrypted.nonce}, ${encrypted.authTag})
-          returning id, provider, name, status, checked_at
+          returning id, provider, name, status, checked_at, key_ciphertext, key_nonce, key_auth_tag
         `;
-    return mapKey(rows[0] as Record<string, unknown>);
+    return await mapKey(rows[0] as Record<string, unknown>);
   });
 
 export const deletePixelKey = createServerFn({ method: "POST" })
@@ -163,6 +184,50 @@ export const testPixelKey = createServerFn({ method: "POST" })
     return { status, checkedAt };
   });
 
+export const testAllPixelKeys = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async (): Promise<{
+    results: { id: string; status: GeminiKeyStatus | null; checkedAt: string | null; error?: string }[];
+  }> => {
+    const sql = await getSql();
+    const rows = await sql`
+      select id, provider, key_ciphertext, key_nonce, key_auth_tag
+      from pixel_ai_keys where user_id = ${SHARED_OWNER} order by created_at
+    `;
+    if (rows.length === 0) return { results: [] };
+    const { decryptSecret } = await import("@/lib/pixel-encryption.server");
+    const results: { id: string; status: GeminiKeyStatus | null; checkedAt: string | null; error?: string }[] = [];
+    for (const raw of rows) {
+      const row = raw as Record<string, unknown>;
+      try {
+        const provider = String(row.provider) as PixelKeyProvider;
+        const key = decryptSecret({
+          ciphertext: String(row.key_ciphertext),
+          nonce: String(row.key_nonce),
+          authTag: String(row.key_auth_tag),
+        });
+        const active = isAIProvider(provider)
+          ? await (await import("@/lib/pixel-ai.server")).checkAIKey(provider, key)
+          : await (await import("@/lib/pixel-search.server")).checkSearchKey(provider as SearchKeyProvider, key);
+        const checkedAt = new Date().toISOString();
+        const status: GeminiKeyStatus = active ? "active" : "inactive";
+        await sql`
+          update pixel_ai_keys set status = ${status}, checked_at = ${checkedAt}, updated_at = now()
+          where id = ${String(row.id)} and user_id = ${SHARED_OWNER}
+        `;
+        results.push({ id: String(row.id), status, checkedAt });
+      } catch (error) {
+        results.push({
+          id: String(row.id),
+          status: null,
+          checkedAt: null,
+          error: error instanceof Error ? error.message : "Không xác định được nguyên nhân",
+        });
+      }
+    }
+    return { results };
+  });
+
 export const savePixelPreferences = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({
@@ -180,11 +245,11 @@ export const savePixelPreferences = createServerFn({ method: "POST" })
         updated_at = now()
     `;
     const [keys, preferences] = await Promise.all([
-      sql`select id, provider, name, status, checked_at from pixel_ai_keys where user_id = ${SHARED_OWNER} order by created_at`,
+      sql`select id, provider, name, status, checked_at, key_ciphertext, key_nonce, key_auth_tag from pixel_ai_keys where user_id = ${SHARED_OWNER} order by created_at`,
       sql`select mandatory_rules, memories from pixel_preferences where user_id = ${SHARED_OWNER}`,
     ]);
     return {
-      keys: keys.map((row) => mapKey(row as Record<string, unknown>)),
+      keys: await Promise.all(keys.map((row) => mapKey(row as Record<string, unknown>))),
       mandatoryRules: String(preferences[0]?.mandatory_rules ?? ""),
       memories: String(preferences[0]?.memories ?? ""),
     };
