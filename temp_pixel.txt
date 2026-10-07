@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+﻿import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Check, Grip, History, LoaderCircle, MessageCircle, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -38,12 +38,10 @@ type PixelMessage = {
 
 type Position = { x: number; y: number };
 const BUTTON_SIZE = 64;
-
 const QUIZ_CHOICES = [
-
-  "Toàn bộ vào một mã đang tăng",
-  "Chia vốn cho nhiều loại tài sản",
-  "Chỉ mua theo tin đồn",
+  "ToÃ n bá»™ vÃ o má»™t mÃ£ Ä‘ang tÄƒng",
+  "Chia vá»‘n cho nhiá»u loáº¡i tÃ i sáº£n",
+  "Chá»‰ mua theo tin Ä‘á»“n",
 ];
 
 function formatCurrency(value: number): string {
@@ -55,7 +53,7 @@ function formatCurrency(value: number): string {
 }
 
 function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string {
-  if (!portfolio) return "Danh mục chưa tải xong.";
+  if (!portfolio) return "Danh má»¥c chÆ°a táº£i xong.";
   const accounts = new Map(portfolio.ledger.accounts.map((account) => [account.id, account.name]));
   const assets = new Map(portfolio.ledger.assets.map((asset) => [asset.id, asset]));
   const transactions = portfolio.ledger.transactions;
@@ -121,12 +119,12 @@ function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string 
 }
 
 function parseStoredSources(content: string): { text: string; sources?: PixelSource[] } {
-  const marker = "\n\nNguồn tham khảo:\n";
+  const marker = "\n\nNguá»“n tham kháº£o:\n";
   const markerIndex = content.lastIndexOf(marker);
   if (markerIndex < 0) return { text: content };
   const sourceLines = content.slice(markerIndex + marker.length).split("\n");
   const sources = sourceLines.flatMap((line) => {
-    const match = line.match(/^\[\d+\]\s+(.+?)\s+—\s+(https:\/\/\S+)$/);
+    const match = line.match(/^\[\d+\]\s+(.+?)\s+â€”\s+(https:\/\/\S+)$/);
     return match ? [{ title: match[1], url: match[2] }] : [];
   });
   return sources.length
@@ -138,18 +136,27 @@ function quizMessage(): PixelMessage {
   return {
     id: crypto.randomUUID(),
     role: "pixel",
-    text: "Đố vui nhanh: Cách nào thường giúp giảm rủi ro tập trung trong danh mục?",
+    text: "Äá»‘ vui nhanh: CÃ¡ch nÃ o thÆ°á»ng giÃºp giáº£m rá»§i ro táº­p trung trong danh má»¥c?",
     choices: QUIZ_CHOICES,
     quizAnswer: 1,
-    quizExplanation: "Đa dạng hóa giúp giảm mức phụ thuộc vào biến động của một mã hoặc một loại tài sản.",
+    quizExplanation: "Äa dáº¡ng hÃ³a giÃºp giáº£m má»©c phá»¥ thuá»™c vÃ o biáº¿n Ä‘á»™ng cá»§a má»™t mÃ£ hoáº·c má»™t loáº¡i tÃ i sáº£n.",
   };
 }
 
 export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | undefined }) {
   const queryClient = useQueryClient();
+  const { data: settings, isFetched: settingsFetched } = useQuery({
+    queryKey: PIXEL_SETTINGS_QUERY_KEY,
+    queryFn: () => fetchPixelSettings(),
+    refetchInterval: 10_000,
+  });
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [loadingConversation, setLoadingConversation] = useState(false);
+  const [deletingConversations, setDeletingConversations] = useState(false);
   const setTheme = useUiStore((state) => state.setTheme);
   const setLoginTheme = useUiStore((state) => state.setLoginTheme);
-  
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<PixelMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -160,93 +167,18 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   const [dragging, setDragging] = useState(false);
   const [unread, setUnread] = useState(false);
   const [notification, setNotification] = useState<PixelMessage | null>(null);
-
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [loadingConversation, setLoadingConversation] = useState(false);
-  const [deletingConversations, setDeletingConversations] = useState(false);
-
-  const { data: settings, isFetched: settingsFetched } = useQuery({
-    queryKey: PIXEL_SETTINGS_QUERY_KEY,
-    queryFn: () => fetchPixelSettings(),
-    refetchInterval: 10_000,
-  });
-
   const { data: conversations = [], isError: conversationsError, isPending: conversationsPending, refetch: refetchConversations } = useQuery({
     queryKey: ["pixel-conversations"],
     queryFn: () => fetchPixelConversations(),
     enabled: historyOpen,
     refetchInterval: historyOpen ? 10_000 : false,
   });
-
   const openRef = useRef(open);
   const dockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragOrigin = useRef<{ x: number; y: number; pointerX: number; pointerY: number } | null>(null);
   const dragged = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-    const panelRef = useRef<HTMLDivElement>(null);
-  const targetPanelSize = useRef({ width: 360, height: 460 });
-  const currentSize = useRef({ width: 360, height: 460 });
-  const rafResizeRef = useRef<number>(0);
-  const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-
-  // High-performance smooth resize (Dragon-style)
-  useEffect(() => {
-    const smoothResize = () => {
-      const dw = targetPanelSize.current.width - currentSize.current.width;
-      const dh = targetPanelSize.current.height - currentSize.current.height;
-
-      if (Math.abs(dw) > 0.1 || Math.abs(dh) > 0.1) {
-        currentSize.current.width += dw * 0.18;
-        currentSize.current.height += dh * 0.18;
-        
-        if (panelRef.current) {
-          panelRef.current.style.width = `${currentSize.current.width}px`;
-          panelRef.current.style.height = `${currentSize.current.height}px`;
-        }
-      } else if (dw !== 0 || dh !== 0) {
-        currentSize.current = { ...targetPanelSize.current };
-        if (panelRef.current) {
-          panelRef.current.style.width = `${currentSize.current.width}px`;
-          panelRef.current.style.height = `${currentSize.current.height}px`;
-        }
-      }
-      rafResizeRef.current = requestAnimationFrame(smoothResize);
-    };
-    rafResizeRef.current = requestAnimationFrame(smoothResize);
-    return () => cancelAnimationFrame(rafResizeRef.current);
-  }, []);
-
-
-  const startResizing = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    resizeStart.current = { x: e.clientX, y: e.clientY, w: targetPanelSize.current.width, h: targetPanelSize.current.height };
-    
-        const handleMove = (moveEvent: globalThis.PointerEvent) => {
-      if (!resizeStart.current) return;
-      const dx = moveEvent.clientX - resizeStart.current.x;
-      const dy = moveEvent.clientY - resizeStart.current.y;
-      targetPanelSize.current = {
-        width: Math.max(300, resizeStart.current.w + (onLeft ? dx : -dx)),
-        height: Math.max(200, resizeStart.current.h + dy)
-      };
-    };
-    
-    const handleUp = () => {
-      resizeStart.current = null;
-      window.removeEventListener('pointermove', handleMove as any);
-      window.removeEventListener('pointerup', handleUp as any);
-    };
-    
-    window.addEventListener('pointermove', handleMove as any);
-    window.addEventListener('pointerup', handleUp as any);
-  };
-
-
 
   const nav = portfolio?.state.nav ?? 0;
   const pnl = portfolio?.state.totalPnl ?? 0;
@@ -255,17 +187,17 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     .sort(([, a], [, b]) => b.pct - a.pct)
     .slice(0, 3)
     .map(([name, value]) => `${name}: ${value.pct.toFixed(0)}%`)
-    .join(" · ");
+    .join(" Â· ");
   const portfolioContext = portfolioContextForAI(portfolio);
   const heldSymbols = (portfolio?.state.holdings ?? [])
     .filter((holding) => holding.quantity > 0)
     .map((holding) => holding.symbol);
   const assetSummary = (portfolio?.state.holdings ?? [])
-    .map((holding) => `${holding.symbol}: ${holding.quantity.toLocaleString("vi-VN")} đơn vị`)
+    .map((holding) => `${holding.symbol}: ${holding.quantity.toLocaleString("vi-VN")} Ä‘Æ¡n vá»‹`)
     .join("; ");
   const portfolioSummary = portfolio
-    ? `${formatCurrency(nav)} giá trị tài sản; ${pnl >= 0 ? "lãi" : "lỗ"} ${formatCurrency(Math.abs(pnl))}; lợi nhuận ${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(1)}%; phân bổ ${allocation || "chưa có dữ liệu"}.`
-    : "Danh mục đang tải dữ liệu.";
+    ? `${formatCurrency(nav)} giÃ¡ trá»‹ tÃ i sáº£n; ${pnl >= 0 ? "lÃ£i" : "lá»—"} ${formatCurrency(Math.abs(pnl))}; lá»£i nhuáº­n ${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(1)}%; phÃ¢n bá»• ${allocation || "chÆ°a cÃ³ dá»¯ liá»‡u"}.`
+    : "Danh má»¥c Ä‘ang táº£i dá»¯ liá»‡u.";
 
   const dismissNotification = useCallback(() => {
     if (notificationTimer.current) clearTimeout(notificationTimer.current);
@@ -303,7 +235,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
         if (next) {
           window.setTimeout(() => {
             document
-              .querySelector<HTMLInputElement>('input[aria-label="Tin nhắn cho Pixel"]')
+              .querySelector<HTMLInputElement>('input[aria-label="Tin nháº¯n cho Pixel"]')
               ?.focus();
           }, 0);
         }
@@ -338,11 +270,11 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     if (!settingsFetched || messages.length > 0 || conversationId || loadingConversation) return;
     addPixelMessage(
       (settings?.keys.length ?? 0) > 0
-        ? "Chào bạn, mình là Pixel. Mình có thể tóm tắt danh mục, giải thích rủi ro hoặc cùng bạn làm một câu đố nhỏ."
+        ? "ChÃ o báº¡n, mÃ¬nh lÃ  Pixel. MÃ¬nh cÃ³ thá»ƒ tÃ³m táº¯t danh má»¥c, giáº£i thÃ­ch rá»§i ro hoáº·c cÃ¹ng báº¡n lÃ m má»™t cÃ¢u Ä‘á»‘ nhá»."
         : settings
-          ? "Chào bạn, mình là Pixel. Thêm API key Gemini, Groq hoặc OpenRouter trong Cài đặt để mình trò chuyện nhé."
-          : "Chào bạn, mình là Pixel. Hiện chưa tải được cài đặt AI; hãy thử tải lại hoặc kiểm tra kết nối.",
-      { choices: ["Tóm tắt danh mục", "Cập nhật các mã", "Đố vui tài chính"] },
+          ? "ChÃ o báº¡n, mÃ¬nh lÃ  Pixel. ThÃªm API key Gemini, Groq hoáº·c OpenRouter trong CÃ i Ä‘áº·t Ä‘á»ƒ mÃ¬nh trÃ² chuyá»‡n nhÃ©."
+          : "ChÃ o báº¡n, mÃ¬nh lÃ  Pixel. Hiá»‡n chÆ°a táº£i Ä‘Æ°á»£c cÃ i Ä‘áº·t AI; hÃ£y thá»­ táº£i láº¡i hoáº·c kiá»ƒm tra káº¿t ná»‘i.",
+      { choices: ["TÃ³m táº¯t danh má»¥c", "Cáº­p nháº­t cÃ¡c mÃ£", "Äá»‘ vui tÃ i chÃ­nh"] },
     );
   }, [addPixelMessage, conversationId, loadingConversation, messages.length, settings, settingsFetched]);
 
@@ -350,9 +282,9 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       const update = assetSummary
-        ? `Ghé qua cập nhật một chút: giá gần nhất trong sổ của bạn là ${assetSummary}. Đây là dữ liệu sẵn có trong danh mục, chưa phải báo giá trực tiếp.`
-        : `Ghé qua chào bạn một chút! ${portfolioSummary} Khi cần, mình có thể giúp xem lại phân bổ hoặc giải thích một khái niệm đầu tư.`;
-      addPixelMessage(update, { choices: ["Xem phân bổ", "Đố vui tài chính"] });
+        ? `GhÃ© qua cáº­p nháº­t má»™t chÃºt: giÃ¡ gáº§n nháº¥t trong sá»• cá»§a báº¡n lÃ  ${assetSummary}. ÄÃ¢y lÃ  dá»¯ liá»‡u sáºµn cÃ³ trong danh má»¥c, chÆ°a pháº£i bÃ¡o giÃ¡ trá»±c tiáº¿p.`
+        : `GhÃ© qua chÃ o báº¡n má»™t chÃºt! ${portfolioSummary} Khi cáº§n, mÃ¬nh cÃ³ thá»ƒ giÃºp xem láº¡i phÃ¢n bá»• hoáº·c giáº£i thÃ­ch má»™t khÃ¡i niá»‡m Ä‘áº§u tÆ°.`;
+      addPixelMessage(update, { choices: ["Xem phÃ¢n bá»•", "Äá»‘ vui tÃ i chÃ­nh"] });
     }, 30 * 60 * 1000);
     return () => clearInterval(timer);
   }, [addPixelMessage, assetSummary, portfolioSummary]);
@@ -382,20 +314,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     };
   }, []);
 
-    // Auto-close when clicking outside
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (open && !target.closest('section[aria-label="Trò chuyện với Pixel"]') && !target.closest('button[title*="Pixel"]')) {
-        setOpen(false);
-        openRef.current = false;
-      }
-    };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
   function beginDrag(event: PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -403,14 +321,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     dragged.current = false;
     setDragging(true);
     if (dockTimer.current) clearTimeout(dockTimer.current);
-    
-    // Auto collapse frame when starting to drag
-    if (open) {
-      setOpen(false);
-      openRef.current = false;
-    }
   }
-
 
   function moveDrag(event: PointerEvent<HTMLButtonElement>) {
     const origin = dragOrigin.current;
@@ -439,34 +350,34 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
 
     const normalizedPrompt = prompt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("vi");
     const themeCommands: { mode: ThemeMode; pattern: RegExp; label: string }[] = [
-      { mode: "light", pattern: /(?:theme|giao dien|che do).*(?:sang|light)|(?:doi|chuyen).*(?:sang|light)|^(?:sang|light)$/, label: "sáng" },
-      { mode: "dark", pattern: /(?:theme|giao dien|che do).*(?:toi|dark)|(?:doi|chuyen).*(?:toi|dark)|^(?:toi|dark)$/, label: "tối" },
+      { mode: "light", pattern: /(?:theme|giao dien|che do).*(?:sang|light)|(?:doi|chuyen).*(?:sang|light)|^(?:sang|light)$/, label: "sÃ¡ng" },
+      { mode: "dark", pattern: /(?:theme|giao dien|che do).*(?:toi|dark)|(?:doi|chuyen).*(?:toi|dark)|^(?:toi|dark)$/, label: "tá»‘i" },
     ];
     const themeCommand = themeCommands.find(({ pattern }) => pattern.test(normalizedPrompt));
     if (themeCommand) {
       setTheme(themeCommand.mode);
-      const answer = `Đã chuyển giao diện sang chế độ ${themeCommand.label}.`;
-      addPixelMessage(answer, { choices: ["Đổi sang sáng", "Đổi sang tối"] });
+      const answer = `ÄÃ£ chuyá»ƒn giao diá»‡n sang cháº¿ Ä‘á»™ ${themeCommand.label}.`;
+      addPixelMessage(answer, { choices: ["Äá»•i sang sÃ¡ng", "Äá»•i sang tá»‘i"] });
       await saveLocalAnswer(prompt, answer);
       return;
     }
 
     const seasonCommands: { pattern: RegExp; season: LoginThemeId; label: string }[] = [
-      { pattern: /(?:mua|season).*(?:xuan|spring)|\b(?:xuan|spring)\b/, season: "spring", label: "xuân" },
-      { pattern: /(?:mua|season).*(?:ha|he|summer)|\b(?:ha|he|summer)\b/, season: "summer", label: "hạ" },
+      { pattern: /(?:mua|season).*(?:xuan|spring)|\b(?:xuan|spring)\b/, season: "spring", label: "xuÃ¢n" },
+      { pattern: /(?:mua|season).*(?:ha|he|summer)|\b(?:ha|he|summer)\b/, season: "summer", label: "háº¡" },
       { pattern: /(?:mua|season).*(?:thu|autumn|fall)|\b(?:thu|autumn|fall)\b/, season: "autumn", label: "thu" },
-      { pattern: /(?:mua|season).*(?:dong|winter)|\b(?:dong|winter)\b/, season: "winter", label: "đông" },
+      { pattern: /(?:mua|season).*(?:dong|winter)|\b(?:dong|winter)\b/, season: "winter", label: "Ä‘Ã´ng" },
     ];
     const seasonCommand = seasonCommands.find(({ pattern }) => pattern.test(normalizedPrompt));
     if (seasonCommand) {
       setLoginTheme(seasonCommand.season);
-      const answer = `Đã chuyển phong cảnh giao diện sang mùa ${seasonCommand.label}.`;
-      addPixelMessage(answer, { choices: ["Mùa xuân", "Mùa hạ", "Mùa thu", "Mùa đông"] });
+      const answer = `ÄÃ£ chuyá»ƒn phong cáº£nh giao diá»‡n sang mÃ¹a ${seasonCommand.label}.`;
+      addPixelMessage(answer, { choices: ["MÃ¹a xuÃ¢n", "MÃ¹a háº¡", "MÃ¹a thu", "MÃ¹a Ä‘Ã´ng"] });
       await saveLocalAnswer(prompt, answer);
       return;
     }
 
-    if (/^(đố vui|đố vui tài chính|đố vui tiếp)$/i.test(prompt)) {
+    if (/^(Ä‘á»‘ vui|Ä‘á»‘ vui tÃ i chÃ­nh|Ä‘á»‘ vui tiáº¿p)$/i.test(prompt)) {
       const quiz = quizMessage();
       addPixelMessage(quiz.text, { choices: quiz.choices, quizAnswer: quiz.quizAnswer, quizExplanation: quiz.quizExplanation });
       await saveLocalAnswer(prompt, quiz.text);
@@ -485,15 +396,15 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       });
       setConversationId(result.conversationId);
       addPixelMessage(result.answer, {
-        choices: ["Hỏi thêm", "Đố vui tài chính"],
+        choices: ["Há»i thÃªm", "Äá»‘ vui tÃ i chÃ­nh"],
         ...(result.memorySuggestion ? { memorySuggestion: result.memorySuggestion } : {}),
         ...(result.sources ? { sources: result.sources } : {}),
       });
       void queryClient.invalidateQueries({ queryKey: ["pixel-conversations"] });
       void queryClient.invalidateQueries({ queryKey: PIXEL_SETTINGS_QUERY_KEY });
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Không gửi được yêu cầu tới AI.";
-      addPixelMessage(`Mình chưa kết nối được AI: ${text}`, { choices: ["Thử lại", "Đố vui tài chính"] });
+      const text = error instanceof Error ? error.message : "KhÃ´ng gá»­i Ä‘Æ°á»£c yÃªu cáº§u tá»›i AI.";
+      addPixelMessage(`MÃ¬nh chÆ°a káº¿t ná»‘i Ä‘Æ°á»£c AI: ${text}`, { choices: ["Thá»­ láº¡i", "Äá»‘ vui tÃ i chÃ­nh"] });
     } finally {
       setSending(false);
     }
@@ -508,7 +419,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       setConversationId(result.conversationId);
       void queryClient.invalidateQueries({ queryKey: ["pixel-conversations"] });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không lưu được hội thoại Pixel");
+      toast.error(error instanceof Error ? error.message : "KhÃ´ng lÆ°u Ä‘Æ°á»£c há»™i thoáº¡i Pixel");
     } finally {
       setSending(false);
     }
@@ -527,9 +438,9 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       setMessages((current) => current.map((item) => item.id === message.id
         ? { ...item, memorySuggestion: undefined, memorySaved: true }
         : item));
-      toast.success("Đã lưu vào Thông tin cần nhớ");
+      toast.success("ÄÃ£ lÆ°u vÃ o ThÃ´ng tin cáº§n nhá»›");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không lưu được nội dung ghi nhớ");
+      toast.error(error instanceof Error ? error.message : "KhÃ´ng lÆ°u Ä‘Æ°á»£c ná»™i dung ghi nhá»›");
     } finally {
       setSavingMemoryId(null);
     }
@@ -546,12 +457,12 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       if (message.selectedChoice !== undefined) return;
       setMessages((current) => current.map((item) => item.id === message.id ? { ...item, selectedChoice: index } : item));
       const correct = index === message.quizAnswer;
-      const answer = `${correct ? "Chính xác!" : "Chưa đúng rồi."} ${message.quizExplanation ?? ""}`;
-      addPixelMessage(answer, { choices: ["Đố vui tiếp", "Tóm tắt danh mục"] });
+      const answer = `${correct ? "ChÃ­nh xÃ¡c!" : "ChÆ°a Ä‘Ãºng rá»“i."} ${message.quizExplanation ?? ""}`;
+      addPixelMessage(answer, { choices: ["Äá»‘ vui tiáº¿p", "TÃ³m táº¯t danh má»¥c"] });
       await saveLocalAnswer(choice, answer);
       return;
     }
-    void sendMessage(choice === "Hỏi thêm" ? "Hãy giải thích thêm về nội dung vừa trả lời." : choice);
+    void sendMessage(choice === "Há»i thÃªm" ? "HÃ£y giáº£i thÃ­ch thÃªm vá» ná»™i dung vá»«a tráº£ lá»i." : choice);
   }
 
   function startNewConversation() {
@@ -579,7 +490,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       }));
     } catch (error) {
       setConversationId(null);
-      toast.error(error instanceof Error ? error.message : "Không mở được hội thoại");
+      toast.error(error instanceof Error ? error.message : "KhÃ´ng má»Ÿ Ä‘Æ°á»£c há»™i thoáº¡i");
     } finally {
       setLoadingConversation(false);
     }
@@ -587,29 +498,28 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
 
   async function deleteSelectedConversations() {
     if (selectedConversations.length === 0) return;
-    if (!window.confirm(`Xóa vĩnh viễn ${selectedConversations.length} hội thoại đã chọn? Thao tác này không thể hoàn tác.`)) return;
+    if (!window.confirm(`XÃ³a vÄ©nh viá»…n ${selectedConversations.length} há»™i thoáº¡i Ä‘Ã£ chá»n? Thao tÃ¡c nÃ y khÃ´ng thá»ƒ hoÃ n tÃ¡c.`)) return;
     setDeletingConversations(true);
     try {
       await deletePixelConversations({ data: { ids: selectedConversations } });
       if (conversationId && selectedConversations.includes(conversationId)) startNewConversation();
       setSelectedConversations([]);
       await refetchConversations();
-      toast.success("Đã xóa vĩnh viễn hội thoại đã chọn");
+      toast.success("ÄÃ£ xÃ³a vÄ©nh viá»…n há»™i thoáº¡i Ä‘Ã£ chá»n");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không xóa được hội thoại");
+      toast.error(error instanceof Error ? error.message : "KhÃ´ng xÃ³a Ä‘Æ°á»£c há»™i thoáº¡i");
     } finally {
       setDeletingConversations(false);
     }
   }
 
-    const onLeft = position.x + BUTTON_SIZE / 2 < viewport.width / 2;
-    const panelTop = Math.min(Math.max(position.y - 380, 12), Math.max(12, viewport.height - currentSize.current.height - 12));
-    const notificationAbove = position.y > viewport.height / 2;
+  const onLeft = position.x + BUTTON_SIZE / 2 < viewport.width / 2;
+  const panelTop = Math.min(Math.max(position.y - 380, 12), Math.max(12, viewport.height - 460));
+  const notificationAbove = position.y > viewport.height / 2;
 
-    return (
-      <>
-        {notification && !open && (
-
+  return (
+    <>
+      {notification && !open && (
         <div
           className="fixed z-120 w-[min(300px,calc(100vw-88px))] animate-in fade-in slide-in-from-bottom-2 duration-200"
           style={{
@@ -629,29 +539,29 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
               setOpen(true);
               setUnread(false);
             }}
-            aria-label="Mở tin nhắn mới từ Pixel"
+            aria-label="Má»Ÿ tin nháº¯n má»›i tá»« Pixel"
           >
             <span className="mb-1.5 flex items-center gap-2">
               <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10 text-primary"><Bot className="h-3.5 w-3.5" /></span>
               <span className="text-xs font-semibold">Pixel</span>
-              <span className="ml-auto text-[10px] text-muted-foreground">Tin nhắn mới</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">Tin nháº¯n má»›i</span>
             </span>
             <span className="line-clamp-3 block text-sm leading-5 text-foreground">{notification.text}</span>
-            <span className="mt-2 flex items-center gap-1 text-[11px] font-medium text-primary"><MessageCircle className="h-3.5 w-3.5" /> Nhấn để trò chuyện</span>
+            <span className="mt-2 flex items-center gap-1 text-[11px] font-medium text-primary"><MessageCircle className="h-3.5 w-3.5" /> Nháº¥n Ä‘á»ƒ trÃ² chuyá»‡n</span>
           </button>
           <button
             type="button"
             className="fixed-surface absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-border text-muted-foreground shadow-sm hover:text-foreground"
             onClick={dismissNotification}
-            aria-label="Đóng thông báo Pixel"
+            aria-label="ÄÃ³ng thÃ´ng bÃ¡o Pixel"
           ><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent title="Lịch sử trò chuyện">
+        <DialogContent title="Lá»‹ch sá»­ trÃ² chuyá»‡n">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Lịch sử này được chia sẻ với mọi tài khoản đăng nhập.</p>
+            <p className="text-xs text-muted-foreground">Lá»‹ch sá»­ nÃ y Ä‘Æ°á»£c chia sáº» vá»›i má»i tÃ i khoáº£n Ä‘Äƒng nháº­p.</p>
             <Button
               type="button"
               variant="destructive"
@@ -659,15 +569,15 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
               disabled={!selectedConversations.length || deletingConversations}
               onClick={() => void deleteSelectedConversations()}
             >
-              <Trash2 className="mr-1.5 h-4 w-4" /> Xóa ({selectedConversations.length})
+              <Trash2 className="mr-1.5 h-4 w-4" /> XÃ³a ({selectedConversations.length})
             </Button>
           </div>
           {conversationsPending ? (
-            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><LoaderCircle className="h-4 w-4 animate-spin" /> Đang tải hội thoại…</div>
+            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><LoaderCircle className="h-4 w-4 animate-spin" /> Äang táº£i há»™i thoáº¡iâ€¦</div>
           ) : conversationsError ? (
-            <p className="py-8 text-sm text-loss">Không tải được lịch sử trò chuyện.</p>
+            <p className="py-8 text-sm text-loss">KhÃ´ng táº£i Ä‘Æ°á»£c lá»‹ch sá»­ trÃ² chuyá»‡n.</p>
           ) : conversations.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có hội thoại nào được lưu.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">ChÆ°a cÃ³ há»™i thoáº¡i nÃ o Ä‘Æ°á»£c lÆ°u.</p>
           ) : (
             <div className="max-h-[55dvh] space-y-2 overflow-y-auto">
               {conversations.map((conversation) => (
@@ -679,12 +589,12 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                         ? current.includes(conversation.id) ? current : [...current, conversation.id]
                         : current.filter((id) => id !== conversation.id)
                     ))}
-                    aria-label={`Chọn hội thoại ${conversation.title}`}
+                    aria-label={`Chá»n há»™i thoáº¡i ${conversation.title}`}
                   />
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openConversation(conversation.id)}>
                     <span className="block truncate text-sm font-medium">{conversation.title}</span>
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      {conversation.messageCount} tin nhắn · {new Date(conversation.updatedAt).toLocaleString("vi-VN")}
+                      {conversation.messageCount} tin nháº¯n Â· {new Date(conversation.updatedAt).toLocaleString("vi-VN")}
                     </span>
                   </button>
                 </div>
@@ -694,54 +604,41 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
         </DialogContent>
       </Dialog>
 
-            {open && (
-              <section
-                ref={panelRef}
-                className={cn("fixed-surface fixed flex flex-col overflow-hidden rounded-2xl border border-border/80 text-card-foreground shadow-[0_16px_48px_rgba(15,23,42,0.22)]", historyOpen ? "z-40" : "z-[130]")}
-                style={{ 
-                  width: currentSize.current.width, 
-                  height: currentSize.current.height,
-                  maxWidth: 'calc(100vw - 24px)',
-                  maxHeight: 'calc(100dvh - 24px)',
-                  transformOrigin: onLeft ? 'top left' : 'top right', 
-                  top: Math.min(panelTop, viewport.height - currentSize.current.height - 12), 
-                  ...(onLeft ? { left: 12 } : { right: 12 }),
-                  willChange: 'width, height'
-                }}
-                onPointerDown={() => resetDockTimer()}
-                aria-label="Trò chuyện với Pixel"
-              >
-
-
-
+      {open && (
+        <section
+          className={cn("fixed-surface fixed flex max-h-[min(460px,calc(100dvh-24px))] w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-border/80 text-card-foreground shadow-[0_16px_48px_rgba(15,23,42,0.22)]", historyOpen ? "z-40" : "z-120")}
+          style={{ top: panelTop, ...(onLeft ? { left: 12 } : { right: 12 }) }}
+          onPointerDown={resetDockTimer}
+          aria-label="TrÃ² chuyá»‡n vá»›i Pixel"
+        >
           <header className="flex items-center justify-between border-b border-border/70 px-4 py-3">
             <div className="flex items-center gap-3">
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Bot className="h-5 w-5" /></span>
-              <div><p className="text-sm font-semibold">Pixel</p><p className="text-[11px] text-muted-foreground">Trợ lý danh mục của bạn</p></div>
+              <div><p className="text-sm font-semibold">Pixel</p><p className="text-[11px] text-muted-foreground">Trá»£ lÃ½ danh má»¥c cá»§a báº¡n</p></div>
             </div>
             <div className="flex items-center gap-1">
-              <button type="button" onClick={startNewConversation} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Tạo hội thoại mới"><Plus className="h-4 w-4" /></button>
-              <button type="button" onClick={() => { setSelectedConversations([]); setHistoryOpen(true); }} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Mở lịch sử trò chuyện"><History className="h-4 w-4" /></button>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Đóng Pixel"><X className="h-4 w-4" /></button>
+              <button type="button" onClick={startNewConversation} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Táº¡o há»™i thoáº¡i má»›i"><Plus className="h-4 w-4" /></button>
+              <button type="button" onClick={() => { setSelectedConversations([]); setHistoryOpen(true); }} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Má»Ÿ lá»‹ch sá»­ trÃ² chuyá»‡n"><History className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="ÄÃ³ng Pixel"><X className="h-4 w-4" /></button>
             </div>
           </header>
 
           <div ref={scrollRef} className="min-h-48 flex-1 space-y-3 overflow-y-auto p-3" aria-live="polite">
-            {loadingConversation && <div className="flex items-center gap-2 px-2 py-4 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Đang mở hội thoại…</div>}
+            {loadingConversation && <div className="flex items-center gap-2 px-2 py-4 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Äang má»Ÿ há»™i thoáº¡iâ€¦</div>}
             {messages.map((message) => (
               <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
                 <div className={cn("max-w-[92%] rounded-2xl px-3 py-2", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted/70")}>
-                  <p className="whitespace-pre-wrap text-xs leading-5">{message.text}</p>
+                  <p className="whitespace-pre-wrap text-sm leading-5">{message.text}</p>
                   {message.sources && message.sources.length > 0 && (
                     <div className="mt-2 border-t border-border/60 pt-2">
-                      <p className="mb-1 text-[10px] font-semibold text-muted-foreground">Nguồn web</p>
+                      <p className="mb-1 text-[10px] font-semibold text-muted-foreground">Nguá»“n web</p>
                       <ul className="space-y-1">
                         {message.sources.map((source, index) => (
                           <li key={source.url} className="text-[11px] leading-4">
                             <a href={source.url} target="_blank" rel="noreferrer" className="text-primary underline-offset-2 hover:underline">
                               [{index + 1}] {source.title}
                             </a>
-                            {source.publishedDate ? <span className="ml-1 text-muted-foreground">· {source.publishedDate}</span> : null}
+                            {source.publishedDate ? <span className="ml-1 text-muted-foreground">Â· {source.publishedDate}</span> : null}
                           </li>
                         ))}
                       </ul>
@@ -749,7 +646,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                   )}
                   {message.memorySuggestion && (
                     <div className="mt-2 rounded-xl border border-primary/20 bg-card/80 p-2.5">
-                      <p className="text-[11px] font-semibold text-primary">Gợi ý ghi nhớ</p>
+                      <p className="text-[11px] font-semibold text-primary">Gá»£i Ã½ ghi nhá»›</p>
                       <p className="mt-1 whitespace-pre-wrap text-xs leading-5">{message.memorySuggestion}</p>
                       <div className="mt-2 flex gap-2">
                         <Button
@@ -760,7 +657,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                           onClick={() => void confirmMemorySuggestion(message)}
                         >
                           {savingMemoryId === message.id ? <LoaderCircle className="animate-spin" /> : <Check />}
-                          Lưu ghi nhớ
+                          LÆ°u ghi nhá»›
                         </Button>
                         <Button
                           type="button"
@@ -770,13 +667,13 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                           disabled={savingMemoryId !== null}
                           onClick={() => dismissMemorySuggestion(message)}
                         >
-                          Bỏ qua
+                          Bá» qua
                         </Button>
                       </div>
                     </div>
                   )}
                   {message.memorySaved && (
-                    <p className="mt-2 flex items-center gap-1 text-[11px] text-profit"><Check className="h-3.5 w-3.5" /> Đã lưu vào ghi nhớ</p>
+                    <p className="mt-2 flex items-center gap-1 text-[11px] text-profit"><Check className="h-3.5 w-3.5" /> ÄÃ£ lÆ°u vÃ o ghi nhá»›</p>
                   )}
                   {message.choices && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -797,27 +694,15 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                 </div>
               </div>
             ))}
-            {sending && <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Pixel đang suy nghĩ…</div>}
+            {sending && <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Pixel Ä‘ang suy nghÄ©â€¦</div>}
           </div>
 
           <form className="flex items-center gap-2 border-t border-border/70 p-3" onSubmit={(event) => { event.preventDefault(); void sendMessage(draft); }}>
-            <Input aria-label="Tin nhắn cho Pixel" placeholder={(settings?.keys.length ?? 0) ? "Hỏi Pixel về danh mục…" : "Thêm API key trong Cài đặt"} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={sending || loadingConversation} />
-            <Button type="submit" size="icon" aria-label="Gửi tin nhắn" disabled={!draft.trim() || sending}><Send /></Button>
+            <Input aria-label="Tin nháº¯n cho Pixel" placeholder={(settings?.keys.length ?? 0) ? "Há»i Pixel vá» danh má»¥câ€¦" : "ThÃªm API key trong CÃ i Ä‘áº·t"} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={sending || loadingConversation} />
+            <Button type="submit" size="icon" aria-label="Gá»­i tin nháº¯n" disabled={!draft.trim() || sending}><Send /></Button>
           </form>
-
-          {/* Resize handle */}
-          <div
-            onPointerDown={startResizing}
-            className={cn(
-              "absolute bottom-0 h-6 w-6 cursor-nwse-resize flex items-end justify-end p-1 opacity-30 hover:opacity-100 transition-opacity z-50",
-              onLeft ? "right-0 cursor-nwse-resize" : "left-0 cursor-nesw-resize"
-            )}
-          >
-            <Grip className={cn("h-3 w-3", onLeft ? "rotate-45" : "-rotate-45")} />
-          </div>
         </section>
       )}
-
 
       <button
         type="button"
@@ -843,8 +728,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
           dragging && "scale-105 cursor-grabbing",
         )}
         style={{ left: position.x, top: position.y }}
-        aria-label={open ? "Đóng Pixel" : "Mở Pixel"}
-        title="Kéo để di chuyển · Pixel"
+        aria-label={open ? "ÄÃ³ng Pixel" : "Má»Ÿ Pixel"}
+        title="KÃ©o Ä‘á»ƒ di chuyá»ƒn Â· Pixel"
       >
         <span className="absolute inset-1 rounded-full border border-primary/10" aria-hidden="true" />
         {open ? <MessageCircle className="relative h-6 w-6" /> : <Bot className="relative h-7 w-7" />}
