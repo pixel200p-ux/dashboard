@@ -311,18 +311,33 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       if (!isBacktick) return;
       event.preventDefault();
       dismissNotification();
-      setOpen((current) => {
-        const next = !current;
-        openRef.current = next;
-        if (next) {
-          window.setTimeout(() => {
-            document
-              .querySelector<HTMLInputElement>('input[aria-label="Tin nhắn cho Pixel"]')
-              ?.focus();
-          }, 0);
+      const next = !openRef.current;
+      if (next) {
+        const margin = 20;
+        const iconX = Math.max(12, window.innerWidth - BUTTON_SIZE - margin);
+        const iconY = Math.max(12, window.innerHeight - BUTTON_SIZE - margin);
+        positionRef.current = { x: iconX, y: iconY };
+        setPosition({ x: iconX, y: iconY });
+
+        const maxH = Math.max(200, iconY - ICON_GAP - 12);
+        const maxW = Math.max(300, iconX + BUTTON_SIZE - 12);
+        if (targetPanelSize.current.height > maxH) {
+          targetPanelSize.current.height = maxH;
+          currentSize.current.height = maxH;
         }
-        return next;
-      });
+        if (targetPanelSize.current.width > maxW) {
+          targetPanelSize.current.width = maxW;
+          currentSize.current.width = maxW;
+        }
+
+        window.setTimeout(() => {
+          document
+            .querySelector<HTMLInputElement>('input[aria-label="Tin nhắn cho Pixel"]')
+            ?.focus();
+        }, 0);
+      }
+      openRef.current = next;
+      setOpen(next);
       setUnread(false);
       resetDockTimer();
     };
@@ -444,6 +459,19 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   function endDrag() {
     dragOrigin.current = null;
     setDragging(false);
+
+    // Chỉ nép cạnh khi đã KÉO thật; bấm mở chat thì để onClick xử lý
+    if (!dragged.current) return;
+
+    setPosition((current) => {
+      const maxX = Math.max(0, window.innerWidth - BUTTON_SIZE);
+      const nearLeft = current.x + BUTTON_SIZE / 2 < window.innerWidth / 2;
+      return {
+        x: nearLeft ? 8 : maxX - 8,
+        y: Math.min(Math.max(current.y, 12), window.innerHeight - BUTTON_SIZE - 12),
+      };
+    });
+
     resetDockTimer();
   }
 
@@ -825,13 +853,13 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
             <Button type="submit" size="icon" aria-label="Gửi tin nhắn" disabled={!draft.trim() || sending}><Send /></Button>
           </form>
 
-          {/* Resize handle */}
-                    {/* Resize handle — góc trên trái */}
+          {/* Resize handle — góc trên trái */}
           <div
             onPointerDown={startResizing}
-            className="absolute left-0 top-0 z-50 flex h-7 w-7 cursor-nwse-resize items-start justify-start p-1 opacity-40 transition-opacity hover:opacity-100"
+            className="absolute left-0 top-0 z-[60] flex h-8 w-8 cursor-nwse-resize items-start justify-start p-1.5 opacity-50 transition-opacity hover:opacity-100"
+            title="Kéo để đổi kích thước"
           >
-            <Grip className="h-3.5 w-3.5 rotate-45" />
+            <Grip className="h-4 w-4 rotate-45" />
           </div>
         </section>
       )}
@@ -849,12 +877,31 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
             return;
           }
           dismissNotification();
-          setOpen((current) => {
-            const next = !current;
-            openRef.current = next;
-            // Giữ nguyên vị trí icon; khung sẽ neo phía trên icon
-            return next;
-          });
+
+          const willOpen = !openRef.current;
+
+          // Khi MỞ: icon luôn về góc dưới phải màn hình (gọi setPosition NGOÀI setOpen)
+          if (willOpen) {
+            const margin = 20;
+            const iconX = Math.max(12, window.innerWidth - BUTTON_SIZE - margin);
+            const iconY = Math.max(12, window.innerHeight - BUTTON_SIZE - margin);
+            positionRef.current = { x: iconX, y: iconY };
+            setPosition({ x: iconX, y: iconY });
+
+            const maxH = Math.max(200, iconY - ICON_GAP - 12);
+            const maxW = Math.max(300, iconX + BUTTON_SIZE - 12);
+            if (targetPanelSize.current.height > maxH) {
+              targetPanelSize.current.height = maxH;
+              currentSize.current.height = maxH;
+            }
+            if (targetPanelSize.current.width > maxW) {
+              targetPanelSize.current.width = maxW;
+              currentSize.current.width = maxW;
+            }
+          }
+
+          openRef.current = willOpen;
+          setOpen(willOpen);
           setUnread(false);
           resetDockTimer();
         }}
