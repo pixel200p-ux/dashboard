@@ -38,6 +38,8 @@ type PixelMessage = {
 
 type Position = { x: number; y: number };
 const BUTTON_SIZE = 64;
+/** Phần icon đè lên mép dưới khung (giống Messenger, nhưng góc dưới). */
+const ICON_OVERLAP = 22;
 
 const QUIZ_CHOICES = [
 
@@ -186,6 +188,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   const dragOrigin = useRef<{ x: number; y: number; pointerX: number; pointerY: number } | null>(null);
   const dragged = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const positionRef = useRef(position);
+  positionRef.current = position;
 
     const panelRef = useRef<HTMLDivElement>(null);
   const targetPanelSize = useRef({ width: 360, height: 460 });
@@ -202,52 +206,58 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       if (Math.abs(dw) > 0.1 || Math.abs(dh) > 0.1) {
         currentSize.current.width += dw * 0.18;
         currentSize.current.height += dh * 0.18;
-        
-        if (panelRef.current) {
-          panelRef.current.style.width = `${currentSize.current.width}px`;
-          panelRef.current.style.height = `${currentSize.current.height}px`;
-        }
       } else if (dw !== 0 || dh !== 0) {
         currentSize.current = { ...targetPanelSize.current };
-        if (panelRef.current) {
-          panelRef.current.style.width = `${currentSize.current.width}px`;
-          panelRef.current.style.height = `${currentSize.current.height}px`;
-        }
       }
+
+      if (panelRef.current) {
+        const w = currentSize.current.width;
+        const h = currentSize.current.height;
+        const icon = positionRef.current;
+        panelRef.current.style.width = `${w}px`;
+        panelRef.current.style.height = `${h}px`;
+        // Neo góc dưới phải = icon; kéo góc trên trái thì icon không chạy
+        panelRef.current.style.left = `${icon.x + BUTTON_SIZE - w}px`;
+        panelRef.current.style.top = `${icon.y + ICON_OVERLAP - h}px`;
+      }
+
       rafResizeRef.current = requestAnimationFrame(smoothResize);
     };
     rafResizeRef.current = requestAnimationFrame(smoothResize);
     return () => cancelAnimationFrame(rafResizeRef.current);
   }, []);
 
-
   const startResizing = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    resizeStart.current = { x: e.clientX, y: e.clientY, w: targetPanelSize.current.width, h: targetPanelSize.current.height };
-    
-        const handleMove = (moveEvent: globalThis.PointerEvent) => {
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: targetPanelSize.current.width,
+      h: targetPanelSize.current.height,
+    };
+
+    const handleMove = (moveEvent: globalThis.PointerEvent) => {
       if (!resizeStart.current) return;
+      // Tay cầm ở góc TRÊN TRÁI: kéo sang trái / lên = to hơn
       const dx = moveEvent.clientX - resizeStart.current.x;
       const dy = moveEvent.clientY - resizeStart.current.y;
       targetPanelSize.current = {
-        width: Math.max(300, resizeStart.current.w + (onLeft ? dx : -dx)),
-        height: Math.max(200, resizeStart.current.h + dy)
+        width: Math.max(300, resizeStart.current.w - dx),
+        height: Math.max(200, resizeStart.current.h - dy),
       };
     };
-    
+
     const handleUp = () => {
       resizeStart.current = null;
-      window.removeEventListener('pointermove', handleMove as any);
-      window.removeEventListener('pointerup', handleUp as any);
+      window.removeEventListener("pointermove", handleMove as any);
+      window.removeEventListener("pointerup", handleUp as any);
     };
-    
-    window.addEventListener('pointermove', handleMove as any);
-    window.addEventListener('pointerup', handleUp as any);
+
+    window.addEventListener("pointermove", handleMove as any);
+    window.addEventListener("pointerup", handleUp as any);
   };
-
-
-
+  
   const nav = portfolio?.state.nav ?? 0;
   const pnl = portfolio?.state.totalPnl ?? 0;
   const returnPct = portfolio?.state.totalReturnPct ?? 0;
@@ -603,7 +613,13 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   }
 
     const onLeft = position.x + BUTTON_SIZE / 2 < viewport.width / 2;
-    const panelTop = Math.min(Math.max(position.y - 380, 12), Math.max(12, viewport.height - currentSize.current.height - 12));
+    // Khi mở: panel nằm phía trên-trái của icon (icon ở góc dưới phải ngoài khung)
+    const panelTop = open
+      ? Math.min(
+          Math.max(position.y - currentSize.current.height + BUTTON_SIZE / 2, 12),
+          Math.max(12, viewport.height - currentSize.current.height - 12),
+        )
+      : Math.min(Math.max(position.y - 380, 12), Math.max(12, viewport.height - currentSize.current.height - 12));
     const notificationAbove = position.y > viewport.height / 2;
 
     return (
@@ -698,15 +714,18 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
               <section
                 ref={panelRef}
                 className={cn("fixed-surface fixed flex flex-col overflow-hidden rounded-2xl border border-border/80 text-card-foreground shadow-[0_16px_48px_rgba(15,23,42,0.22)]", historyOpen ? "z-40" : "z-[130]")}
-                style={{ 
-                  width: currentSize.current.width, 
+                style={{
+                  width: currentSize.current.width,
                   height: currentSize.current.height,
-                  maxWidth: 'calc(100vw - 24px)',
-                  maxHeight: 'calc(100dvh - 24px)',
-                  transformOrigin: onLeft ? 'top left' : 'top right', 
-                  top: Math.min(panelTop, viewport.height - currentSize.current.height - 12), 
-                  ...(onLeft ? { left: 12 } : { right: 12 }),
-                  willChange: 'width, height'
+                  maxWidth: "calc(100vw - 24px)",
+                  maxHeight: "calc(100dvh - 24px)",
+                  transformOrigin: onLeft ? "bottom left" : "bottom right",
+                  top: Math.min(panelTop, viewport.height - currentSize.current.height - 12),
+                  // Căn theo icon: icon nằm góc dưới phải ngoài khung
+                  ...(onLeft
+                    ? { left: Math.max(12, position.x - currentSize.current.width + BUTTON_SIZE / 2) }
+                    : { right: Math.max(12, viewport.width - position.x - BUTTON_SIZE / 2) }),
+                  willChange: "width, height",
                 }}
                 onPointerDown={() => resetDockTimer()}
                 aria-label="Trò chuyện với Pixel"
@@ -832,8 +851,25 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
           }
           dismissNotification();
           setOpen((current) => {
-            openRef.current = !current;
-            return !current;
+            const next = !current;
+            openRef.current = next;
+
+            // Khi MỞ khung chat: đưa icon về góc dưới phải BÊN NGOÀI khung
+            if (next) {
+              const panelW = currentSize.current.width;
+              const panelH = currentSize.current.height;
+              const panelLeft = onLeft ? 12 : Math.max(12, viewport.width - panelW - 12);
+              const panelTopNow = Math.min(
+                Math.max(position.y - 380, 12),
+                Math.max(12, viewport.height - panelH - 12),
+              );
+              // Icon nằm ngoài khung, góc dưới phải
+              setPosition({
+                x: panelLeft + panelW - BUTTON_SIZE / 2,
+                y: panelTopNow + panelH - BUTTON_SIZE / 2,
+              });
+            }
+            return next;
           });
           setUnread(false);
           resetDockTimer();
