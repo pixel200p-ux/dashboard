@@ -339,7 +339,11 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       openRef.current = next;
       setOpen(next);
       setUnread(false);
-      resetDockTimer();
+      if (next) {
+        clearDockTimer();
+      } else {
+        resetDockTimer();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -390,17 +394,29 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, sending, open]);
 
+  function clearDockTimer() {
+    if (dockTimer.current) {
+      clearTimeout(dockTimer.current);
+      dockTimer.current = null;
+    }
+  }
+
   function resetDockTimer() {
-    if (dockTimer.current) clearTimeout(dockTimer.current);
+    clearDockTimer();
+    // Chỉ nép 10% khi khung chat ĐANG ĐÓNG
+    if (openRef.current) return;
     dockTimer.current = setTimeout(() => {
+      if (openRef.current) return; // vẫn đang mở thì bỏ qua
       setPosition((current) => {
         const maxX = Math.max(0, window.innerWidth - BUTTON_SIZE);
         return {
-            x: current.x + BUTTON_SIZE / 2 < window.innerWidth / 2 ? -BUTTON_SIZE * 0.1 : maxX + BUTTON_SIZE * 0.1,
+          x: current.x + BUTTON_SIZE / 2 < window.innerWidth / 2
+            ? -BUTTON_SIZE * 0.1
+            : maxX + BUTTON_SIZE * 0.1,
           y: Math.min(Math.max(current.y, 16), window.innerHeight - BUTTON_SIZE - 16),
         };
       });
-    }, 5000);
+    }, 5000); // 5 giây không đụng → nép 10%
   }
 
   useEffect(() => {
@@ -421,6 +437,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       if (open && !target.closest('section[aria-label="Trò chuyện với Pixel"]') && !target.closest('button[title*="Pixel"]')) {
         setOpen(false);
         openRef.current = false;
+        resetDockTimer();
       }
     };
     window.addEventListener('mousedown', handleClickOutside);
@@ -433,9 +450,9 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     dragOrigin.current = { x: position.x, y: position.y, pointerX: event.clientX, pointerY: event.clientY };
     dragged.current = false;
     setDragging(true);
-    if (dockTimer.current) clearTimeout(dockTimer.current);
-    
-    // Auto collapse frame when starting to drag
+    clearDockTimer();
+
+    // Kéo icon → đóng khung nếu đang mở
     if (open) {
       setOpen(false);
       openRef.current = false;
@@ -770,7 +787,16 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
             <div className="flex items-center gap-1">
               <button type="button" onClick={startNewConversation} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Tạo hội thoại mới"><Plus className="h-4 w-4" /></button>
               <button type="button" onClick={() => { setSelectedConversations([]); setHistoryOpen(true); }} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Mở lịch sử trò chuyện"><History className="h-4 w-4" /></button>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Đóng Pixel"><X className="h-4 w-4" /></button>
+              <button
+                type="button"
+                onClick={() => {
+                  openRef.current = false;
+                  setOpen(false);
+                  resetDockTimer();
+                }}
+                className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Đóng Pixel"
+              ><X className="h-4 w-4" /></button>
             </div>
           </header>
 
@@ -903,7 +929,11 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
           openRef.current = willOpen;
           setOpen(willOpen);
           setUnread(false);
-          resetDockTimer();
+          if (willOpen) {
+            clearDockTimer(); // đang mở → không nép
+          } else {
+            resetDockTimer(); // đóng → sau 5s mới nép 10%
+          }
         }}
         className={cn(
           "fixed-surface fixed grid h-16 w-16 touch-none place-items-center rounded-full border border-border text-primary shadow-[0_6px_22px_rgba(15,23,42,0.18)] transition-[transform,box-shadow] hover:scale-105 hover:shadow-[0_8px_28px_rgba(15,23,42,0.24)]",
