@@ -38,8 +38,8 @@ type PixelMessage = {
 
 type Position = { x: number; y: number };
 const BUTTON_SIZE = 64;
-/** Phần icon đè lên mép dưới khung (giống Messenger, nhưng góc dưới). */
-const ICON_OVERLAP = 22;
+/** Khoảng trống giữa mép dưới khung chat và icon (không chạm nhau). */
+const ICON_GAP = 12;
 
 const QUIZ_CHOICES = [
 
@@ -192,8 +192,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   positionRef.current = position;
 
     const panelRef = useRef<HTMLDivElement>(null);
-  const targetPanelSize = useRef({ width: 360, height: 460 });
-  const currentSize = useRef({ width: 360, height: 460 });
+  const targetPanelSize = useRef({ width: 360, height: 560 });
+  const currentSize = useRef({ width: 360, height: 560 });
   const rafResizeRef = useRef<number>(0);
   const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
 
@@ -218,7 +218,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
         panelRef.current.style.height = `${h}px`;
         // Neo góc dưới phải = icon; kéo góc trên trái thì icon không chạy
         panelRef.current.style.left = `${icon.x + BUTTON_SIZE - w}px`;
-        panelRef.current.style.top = `${icon.y + ICON_OVERLAP - h}px`;
+        panelRef.current.style.top = `${icon.y - ICON_GAP - h}px`;
       }
 
       rafResizeRef.current = requestAnimationFrame(smoothResize);
@@ -230,6 +230,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   const startResizing = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     resizeStart.current = {
       x: e.clientX,
       y: e.clientY,
@@ -239,12 +240,13 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
 
     const handleMove = (moveEvent: globalThis.PointerEvent) => {
       if (!resizeStart.current) return;
-      // Tay cầm ở góc TRÊN TRÁI: kéo sang trái / lên = to hơn
+      moveEvent.preventDefault();
+      // Tay cầm góc TRÊN TRÁI: kéo sang trái / lên = to hơn
       const dx = moveEvent.clientX - resizeStart.current.x;
       const dy = moveEvent.clientY - resizeStart.current.y;
       targetPanelSize.current = {
-        width: Math.max(300, resizeStart.current.w - dx),
-        height: Math.max(200, resizeStart.current.h - dy),
+        width: Math.max(300, Math.min(window.innerWidth - 24, resizeStart.current.w - dx)),
+        height: Math.max(200, Math.min(window.innerHeight - 24, resizeStart.current.h - dy)),
       };
     };
 
@@ -252,12 +254,14 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       resizeStart.current = null;
       window.removeEventListener("pointermove", handleMove as any);
       window.removeEventListener("pointerup", handleUp as any);
+      window.removeEventListener("pointercancel", handleUp as any);
     };
 
     window.addEventListener("pointermove", handleMove as any);
     window.addEventListener("pointerup", handleUp as any);
+    window.addEventListener("pointercancel", handleUp as any);
   };
-  
+
   const nav = portfolio?.state.nav ?? 0;
   const pnl = portfolio?.state.totalPnl ?? 0;
   const returnPct = portfolio?.state.totalReturnPct ?? 0;
@@ -396,6 +400,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
+      // Đang kéo resize thì không đóng khung
+      if (resizeStart.current) return;
       const target = e.target as HTMLElement;
       if (open && !target.closest('section[aria-label="Trò chuyện với Pixel"]') && !target.closest('button[title*="Pixel"]')) {
         setOpen(false);
@@ -613,13 +619,11 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   }
 
     const onLeft = position.x + BUTTON_SIZE / 2 < viewport.width / 2;
-    // Khi mở: panel nằm phía trên-trái của icon (icon ở góc dưới phải ngoài khung)
-    const panelTop = open
-      ? Math.min(
-          Math.max(position.y - currentSize.current.height + BUTTON_SIZE / 2, 12),
-          Math.max(12, viewport.height - currentSize.current.height - 12),
-        )
-      : Math.min(Math.max(position.y - 380, 12), Math.max(12, viewport.height - currentSize.current.height - 12));
+    const panelWidth = currentSize.current.width;
+    const panelHeight = currentSize.current.height;
+    // Khung nằm phía trên icon, góc dưới phải; cách ICON_GAP — không chạm
+    const panelLeft = position.x + BUTTON_SIZE - panelWidth;
+    const panelTop = position.y - ICON_GAP - panelHeight;
     const notificationAbove = position.y > viewport.height / 2;
 
     return (
@@ -715,17 +719,14 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                 ref={panelRef}
                 className={cn("fixed-surface fixed flex flex-col overflow-hidden rounded-2xl border border-border/80 text-card-foreground shadow-[0_16px_48px_rgba(15,23,42,0.22)]", historyOpen ? "z-40" : "z-[130]")}
                 style={{
-                  width: currentSize.current.width,
-                  height: currentSize.current.height,
+                  width: panelWidth,
+                  height: panelHeight,
                   maxWidth: "calc(100vw - 24px)",
                   maxHeight: "calc(100dvh - 24px)",
-                  transformOrigin: onLeft ? "bottom left" : "bottom right",
-                  top: Math.min(panelTop, viewport.height - currentSize.current.height - 12),
-                  // Căn theo icon: icon nằm góc dưới phải ngoài khung
-                  ...(onLeft
-                    ? { left: Math.max(12, position.x - currentSize.current.width + BUTTON_SIZE / 2) }
-                    : { right: Math.max(12, viewport.width - position.x - BUTTON_SIZE / 2) }),
-                  willChange: "width, height",
+                  transformOrigin: "bottom right",
+                  top: panelTop,
+                  left: panelLeft,
+                  willChange: "width, height, top, left",
                 }}
                 onPointerDown={() => resetDockTimer()}
                 aria-label="Trò chuyện với Pixel"
@@ -825,14 +826,12 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
           </form>
 
           {/* Resize handle */}
+                    {/* Resize handle — góc trên trái */}
           <div
             onPointerDown={startResizing}
-            className={cn(
-              "absolute bottom-0 h-6 w-6 cursor-nwse-resize flex items-end justify-end p-1 opacity-30 hover:opacity-100 transition-opacity z-50",
-              onLeft ? "right-0 cursor-nwse-resize" : "left-0 cursor-nesw-resize"
-            )}
+            className="absolute left-0 top-0 z-50 flex h-7 w-7 cursor-nwse-resize items-start justify-start p-1 opacity-40 transition-opacity hover:opacity-100"
           >
-            <Grip className={cn("h-3 w-3", onLeft ? "rotate-45" : "-rotate-45")} />
+            <Grip className="h-3.5 w-3.5 rotate-45" />
           </div>
         </section>
       )}
@@ -853,29 +852,15 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
           setOpen((current) => {
             const next = !current;
             openRef.current = next;
-
-            // Khi MỞ khung chat: đưa icon về góc dưới phải BÊN NGOÀI khung
-            if (next) {
-              const panelW = currentSize.current.width;
-              const panelH = currentSize.current.height;
-              const panelLeft = onLeft ? 12 : Math.max(12, viewport.width - panelW - 12);
-              const panelTopNow = Math.min(
-                Math.max(position.y - 380, 12),
-                Math.max(12, viewport.height - panelH - 12),
-              );
-              // Icon nằm ngoài khung, góc dưới phải
-              setPosition({
-                x: panelLeft + panelW - BUTTON_SIZE / 2,
-                y: panelTopNow + panelH - BUTTON_SIZE / 2,
-              });
-            }
+            // Giữ nguyên vị trí icon; khung sẽ neo phía trên icon
             return next;
           });
           setUnread(false);
           resetDockTimer();
         }}
         className={cn(
-          "fixed-surface fixed z-120 grid h-16 w-16 touch-none place-items-center rounded-full border border-border text-primary shadow-[0_6px_22px_rgba(15,23,42,0.18)] transition-[transform,box-shadow] hover:scale-105 hover:shadow-[0_8px_28px_rgba(15,23,42,0.24)]",
+          "fixed-surface fixed grid h-16 w-16 touch-none place-items-center rounded-full border border-border text-primary shadow-[0_6px_22px_rgba(15,23,42,0.18)] transition-[transform,box-shadow] hover:scale-105 hover:shadow-[0_8px_28px_rgba(15,23,42,0.24)]",
+          open ? "z-[140]" : "z-120",
           dragging && "scale-105 cursor-grabbing",
         )}
         style={{ left: position.x, top: position.y }}
