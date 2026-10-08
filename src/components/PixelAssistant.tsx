@@ -147,8 +147,221 @@ function quizMessage(): PixelMessage {
   };
 }
 
+function BlackHoleIcon({
+  open,
+  hovered,
+  position,
+  theme,
+}: {
+  open: boolean;
+  hovered: boolean;
+  position: Position;
+  theme: ThemeMode;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef({ open, hovered, position, theme });
+  stateRef.current = { open, hovered, position, theme };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+
+    const maxOrbit = 100;
+    const maxOpacity = 1;
+    const lineWidth = 0.6;
+    const normalStars = 1400;
+    const expanseStars = 2000;
+    const stars: {
+      index: number;
+      x: number;
+      y: number;
+      yOrigin: number;
+      speed: number;
+      rotation: number;
+      startRotation: number;
+      collapseBonus: number;
+      color: string;
+      hoverPos: number;
+      expansePos: number;
+      prevR: number;
+      prevX: number;
+      prevY: number;
+      opacity: number;
+    }[] = [];
+
+    let width = 0;
+    let height = 0;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let maxRadius = 0;
+    let frameId = 0;
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    let startTime = 0;
+    let currentTime = 0;
+    let currentTheme = stateRef.current.theme;
+    let wasExpanse = false;
+
+    const colorForStar = (opacity: number) =>
+      `rgba(${currentTheme === "dark" ? "255, 255, 255" : "0, 0, 0"}, ${opacity.toFixed(3)})`;
+
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      maxRadius = Math.max(width, height) * 1.2;
+      canvas.width = Math.ceil(width * dpr);
+      canvas.height = Math.ceil(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      createStars();
+    };
+
+    const createStars = () => {
+      stars.length = 0;
+      for (let i = 0; i < expanseStars; i += 1) {
+        const orbitRanges = [
+          Math.random() * (maxOrbit / 2) + 1,
+          Math.random() * maxOrbit + maxOrbit / 2,
+        ];
+        const orbital = (orbitRanges[0] + orbitRanges[1]) / 2;
+        const startRotation = (Math.floor(Math.random() * 360) + 1) * Math.PI / 180;
+        const collapseBonus = Math.max(0, orbital - maxOrbit * 0.7);
+        const distFactor = Math.pow(Math.random(), 1.8);
+        const expanseRadius = distFactor * maxRadius;
+        const baseAlpha = 1 - (expanseRadius / maxRadius) * 0.85;
+        const opacity = Math.max(0.05, baseAlpha * maxOpacity);
+
+        stars.push({
+          index: i,
+          x: 0,
+          y: orbital,
+          yOrigin: orbital,
+          speed: (Math.floor(Math.random() * 2.5) + 1.5) * Math.PI / 180,
+          rotation: 0,
+          startRotation,
+          collapseBonus,
+          color: colorForStar(opacity),
+          hoverPos: maxOrbit / 2 + collapseBonus,
+          expansePos: -expanseRadius,
+          prevR: startRotation,
+          prevX: 0,
+          prevY: orbital,
+          opacity,
+        });
+      }
+    };
+
+    const rotate = (px: number, py: number, x: number, y: number, angle: number) => {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      return [
+        cos * (x - px) + sin * (y - py) + px,
+        cos * (y - py) - sin * (x - px) + py,
+      ];
+    };
+
+    const animate = () => {
+      if (document.visibilityState !== "visible") return;
+      currentTime = (Date.now() - startTime) / 50;
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = "lighter";
+
+      const { open: expanse, hovered: collapse, position: iconPosition, theme: nextTheme } = stateRef.current;
+      const centerX = iconPosition.x + BUTTON_SIZE / 2;
+      const centerY = iconPosition.y + BUTTON_SIZE / 2;
+
+      if (currentTheme !== nextTheme) {
+        currentTheme = nextTheme;
+        for (const star of stars) {
+          star.color = colorForStar(star.opacity);
+        }
+      }
+
+      if (expanse && !wasExpanse) {
+        for (const star of stars) {
+          star.y = 0;
+          star.prevY = 0;
+          star.prevX = 0;
+        }
+      }
+      wasExpanse = expanse;
+
+      for (const star of stars) {
+        if (!expanse && star.index >= normalStars) continue;
+        if (expanse && star.index >= expanseStars) continue;
+
+        if (expanse) {
+          star.rotation = star.startRotation + currentTime * (star.speed / 2);
+          star.y += (star.expansePos - star.y) * 0.05;
+        } else if (collapse) {
+          star.rotation = star.startRotation + currentTime * star.speed;
+          if (star.y > star.hoverPos) star.y -= (star.hoverPos - star.y) / -5;
+          if (star.y < star.hoverPos - 4) star.y += 2.5;
+        } else {
+          star.rotation = star.startRotation + currentTime * star.speed;
+          star.y += (star.yOrigin - star.y) * 0.08;
+        }
+
+        ctx.strokeStyle = star.color;
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        const oldPos = rotate(0, 0, star.prevX, star.prevY, -star.prevR);
+        ctx.moveTo(centerX + oldPos[0], centerY + oldPos[1]);
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(star.rotation);
+        ctx.translate(-centerX, -centerY);
+        ctx.lineTo(centerX + star.x, centerY + star.y);
+        ctx.stroke();
+        ctx.restore();
+
+        star.prevR = star.rotation;
+        star.prevX = star.x;
+        star.prevY = star.y;
+      }
+
+      ctx.globalCompositeOperation = "source-over";
+      frameId = requestAnimationFrame(animate);
+    };
+
+    const start = () => {
+      cancelAnimationFrame(frameId);
+      if (document.visibilityState !== "visible") return;
+      if (startTime === 0) startTime = Date.now();
+      frameId = requestAnimationFrame(animate);
+    };
+
+    const handleResize = () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        resize();
+        start();
+      }, 150);
+    };
+
+    resize();
+    start();
+    document.addEventListener("visibilitychange", start);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+
+    return () => {
+    cancelAnimationFrame(frameId);
+    if (resizeTimer) clearTimeout(resizeTimer);
+    document.removeEventListener("visibilitychange", start);
+    window.removeEventListener("resize", handleResize);
+    window.removeEventListener("orientationchange", handleResize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-[119] h-dvh w-screen" aria-hidden="true" />;
+}
+
 export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | undefined }) {
   const queryClient = useQueryClient();
+  const theme = useUiStore((state) => state.theme);
   const setTheme = useUiStore((state) => state.setTheme);
   const setLoginTheme = useUiStore((state) => state.setLoginTheme);
   
@@ -160,6 +373,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [dragging, setDragging] = useState(false);
+  const [iconHovered, setIconHovered] = useState(false);
   const [unread, setUnread] = useState(false);
   const [notification, setNotification] = useState<PixelMessage | null>(null);
 
@@ -897,6 +1111,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onMouseEnter={() => setIconHovered(true)}
+        onMouseLeave={() => setIconHovered(false)}
         onClick={() => {
           if (dragged.current) {
             dragged.current = false;
@@ -936,20 +1152,19 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
           }
         }}
         className={cn(
-          "fixed-surface fixed grid h-16 w-16 touch-none place-items-center rounded-full border border-border text-primary shadow-[0_6px_22px_rgba(15,23,42,0.18)] transition-[transform,box-shadow] hover:scale-105 hover:shadow-[0_8px_28px_rgba(15,23,42,0.24)]",
+          "fixed grid h-16 w-16 touch-none place-items-center rounded-full border-0 bg-transparent p-0 text-primary shadow-none transition-transform hover:scale-105 hover:shadow-none",
           open ? "z-[140]" : "z-120",
           dragging && "scale-105 cursor-grabbing",
         )}
-        style={{ left: position.x, top: position.y }}
+        style={{ left: position.x, top: position.y, background: "transparent", boxShadow: "none" }}
         aria-label={open ? "Đóng Pixel" : "Mở Pixel"}
         title="Kéo để di chuyển · Pixel"
       >
-        <span className="absolute inset-1 rounded-full border border-primary/10" aria-hidden="true" />
-        {open ? <MessageCircle className="relative h-6 w-6" /> : <Bot className="relative h-7 w-7" />}
         <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-card bg-secondary text-secondary-foreground" aria-hidden="true">
           {unread ? <Sparkles className="h-3 w-3" /> : <Grip className="h-3 w-3" />}
         </span>
       </button>
+      <BlackHoleIcon open={open} hovered={iconHovered} position={position} theme={theme} />
     </>
   );
 }
