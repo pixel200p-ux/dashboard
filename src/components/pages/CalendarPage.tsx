@@ -15,6 +15,7 @@ import {
 } from "@/engine/calendar";
 import {
   formatViDate,
+  formatViDayMonth,
   remainingDays,
   toDate,
   todayYmd,
@@ -778,7 +779,7 @@ export function CalendarPage() {
                           <div key={date} className="pb-6 last:pb-0">
                             <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums tracking-[0.08em] text-[#475569] dark:text-[#94A3B8]">
                               <span className="inline-block h-2 w-2 rounded-full bg-[#94A3B8] dark:bg-[#64748B]" />
-                              <span>{date.slice(5).replace("-", "/")}</span>
+                              <span>{formatViDayMonth(date)}</span>
                             </div>
 
                             <div className="mt-1 ml-4 border-l border-[#E2E8F0] pl-3 dark:border-[#334155]">

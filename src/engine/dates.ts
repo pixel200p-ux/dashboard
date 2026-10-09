@@ -26,11 +26,24 @@ export function actualDays(fromIso: string, toIso: string): number {
 }
 
 export function formatViDate(iso: string): string {
+  if (/^\d{4}-\d{2}$/.test(iso)) {
+    const [year, month] = iso.split("-");
+    return `${month}/${year}`;
+  }
+  if (/^\d{4}$/.test(iso)) return iso;
   try {
     return format(toDate(iso), "dd/MM/yyyy");
   } catch {
     return iso;
   }
+}
+
+export function formatViDayMonth(iso: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [, month, day] = iso.split("-");
+    return `${day}/${month}`;
+  }
+  return formatViDate(iso);
 }
 /** Ngày theo giờ Việt Nam (YYYY-MM-DD). Dùng cho snapshot đầu ngày. */
 export function todayVnYmd(now = new Date()): string {

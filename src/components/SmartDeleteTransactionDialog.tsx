@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { formatViDate } from "@/engine/dates";
 import { deleteTransaction, checkTxLinks } from "@/lib/api/portfolio";
 import { askEditPin } from "@/lib/edit-pin";
 import { usePortfolioMutation } from "@/lib/use-portfolio";
@@ -74,7 +75,7 @@ export function SmartDeleteTransactionDialog({
           <div className="space-y-4">
             <div>
               <p className="font-medium">
-                {txTypeLabel} {symbol} · {transaction.txDate}
+                {txTypeLabel} {symbol} · {formatViDate(transaction.txDate)}
               </p>
               <p className="text-sm text-muted-foreground">
                 {linkedTransactions === null
@@ -89,7 +90,7 @@ export function SmartDeleteTransactionDialog({
               <ul className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-border p-3 text-sm">
                 {linkedTransactions.map((linked) => (
                   <li key={linked.id}>
-                    {linked.txType === "BUY" ? "MUA" : "BÁN"} {linked.symbol ?? "Lệnh"} · {linked.txDate}
+                    {linked.txType === "BUY" ? "MUA" : "BÁN"} {linked.symbol ?? "Lệnh"} · {formatViDate(linked.txDate)}
                     {linked.quantity != null ? ` · SL ${linked.quantity}` : ""}
                   </li>
                 ))}
