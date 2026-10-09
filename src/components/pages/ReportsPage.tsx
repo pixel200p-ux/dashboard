@@ -87,8 +87,13 @@ export function ReportsPage() {
 
   const allRows = useMemo(() => (data ? buildReportRows(data.ledger, data.state.asOf) : []), [data]);
   const reportSymbols = useMemo(
-    () => [...new Set(allRows.map((row) => row.symbol).filter((value) => value !== "—"))].sort((a, b) => a.localeCompare(b)),
-    [allRows],
+    () => [...new Set(
+      allRows
+        .filter((row) => bucket === "ALL" || row.bucket === bucket)
+        .map((row) => row.symbol)
+        .filter((value) => value !== "—"),
+    )].sort((a, b) => a.localeCompare(b)),
+    [allRows, bucket],
   );
   const rows = useMemo(
     () => filterReportRows(allRows, { bucket, kind, symbol, from, to }),
@@ -186,7 +191,10 @@ export function ReportsPage() {
             <Label>Danh mục</Label>
             <Select
               value={bucket}
-              onValueChange={(v) => setBucket(v as "ALL" | CapitalBucket)}
+              onValueChange={(v) => {
+                setBucket(v as "ALL" | CapitalBucket);
+                setSymbol("ALL");
+              }}
               options={REPORT_BUCKETS}
             />
           </div>
