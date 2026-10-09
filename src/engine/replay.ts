@@ -28,6 +28,7 @@ interface Pos {
   cashDividend: number;
   stockDividendQty: number;
   totalInvested: number;
+  coreCostLots: { buyTxId: string; quantity: number; adjustedCost: number }[];
   openLots: OpenTplusLot[];
   cycles: TplusCycleRecord[];
 }
@@ -55,6 +56,22 @@ function adjustedAvg(p: Pos): number {
 function originalAvg(p: Pos): number {
   if (p.coreQty <= 0) return 0;
   return Math.max(0, p.coreCostTotal) / p.coreQty;
+}
+
+function syncCoreLotCosts(p: Pos): void {
+  const targetCost = Math.max(0, p.coreCostTotal - p.tplusReduction);
+  const currentCost = p.coreCostLots.reduce((sum, lot) => sum + lot.adjustedCost, 0);
+  if (currentCost > 0) {
+    const ratio = targetCost / currentCost;
+    for (const lot of p.coreCostLots) lot.adjustedCost *= ratio;
+  } else if (targetCost > 0) {
+    const totalQty = p.coreCostLots.reduce((sum, lot) => sum + lot.quantity, 0);
+    if (totalQty > 0) {
+      for (const lot of p.coreCostLots) {
+        lot.adjustedCost = (targetCost * lot.quantity) / totalQty;
+      }
+    }
+  }
 }
 
 function openQty(p: Pos): number {
@@ -92,6 +109,7 @@ function ensurePos(
     cashDividend: 0,
     stockDividendQty: 0,
     totalInvested: 0,
+    coreCostLots: [],
     openLots: [],
     cycles: [],
   };
@@ -113,6 +131,11 @@ function applyCoreSell(p: Pos, qty: number, netProceeds: number) {
   p.realizedTradePnl += netProceeds * (sellQty / qty) - cost;
   p.coreCostTotal -= p.coreCostTotal * frac;
   p.tplusReduction -= p.tplusReduction * frac;
+  for (const lot of p.coreCostLots) {
+    lot.quantity *= 1 - frac;
+    lot.adjustedCost *= 1 - frac;
+  }
+  p.coreCostLots = p.coreCostLots.filter((lot) => lot.quantity > 1e-12);
   p.coreQty -= sellQty;
 }
 export function emptyBuckets(): Record<CapitalBucket, number> {
@@ -189,6 +212,12 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
       } else {
         p.coreCostTotal += qty * price + fee;
         p.coreQty += qty;
+        p.coreCostLots.push({
+          buyTxId: tx.id,
+          quantity: qty,
+          adjustedCost: qty * price + fee,
+        });
+        syncCoreLotCosts(p);
       }
       continue;
     }
@@ -203,12 +232,18 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
       } else {
         p.coreCostTotal -= net;
       }
+      syncCoreLotCosts(p);
       continue;
     }
 
     if (tx.txType === "STOCK_DIVIDEND") {
       const add = num(tx.stockDivQty) || (num(tx.dividendPerShare) > 0 ? p.coreQty * num(tx.dividendPerShare) : qty);
+      const coreQtyBeforeDividend = p.coreQty;
       p.coreQty += add;
+      if (coreQtyBeforeDividend > 0) {
+        const ratio = p.coreQty / coreQtyBeforeDividend;
+        for (const lot of p.coreCostLots) lot.quantity *= ratio;
+      }
       p.stockDividendQty += add;
       continue;
     }
@@ -242,6 +277,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
       lot.qtyRemaining -= take;
       matchedQty += take;
       p.tplusReduction += net;
+      syncCoreLotCosts(p);
 
       const avgAfter = adjustedAvg(p);
       p.cycles.push({
@@ -333,6 +369,13 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
         tplusProfitCompleted: p.tplusReduction,
         totalInvested: p.totalInvested,
         openLots: p.openLots,
+        buyLotCosts: p.coreCostLots
+          .filter((lot) => lot.quantity > 1e-12)
+          .map((lot) => ({
+            buyTxId: lot.buyTxId,
+            remainingQty: lot.quantity,
+            adjustedPrice: lot.adjustedCost / lot.quantity,
+          })),
       });
     }
 

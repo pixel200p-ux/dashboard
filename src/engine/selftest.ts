@@ -141,5 +141,91 @@ export function runTplusSpecExample(): string[] {
     if (cycle3.holdings[0]?.quantity !== 1150) errors.push(`cycle3 holdings ${cycle3.holdings[0]?.quantity} != 1150`);
   }
 
+  const dividendLedger: LedgerSnapshot = {
+    ...ledger,
+    transactions: [
+      tx({
+        id: "old-buy",
+        txType: "BUY",
+        txDate: "2026-02-01",
+        quantity: 50,
+        price: 10000,
+      }),
+      tx({
+        id: "old-sell",
+        txType: "SELL",
+        txDate: "2026-02-02",
+        quantity: 50,
+        price: 12000,
+      }),
+      tx({
+        id: "current-buy",
+        txType: "BUY",
+        txDate: "2026-02-03",
+        quantity: 60,
+        price: 15000,
+      }),
+      tx({
+        id: "cash-dividend",
+        txType: "CASH_DIVIDEND",
+        txDate: "2026-02-04",
+        amount: 250000,
+        tax: 10000,
+      }),
+    ],
+    matches: [],
+  };
+  const afterCashDividend = replayPortfolio(dividendLedger, "2026-02-05").holdings[0];
+  if (!afterCashDividend) errors.push("holding missing after cash dividend");
+  else {
+    if (afterCashDividend.buyLotCosts.length !== 1) {
+      errors.push(`open buy lots ${afterCashDividend.buyLotCosts.length} != 1 after earlier lot was sold`);
+    } else {
+      const currentLot = afterCashDividend.buyLotCosts[0];
+      if (currentLot.buyTxId !== "current-buy") errors.push(`adjusted lot id ${currentLot.buyTxId} != current-buy`);
+      if (Math.abs(currentLot.adjustedPrice - 11000) > 0.5) {
+        errors.push(`cash dividend adjusted price ${currentLot.adjustedPrice} != 11000`);
+      }
+    }
+  }
+
+  const stockDividendLedger: LedgerSnapshot = {
+    ...dividendLedger,
+    transactions: [
+      tx({
+        id: "stock-buy",
+        txType: "BUY",
+        txDate: "2026-03-01",
+        quantity: 60,
+        price: 15000,
+      }),
+      tx({
+        id: "stock-dividend",
+        txType: "STOCK_DIVIDEND",
+        txDate: "2026-03-02",
+        stockDivQty: 60,
+      }),
+      tx({
+        id: "paid-issuance",
+        txType: "BUY",
+        txDate: "2026-03-03",
+        quantity: 10,
+        price: 8000,
+      }),
+    ],
+  };
+  const afterStockDividend = replayPortfolio(stockDividendLedger, "2026-03-04").holdings[0];
+  if (!afterStockDividend) errors.push("holding missing after stock dividend");
+  else {
+    const stockLot = afterStockDividend.buyLotCosts.find((lot) => lot.buyTxId === "stock-buy");
+    const paidIssueLot = afterStockDividend.buyLotCosts.find((lot) => lot.buyTxId === "paid-issuance");
+    if (!stockLot || Math.abs(stockLot.adjustedPrice - 7500) > 0.5) {
+      errors.push(`stock dividend adjusted price ${stockLot?.adjustedPrice} != 7500`);
+    }
+    if (!paidIssueLot || Math.abs(paidIssueLot.adjustedPrice - 8000) > 0.5) {
+      errors.push(`paid issuance price ${paidIssueLot?.adjustedPrice} != 8000`);
+    }
+  }
+
   return errors;
 }

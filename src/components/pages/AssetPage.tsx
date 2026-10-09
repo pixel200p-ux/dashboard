@@ -586,6 +586,15 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                                       : transaction.txType === "SELL"
                                         ? "loss"
                                         : "muted";
+                                    const buyLotCost = transaction.txType === "BUY" && assetType === "STOCK"
+                                      ? state.holdings
+                                          .find((holding) => holding.assetId === transaction.assetId)
+                                          ?.buyLotCosts.find((lot) => lot.buyTxId === transaction.id)
+                                      : undefined;
+                                    const displayedBuyPrice =
+                                      buyLotCost && transaction.price != null
+                                        ? buyLotCost.adjustedPrice
+                                        : transaction.price;
 
                                     return (
                                       <div key={transaction.id} className="relative py-1 pl-3.5">
@@ -602,9 +611,16 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
                                             <p className="mt-1 text-xs leading-5 text-[#475569] dark:text-[#CBD5E1]">
                                               SL {transaction.quantity != null ? formatQty(transaction.quantity, assetType) : "—"}
                                               {" · "}
-                                              {transaction.price != null
-                                                ? displayPrice(transaction.price, assetType, currency, usd)
+                                              {displayedBuyPrice != null
+                                                ? displayPrice(displayedBuyPrice, assetType, currency, usd)
                                                 : displayMoney(transaction.amount, currency, usd)}
+                                              {buyLotCost &&
+                                                transaction.price != null &&
+                                                Math.abs(buyLotCost.adjustedPrice - transaction.price) > 0.5 && (
+                                                  <span className="ml-1 text-[10px] text-muted-foreground">
+                                                    (giá vốn đã điều chỉnh)
+                                                  </span>
+                                                )}
                                             </p>
                                           </div>
                                           <div className="flex shrink-0 gap-1">

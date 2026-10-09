@@ -373,8 +373,10 @@
           ],
           "businessRules": [
             "Cổ tức chỉ áp dụng cho Stock.",
-            "Cash Dividend: Nhập số tiền/CP hoặc tổng tiền thực nhận. Hạch toán thẳng vào chỉ số Cổ Tức Tiền Mặt lũy kế.",
-            "Stock Dividend: Nhập trực tiếp trường Số lượng (quantity) cổ phiếu thực nhận (> 0). Tăng Holdings cổ phiếu gốc và tự động tính lại Average Cost do pha loãng."
+            "Cash Dividend: Nhập tổng tiền trước thuế và thuế. Tiền thực nhận sau thuế được hạch toán vào chỉ số Cổ Tức Tiền Mặt và trừ khỏi giá vốn vị thế gốc; chỉ các lô còn nắm giữ tại ngày giao dịch cổ tức được phản ánh lại giá vốn.",
+            "Stock Dividend: Nhập trực tiếp số lượng cổ phiếu miễn phí thực nhận (> 0). Tăng số lượng cổ phiếu gốc, giữ nguyên tổng giá vốn và phân bổ lại giá vốn trên các lô còn nắm giữ.",
+            "Lịch sử lệnh MUA của lô cổ phiếu còn nắm giữ hiển thị giá vốn sau điều chỉnh; lô đã bán hết giữ nguyên giá khớp mua lịch sử.",
+            "Cổ phiếu phát hành thêm có trả tiền được ghi nhận như một lệnh MUA mới; phần cổ phiếu phát hành miễn phí được ghi nhận như Stock Dividend."
           ]
         },
         {

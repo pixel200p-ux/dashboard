@@ -169,6 +169,7 @@ export interface HoldingView {
   tplusProfitCompleted: number;
   totalInvested: number;
   openLots: OpenTplusLot[];
+  buyLotCosts: { buyTxId: string; remainingQty: number; adjustedPrice: number }[];
 }
 
 export interface BankView {
