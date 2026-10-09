@@ -18,7 +18,12 @@ import {
   type PixelConversationMessage,
 } from "@/lib/api/pixel";
 import type { PortfolioPayload } from "@/lib/api/portfolio";
-import { useUiStore, type LoginThemeId, type ThemeMode } from "@/lib/ui-store";
+import {
+  useUiStore,
+  type AssistantPanelSize,
+  type LoginThemeId,
+  type ThemeMode,
+} from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 
 type PixelSource = { title: string; url: string; publishedDate?: string };
@@ -364,6 +369,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   const theme = useUiStore((state) => state.theme);
   const setTheme = useUiStore((state) => state.setTheme);
   const setLoginTheme = useUiStore((state) => state.setLoginTheme);
+  const assistantPanelSize = useUiStore((state) => state.assistantPanelSize);
+  const setAssistantPanelSize = useUiStore((state) => state.setAssistantPanelSize);
   
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<PixelMessage[]>([]);
@@ -401,15 +408,21 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   const notificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragOrigin = useRef<{ x: number; y: number; pointerX: number; pointerY: number } | null>(null);
   const dragged = useRef(false);
+  const ignoreTriggerClick = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef(position);
   positionRef.current = position;
 
-    const panelRef = useRef<HTMLDivElement>(null);
-  const targetPanelSize = useRef({ width: 360, height: 560 });
-  const currentSize = useRef({ width: 360, height: 560 });
+  const panelRef = useRef<HTMLDivElement>(null);
+  const targetPanelSize = useRef<AssistantPanelSize>(assistantPanelSize);
+  const currentSize = useRef<AssistantPanelSize>(assistantPanelSize);
   const rafResizeRef = useRef<number>(0);
   const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    targetPanelSize.current = assistantPanelSize;
+    currentSize.current = assistantPanelSize;
+  }, [assistantPanelSize]);
 
   // High-performance smooth resize (Dragon-style)
   useEffect(() => {
@@ -466,6 +479,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
 
     const handleUp = () => {
       resizeStart.current = null;
+      setAssistantPanelSize({ ...targetPanelSize.current });
       window.removeEventListener("pointermove", handleMove as any);
       window.removeEventListener("pointerup", handleUp as any);
       window.removeEventListener("pointercancel", handleUp as any);
@@ -641,21 +655,22 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     };
   }, []);
 
-    // Auto-close when clicking outside
+  // Auto-close when interacting outside the chat.
   useEffect(() => {
     if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      // Đang kéo resize thì không đóng khung
-      if (resizeStart.current) return;
-      const target = e.target as HTMLElement;
-      if (open && !target.closest('section[aria-label="Trò chuyện với Pixel"]') && !target.closest('button[title*="Pixel"]')) {
-        setOpen(false);
-        openRef.current = false;
-        resetDockTimer();
+    const handlePointerDownOutside = (e: globalThis.PointerEvent) => {
+      if (resizeStart.current || !(e.target instanceof Element)) return;
+      const target = e.target;
+      if (target.closest('section[aria-label="Trò chuyện với Pixel"]')) return;
+      if (target.closest('button[aria-label="Mở Pixel"], button[aria-label="Đóng Pixel"]')) {
+        ignoreTriggerClick.current = true;
       }
+      setOpen(false);
+      openRef.current = false;
+      resetDockTimer();
     };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener("pointerdown", handlePointerDownOutside);
+    return () => window.removeEventListener("pointerdown", handlePointerDownOutside);
   }, [open]);
 
   function beginDrag(event: PointerEvent<HTMLButtonElement>) {
@@ -693,6 +708,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
 
     // Chỉ nép cạnh khi đã KÉO thật; bấm mở chat thì để onClick xử lý
     if (!dragged.current) return;
+    ignoreTriggerClick.current = false;
 
     setPosition((current) => {
       const maxX = Math.max(0, window.innerWidth - BUTTON_SIZE);
@@ -1114,6 +1130,10 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
         onMouseEnter={() => setIconHovered(true)}
         onMouseLeave={() => setIconHovered(false)}
         onClick={() => {
+          if (ignoreTriggerClick.current) {
+            ignoreTriggerClick.current = false;
+            return;
+          }
           if (dragged.current) {
             dragged.current = false;
             return;

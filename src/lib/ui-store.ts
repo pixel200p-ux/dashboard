@@ -5,6 +5,7 @@ import type { AssetType, CapitalBucket, TxType } from "@/engine/types";
 export type ThemeMode = "light" | "dark";
 export type DisplayCurrency = "VND" | "USD";
 export type LoginThemeId = "default" | "spring" | "summer" | "autumn" | "winter";
+export type AssistantPanelSize = { width: number; height: number };
 
 export type CapitalPrefill = {
   id: string;
@@ -48,6 +49,7 @@ type UiState = {
   dragonAtHome: boolean;
   dragonSize: number;
   dragonFacingUp: boolean;
+  assistantPanelSize: AssistantPanelSize;
   txOpen: TxPrefill | null;
   capitalOpen: "DEPOSIT" | "WITHDRAW" | null;
   capitalEdit: CapitalPrefill | null;
@@ -63,6 +65,7 @@ type UiState = {
   setDragonAtHome: (atHome: boolean) => void;
   setDragonSize: (size: number) => void;
   setDragonFacingUp: (facingUp: boolean) => void;
+  setAssistantPanelSize: (size: AssistantPanelSize) => void;
   setStockFilter: (f: UiState["stockFilter"]) => void;
   openTx: (p?: TxPrefill) => void;
   closeTx: () => void;
@@ -87,6 +90,7 @@ export const useUiStore = create<UiState>()(
       dragonAtHome: false,
       dragonSize: 1,
       dragonFacingUp: false,
+      assistantPanelSize: { width: 360, height: 560 },
       txOpen: null,
       capitalOpen: null,
       capitalEdit: null,
@@ -117,6 +121,7 @@ export const useUiStore = create<UiState>()(
       setDragonAtHome: (dragonAtHome) => set({ dragonAtHome }),
       setDragonSize: (dragonSize) => set({ dragonSize }),
       setDragonFacingUp: (dragonFacingUp) => set({ dragonFacingUp }),
+      setAssistantPanelSize: (assistantPanelSize) => set({ assistantPanelSize }),
       setStockFilter: (stockFilter) => set({ stockFilter }),
       openTx: (p) => set({ txOpen: p ?? {} }),
       closeTx: () => set({ txOpen: null }),
@@ -144,6 +149,7 @@ export const useUiStore = create<UiState>()(
         dragonAtHome: s.dragonAtHome,
         dragonSize: s.dragonSize,
         dragonFacingUp: s.dragonFacingUp,
+        assistantPanelSize: s.assistantPanelSize,
       }),
     },
   ),
