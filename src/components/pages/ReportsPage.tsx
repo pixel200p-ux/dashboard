@@ -11,6 +11,7 @@ import { formatViDate } from "@/engine/dates";
 import { formatPct, formatQty, signedClass } from "@/engine/money";
 import type { CapitalBucket, HoldingView, Transaction } from "@/engine/types";
 import { displayMoney, displayPrice } from "@/lib/display";
+import type { DisplayCurrency } from "@/lib/ui-store";
 import { SmartDeleteTransactionDialog } from "@/components/SmartDeleteTransactionDialog";
 import {
   buildReportRows,
@@ -27,7 +28,15 @@ import { askEditPin } from "@/lib/edit-pin";
 import { Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-function RealizedProfitCard({ holding, currency, usd }: { holding: HoldingView; currency: string; usd: number }) {
+function RealizedProfitCard({
+  holding,
+  currency,
+  usd,
+}: {
+  holding: HoldingView;
+  currency: DisplayCurrency;
+  usd: number;
+}) {
   const totalPnl = holding.realizedTradePnl + holding.tplusProfitCompleted + holding.cashDividend;
   const pnlPct = holding.totalInvested > 0 ? (totalPnl / holding.totalInvested) * 100 : 0;
   const isProfit = totalPnl >= 0;
@@ -36,7 +45,7 @@ function RealizedProfitCard({ holding, currency, usd }: { holding: HoldingView; 
     <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-3 shadow-sm">
       <div className="flex items-center justify-between">
         <span className="text-lg font-bold">{holding.symbol}</span>
-        <Badge variant="outline" className={isProfit ? "border-emerald-500 text-emerald-600" : "border-rose-500 text-rose-600"}>
+        <Badge className={isProfit ? "border-emerald-500 text-emerald-600" : "border-rose-500 text-rose-600"}>
           {isProfit ? <TrendingUp className="mr-1 h-3 w-3" /> : <TrendingDown className="mr-1 h-3 w-3" />}
           {formatPct(pnlPct)}
         </Badge>

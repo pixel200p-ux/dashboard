@@ -43,14 +43,20 @@ export const restoreTrashItem = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const sql = await requireTrashPin(data.pin);
     if (data.kind === "TRANSACTION") {
-      const rows = await sql`update transactions set deleted_at = null where id = ${data.id} and deleted_at is not null returning id`;
-      if (rows.length === 0) throw new Error("Không tìm thấy giao dịch trong thùng rác");
+      const rows =
+        await sql`update transactions set deleted_at = null where id = ${data.id} and deleted_at is not null returning id`;
+      if (rows.length === 0)
+        throw new Error("Không tìm thấy giao dịch trong thùng rác");
     } else if (data.kind === "CAPITAL") {
-      const rows = await sql`update capital_movements set deleted_at = null where id = ${data.id} and deleted_at is not null returning id`;
-      if (rows.length === 0) throw new Error("Không tìm thấy dòng vốn trong thùng rác");
+      const rows =
+        await sql`update capital_movements set deleted_at = null where id = ${data.id} and deleted_at is not null returning id`;
+      if (rows.length === 0)
+        throw new Error("Không tìm thấy dòng vốn trong thùng rác");
     } else {
-      const rows = await sql`update bank_deposits set deleted_at = null where id = ${data.id} and deleted_at is not null returning id`;
-      if (rows.length === 0) throw new Error("Không tìm thấy sổ tiết kiệm trong thùng rác");
+      const rows =
+        await sql`update bank_deposits set deleted_at = null where id = ${data.id} and deleted_at is not null returning id`;
+      if (rows.length === 0)
+        throw new Error("Không tìm thấy sổ tiết kiệm trong thùng rác");
     }
     return { restored: true };
   });
@@ -61,20 +67,28 @@ export const permanentlyDeleteTrashItem = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const sql = await requireTrashPin(data.pin);
 
-    if (data.kind === "TRANSACTION") {
-      const rows = await sql`select id from transactions where id = ${data.id} and deleted_at is not null`;
-      if (rows.length === 0) throw new Error("Không tìm thấy giao dịch trong thùng rác");
-      await sql`delete from tplus_matches where sell_tx_id = ${data.id} or buy_tx_id = ${data.id}`;
-      await sql`delete from transactions where id = ${data.id} and deleted_at is not null`;
-    } else if (data.kind === "CAPITAL") {
-      const rows = await sql`select id from capital_movements where id = ${data.id} and deleted_at is not null`;
-      if (rows.length === 0) throw new Error("Không tìm thấy dòng vốn trong thùng rác");
-      await sql`delete from capital_movements where id = ${data.id} and deleted_at is not null`;
-    } else {
-      const rows = await sql`select id from bank_deposits where id = ${data.id} and deleted_at is not null`;
-      if (rows.length === 0) throw new Error("Không tìm thấy sổ tiết kiệm trong thùng rác");
-      await sql`delete from bank_deposits where id = ${data.id} and deleted_at is not null`;
-    }
+    await sql.transaction(async (tx) => {
+      if (data.kind === "TRANSACTION") {
+        const rows =
+          await tx`select id from transactions where id = ${data.id} and deleted_at is not null`;
+        if (rows.length === 0)
+          throw new Error("Không tìm thấy giao dịch trong thùng rác");
+        await tx`delete from tplus_matches where sell_tx_id = ${data.id} or buy_tx_id = ${data.id}`;
+        await tx`delete from transactions where id = ${data.id} and deleted_at is not null`;
+      } else if (data.kind === "CAPITAL") {
+        const rows =
+          await tx`select id from capital_movements where id = ${data.id} and deleted_at is not null`;
+        if (rows.length === 0)
+          throw new Error("Không tìm thấy dòng vốn trong thùng rác");
+        await tx`delete from capital_movements where id = ${data.id} and deleted_at is not null`;
+      } else {
+        const rows =
+          await tx`select id from bank_deposits where id = ${data.id} and deleted_at is not null`;
+        if (rows.length === 0)
+          throw new Error("Không tìm thấy sổ tiết kiệm trong thùng rác");
+        await tx`delete from bank_deposits where id = ${data.id} and deleted_at is not null`;
+      }
+    });
 
     return { deleted: true };
   });

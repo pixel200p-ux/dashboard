@@ -2,7 +2,18 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 
 export function AppErrorComponent({ error }: ErrorComponentProps) {
-  const message = error.message || "An unexpected error occurred. Try reloading the page.";
+  const fallbackMessage = "An unexpected error occurred. Try reloading the page.";
+  const message =
+    error instanceof Error
+      ? error.message || fallbackMessage
+      : typeof error === "string" && error
+        ? error
+        : typeof error === "object" &&
+            error !== null &&
+            "message" in error &&
+            typeof error.message === "string"
+          ? error.message || fallbackMessage
+          : fallbackMessage;
   const databaseError = /DATABASE_URL|database|ENOTFOUND|Unauthorized|Supabase/i.test(message);
   return (
     <main

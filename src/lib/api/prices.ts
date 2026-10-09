@@ -6,9 +6,8 @@ import { todayVnYmd } from "@/engine/dates";
 import { resolveRefreshPrice } from "@/lib/market-refresh.js";
 import { buildMarketSourceStatus } from "@/lib/market-status.js";
 import { fetchFmarketDcdsNav } from "@/lib/api/fmarket";
+import { loadLedgerSnapshot } from "@/lib/api/load-snapshot";
 import { n } from "./map";
-import { mapAccount, mapAsset, mapBank, mapBankRate, mapCapital, mapFee, mapMatch, mapTx } from "./map";
-import type { LedgerSnapshot } from "@/engine/types";
 
 const COINGECKO: Record<string, string> = {
   BTC: "bitcoin",
@@ -36,33 +35,6 @@ const COINGECKO: Record<string, string> = {
   USDT: "tether",
   USDC: "usd-coin",
 };
-
-async function loadSnapshot(): Promise<LedgerSnapshot> {
-  const sql = await getSql();
-  const [accounts, assets, capital, transactions, matches, banks, bankRates, fees, meta] =
-    await Promise.all([
-      sql`select * from accounts order by id`,
-      sql`select * from assets order by symbol`,
-      sql`select * from capital_movements where deleted_at is null order by movement_date, created_at`,
-      sql`select * from transactions where deleted_at is null order by tx_date, created_at`,
-      sql`select * from tplus_matches`,
-      sql`select * from bank_deposits where deleted_at is null order by start_date`,
-      sql`select * from bank_rate_updates`,
-      sql`select * from fee_settings`,
-      sql`select value from app_meta where key = 'usd_vnd'`,
-    ]);
-  return {
-    accounts: accounts.map(mapAccount),
-    assets: assets.map(mapAsset),
-    capital: capital.map(mapCapital),
-    transactions: transactions.map(mapTx),
-    matches: matches.map(mapMatch),
-    banks: banks.map(mapBank),
-    bankRates: bankRates.map(mapBankRate),
-    fees: fees.map(mapFee),
-    usdVnd: meta[0] ? n((meta[0] as { value: string }).value) || 25000 : 25000,
-  };
-}
 
 async function fetchUsdVnd(): Promise<number | null> {
   try {
@@ -117,7 +89,7 @@ async function fetchVnStocks(symbols: string[]): Promise<Record<string, number>>
 }
 async function writeDailySnapshot(asOf: string) {
   const sql = await getSql();
-  const ledger = await loadSnapshot();
+  const ledger = await loadLedgerSnapshot();
   for (const a of ledger.assets) {
     if (a.currentPrice == null || a.currentPrice <= 0) continue;
     await sql`
@@ -140,7 +112,7 @@ export async function ensureDailyPriceSnapshot(): Promise<void> {
   const existing = await sql`select 1 from fx_snapshots where as_of = ${asOf} limit 1`;
   if (existing.length > 0) return;
 
-  const ledger = await loadSnapshot();
+  const ledger = await loadLedgerSnapshot();
   const usd = await fetchUsdVnd();
   if (usd && usd > 0) {
     await sql`
@@ -171,7 +143,7 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async () => {
     const sql = await getSql();
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     const notes: string[] = [];
     const status: Record<string, { ok: boolean; label: string; detail?: string }> = {};
 
@@ -238,6 +210,6 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
     }
     notes.push(`Đã cập nhật ${updated} mã`);
     await writeDailySnapshot(todayVnYmd());
-    const next = await loadSnapshot();
+    const next = await loadLedgerSnapshot();
     return { ledger: next, state: replayPortfolio(next), notes, status };
   });

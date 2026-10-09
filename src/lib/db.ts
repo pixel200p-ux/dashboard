@@ -27,8 +27,9 @@ export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
  *   const sql = await getSql();
  *   const rows = await sql`select * from todos where id = ${id}`; // parameterized
  *   const rows2 = await sql.query("select * from todos where id = $1", [id]);
+ *   await sql.transaction(async (tx) => { await tx`delete from todos`; });
  */
-export interface Sql {
+export interface SqlQuery {
   <T = Record<string, unknown>>(
     strings: TemplateStringsArray,
     ...values: unknown[]
@@ -37,6 +38,10 @@ export interface Sql {
     text: string,
     params?: unknown[],
   ): Promise<T[]>;
+}
+
+export interface Sql extends SqlQuery {
+  transaction<T>(run: (sql: SqlQuery) => Promise<T>): Promise<T>;
 }
 
 /**
@@ -72,19 +77,26 @@ const identity = (v: string) => v;
 type Run = <T>(text: string, params: unknown[]) => Promise<T[]>;
 
 /** Wrap a query runner in the tagged-template + `.query()` `Sql` surface. */
-function toSql(run: Run): Sql {
+function toSql(run: Run): SqlQuery {
   const sql = (async <T = Record<string, unknown>>(
     strings: TemplateStringsArray,
     ...values: unknown[]
   ): Promise<T[]> => {
     // Rebuild with $1, $2, … placeholders so values stay parameterized.
     let text = strings[0];
-    for (let i = 0; i < values.length; i += 1) text += `$${i + 1}${strings[i + 1]}`;
+    for (let i = 0; i < values.length; i += 1)
+      text += `$${i + 1}${strings[i + 1]}`;
     return run<T>(text, values);
-  }) as unknown as Sql;
-  sql.query = <T = Record<string, unknown>>(text: string, params: unknown[] = []) =>
-    run<T>(text, params);
+  }) as unknown as SqlQuery;
+  sql.query = <T = Record<string, unknown>>(
+    text: string,
+    params: unknown[] = [],
+  ) => run<T>(text, params);
   return sql;
+}
+
+function withTransaction(sql: SqlQuery, transaction: Sql["transaction"]): Sql {
+  return Object.assign(sql, { transaction });
 }
 
 function createNeonSql(): Promise<Sql> {
@@ -99,10 +111,38 @@ function createNeonSql(): Promise<Sql> {
       connectionString: databaseUrl,
       ssl: { rejectUnauthorized: databaseSslRejectUnauthorized },
     });
-    return toSql(async <T>(text: string, params: unknown[]) => {
-      const res = await pool.query(text, params);
-      return res.rows as T[];
-    });
+    return withTransaction(
+      toSql(async <T>(text: string, params: unknown[]) => {
+        const res = await pool.query(text, params);
+        return res.rows as T[];
+      }),
+      async <T>(runInTransaction: (tx: SqlQuery) => Promise<T>) => {
+        const client = await pool.connect();
+        try {
+          await client.query("begin");
+          const result = await runInTransaction(
+            toSql(async <TResult>(text: string, params: unknown[]) => {
+              const response = await client.query(text, params);
+              return response.rows as TResult[];
+            }),
+          );
+          await client.query("commit");
+          return result;
+        } catch (error) {
+          try {
+            await client.query("rollback");
+          } catch (rollbackError) {
+            console.error(
+              "[db] Postgres transaction rollback failed:",
+              rollbackError,
+            );
+          }
+          throw error;
+        } finally {
+          client.release();
+        }
+      },
+    );
   })().catch((err) => {
     globalRef.__pgSqlPromise__ = undefined;
     throw err;
@@ -151,7 +191,10 @@ async function createPgliteSql(): Promise<Sql> {
       "select name from _migrations",
     );
     const done = doneRows.rows.map((r) => r.name);
-    for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) {
+    for (const { name, path } of pendingMigrations(
+      Object.keys(migrations),
+      done,
+    )) {
       // Apply + record atomically (parity with scripts/migrate.mjs) so a failed
       // statement can't leave a file half-applied but untracked.
       await pg.transaction(async (tx) => {
@@ -166,10 +209,21 @@ async function createPgliteSql(): Promise<Sql> {
   globalRef.__pgliteMigrateChain__ = pass;
   await pass;
 
-  return toSql(async <T>(text: string, params: unknown[]) => {
-    const result = await pg.query<T>(text, params);
-    return result.rows;
-  });
+  return withTransaction(
+    toSql(async <T>(text: string, params: unknown[]) => {
+      const result = await pg.query<T>(text, params);
+      return result.rows;
+    }),
+    <T>(runInTransaction: (tx: SqlQuery) => Promise<T>) =>
+      pg.transaction((tx) =>
+        runInTransaction(
+          toSql(async <TResult>(text: string, params: unknown[]) => {
+            const result = await tx.query<TResult>(text, params);
+            return result.rows;
+          }),
+        ),
+      ),
+  );
 }
 
 let sqlPromise: Promise<Sql> | null = null;
@@ -204,9 +258,13 @@ export function getSql(): Promise<Sql> {
  * Lets Better Auth persist to the SAME embedded DB as app data in preview (via a
  * Kysely dialect). Throws when `DATABASE_URL` is set (that path uses Neon).
  */
-export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite> {
+export async function getPglite(): Promise<
+  import("@electric-sql/pglite").PGlite
+> {
   if (dbSource !== "pglite") {
-    throw new Error("getPglite() is only available on the PGLite fallback (no DATABASE_URL)");
+    throw new Error(
+      "getPglite() is only available on the PGLite fallback (no DATABASE_URL)",
+    );
   }
   await getSql();
   const pg = await globalRef.__pgliteInstance__;

@@ -1,65 +1,37 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { getSql, type Sql } from "@/lib/db";
+import { getSql, type SqlQuery } from "@/lib/db";
 import { replayOriginalByBucket, replayPortfolio } from "@/engine/replay";
 import { formatVnd } from "@/engine/money";
 import { replayBank } from "@/engine/bank";
 import { todayYmd } from "@/engine/dates";
 import { ensureDailyPriceSnapshot } from "@/lib/api/prices";
+import { loadLedgerSnapshot } from "@/lib/api/load-snapshot";
 import type { LedgerSnapshot, PortfolioState } from "@/engine/types";
-import {
-  mapAccount,
-  mapAsset,
-  mapBank,
-  mapBankRate,
-  mapCapital,
-  mapFee,
-  mapMatch,
-  mapTx,
-  n,
-} from "./map";
-
-async function loadSnapshot(): Promise<LedgerSnapshot> {
-  const sql = await getSql();
-  const [accounts, assets, capital, transactions, matches, banks, bankRates, fees, meta] =
-    await Promise.all([
-      sql`select * from accounts order by id`,
-      sql`select * from assets order by symbol`,
-      sql`select * from capital_movements where deleted_at is null order by movement_date, created_at`,
-      sql`select * from transactions where deleted_at is null order by tx_date, created_at`,
-      sql`select * from tplus_matches`,
-      sql`select * from bank_deposits where deleted_at is null order by start_date`,
-      sql`select * from bank_rate_updates`,
-      sql`select * from fee_settings`,
-      sql`select value from app_meta where key = 'usd_vnd'`,
-    ]);
-  return {
-    accounts: accounts.map(mapAccount),
-    assets: assets.map(mapAsset),
-    capital: capital.map(mapCapital),
-    transactions: transactions.map(mapTx),
-    matches: matches.map(mapMatch),
-    banks: banks.map(mapBank),
-    bankRates: bankRates.map(mapBankRate),
-    fees: fees.map(mapFee),
-    usdVnd: meta[0] ? n((meta[0] as { value: string }).value) || 25000 : 25000,
-  };
-}
 
 export type PortfolioPayload = {
   ledger: LedgerSnapshot;
   state: PortfolioState;
 };
 
-async function getTransactionMatchGroup(sql: Sql, transactionId: string): Promise<string[]> {
+async function getTransactionMatchGroup(
+  sql: SqlQuery,
+  transactionId: string,
+): Promise<string[]> {
   const matches = await sql<{ buy_tx_id: string; sell_tx_id: string }>`
     select buy_tx_id, sell_tx_id from tplus_matches
   `;
   const linkedById = new Map<string, Set<string>>();
   for (const match of matches) {
-    linkedById.set(match.buy_tx_id, (linkedById.get(match.buy_tx_id) ?? new Set()).add(match.sell_tx_id));
-    linkedById.set(match.sell_tx_id, (linkedById.get(match.sell_tx_id) ?? new Set()).add(match.buy_tx_id));
+    linkedById.set(
+      match.buy_tx_id,
+      (linkedById.get(match.buy_tx_id) ?? new Set()).add(match.sell_tx_id),
+    );
+    linkedById.set(
+      match.sell_tx_id,
+      (linkedById.get(match.sell_tx_id) ?? new Set()).add(match.buy_tx_id),
+    );
   }
 
   const group = new Set([transactionId]);
@@ -79,7 +51,7 @@ export const fetchPortfolio = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async (): Promise<PortfolioPayload> => {
     await ensureDailyPriceSnapshot();
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -94,13 +66,14 @@ const capitalSchema = z.object({
 export const saveCapital = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(capitalSchema)
-    .handler(async ({ data }) => {
+  .handler(async ({ data }) => {
     const sql = await getSql();
     const id = crypto.randomUUID();
     let notes = data.notes?.trim() ? data.notes.trim() : null;
     if (data.kind === "WITHDRAW") {
-      const current = await loadSnapshot();
-      const originalBefore = replayOriginalByBucket(current.capital)[data.bucket] ?? 0;
+      const current = await loadLedgerSnapshot();
+      const originalBefore =
+        replayOriginalByBucket(current.capital)[data.bucket] ?? 0;
       const excess = data.amount - originalBefore;
       if (excess > 0) {
         const core = `đã chốt lãi ${formatVnd(excess)}`;
@@ -111,7 +84,7 @@ export const saveCapital = createServerFn({ method: "POST" })
       insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
       values (${id}, ${data.kind}, ${data.amount}, ${data.movementDate}, ${notes}, ${data.bucket})
     `;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -120,9 +93,11 @@ export const deleteCapital = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
-    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
+    await (
+      await import("@/lib/auth/edit-pin.server")
+    ).requireEditPin(sql, data.pin);
     await sql`update capital_movements set deleted_at = now() where id = ${data.id}`;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -141,7 +116,9 @@ export const updateCapital = createServerFn({ method: "POST" })
   .validator(updateCapitalSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
-    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
+    await (
+      await import("@/lib/auth/edit-pin.server")
+    ).requireEditPin(sql, data.pin);
     const notes = data.notes?.trim() ? data.notes.trim() : null;
     await sql`
       update capital_movements set
@@ -151,7 +128,7 @@ export const updateCapital = createServerFn({ method: "POST" })
         bucket = ${data.bucket}
       where id = ${data.id} and deleted_at is null
     `;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -218,91 +195,112 @@ export const saveTransaction = createServerFn({ method: "POST" })
   .validator(txSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
-    if (data.createOriginalDeposit && (data.txType !== "BUY" || (data.assetType !== "DCDS" && data.assetType !== "ETF"))) {
+    if (
+      data.createOriginalDeposit &&
+      (data.txType !== "BUY" ||
+        (data.assetType !== "DCDS" && data.assetType !== "ETF"))
+    ) {
       throw new Error("Nạp vốn gốc chỉ áp dụng cho lệnh Buy DCDS hoặc ETF.");
     }
-    if (data.id) await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin ?? "");
+    if (data.id)
+      await (
+        await import("@/lib/auth/edit-pin.server")
+      ).requireEditPin(sql, data.pin ?? "");
     const symbol = data.symbol.trim().toUpperCase();
     const assetId = `${data.accountId}:${symbol}`;
-    await sql`
-      insert into assets (id, account_id, symbol, name, asset_type, currency, current_price, price_updated_at)
-      values (
-        ${assetId}, ${data.accountId}, ${symbol}, ${data.name?.trim() || symbol},
-        ${data.assetType}, ${data.currency}, ${data.currentPrice ?? data.price},
-        ${new Date().toISOString()}
-      )
-      on conflict (id) do update set
-        name = case when excluded.name <> excluded.symbol then excluded.name else assets.name end,
-        current_price = coalesce(excluded.current_price, assets.current_price)
-    `;
     const id = data.id ?? crypto.randomUUID();
-    if (data.id) {
-      await sql`delete from tplus_matches where sell_tx_id = ${id}`;
-      await sql`
-        update transactions set
-          account_id = ${data.accountId},
-          asset_id = ${assetId},
-          tx_type = ${data.txType},
-          tx_date = ${data.txDate},
-          quantity = ${data.quantity},
-          price = ${data.price},
-          amount = ${data.amount},
-          fee = ${data.fee},
-          tax = ${data.tax},
-          trade_tplus = ${data.tradeTplus},
-          fx_rate = ${data.fxRate},
-          dividend_per_share = ${data.dividendPerShare},
-          stock_div_qty = ${data.stockDivQty},
-          notes = ${data.notes ?? null}
-        where id = ${id}
-      `;
-    } else {
-      await sql`
-        insert into transactions (
-          id, account_id, asset_id, tx_type, tx_date, quantity, price, amount,
-          fee, tax, trade_tplus, fx_rate, dividend_per_share, stock_div_qty, notes
-        ) values (
-          ${id}, ${data.accountId}, ${assetId}, ${data.txType}, ${data.txDate},
-          ${data.quantity}, ${data.price}, ${data.amount}, ${data.fee}, ${data.tax},
-          ${data.tradeTplus}, ${data.fxRate}, ${data.dividendPerShare}, ${data.stockDivQty},
-          ${data.notes ?? null}
+    await sql.transaction(async (tx) => {
+      await tx`
+        insert into assets (id, account_id, symbol, name, asset_type, currency, current_price, price_updated_at)
+        values (
+          ${assetId}, ${data.accountId}, ${symbol}, ${data.name?.trim() || symbol},
+          ${data.assetType}, ${data.currency}, ${data.currentPrice ?? data.price},
+          ${new Date().toISOString()}
         )
+        on conflict (id) do update set
+          name = case when excluded.name <> excluded.symbol then excluded.name else assets.name end,
+          current_price = coalesce(excluded.current_price, assets.current_price)
       `;
-    }
-    for (const m of data.matches ?? []) {
-      await sql`
-        insert into tplus_matches (id, sell_tx_id, buy_tx_id, quantity)
-        values (${crypto.randomUUID()}, ${id}, ${m.buyTxId}, ${m.quantity})
-      `;
-    }
-    if (data.createOriginalDeposit) {
-      await sql`
-        insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
-        values (${crypto.randomUUID()}, 'DEPOSIT', ${data.amount}, ${data.txDate}, ${null}, ${data.assetType})
-      `;
-    }
-    const ledger = await loadSnapshot();
+      if (data.id) {
+        await tx`delete from tplus_matches where sell_tx_id = ${id}`;
+        await tx`
+          update transactions set
+            account_id = ${data.accountId},
+            asset_id = ${assetId},
+            tx_type = ${data.txType},
+            tx_date = ${data.txDate},
+            quantity = ${data.quantity},
+            price = ${data.price},
+            amount = ${data.amount},
+            fee = ${data.fee},
+            tax = ${data.tax},
+            trade_tplus = ${data.tradeTplus},
+            fx_rate = ${data.fxRate},
+            dividend_per_share = ${data.dividendPerShare},
+            stock_div_qty = ${data.stockDivQty},
+            notes = ${data.notes ?? null}
+          where id = ${id}
+        `;
+      } else {
+        await tx`
+          insert into transactions (
+            id, account_id, asset_id, tx_type, tx_date, quantity, price, amount,
+            fee, tax, trade_tplus, fx_rate, dividend_per_share, stock_div_qty, notes
+          ) values (
+            ${id}, ${data.accountId}, ${assetId}, ${data.txType}, ${data.txDate},
+            ${data.quantity}, ${data.price}, ${data.amount}, ${data.fee}, ${data.tax},
+            ${data.tradeTplus}, ${data.fxRate}, ${data.dividendPerShare}, ${data.stockDivQty},
+            ${data.notes ?? null}
+          )
+        `;
+      }
+      for (const m of data.matches ?? []) {
+        await tx`
+          insert into tplus_matches (id, sell_tx_id, buy_tx_id, quantity)
+          values (${crypto.randomUUID()}, ${id}, ${m.buyTxId}, ${m.quantity})
+        `;
+      }
+      if (data.createOriginalDeposit) {
+        await tx`
+          insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
+          values (${crypto.randomUUID()}, 'DEPOSIT', ${data.amount}, ${data.txDate}, ${null}, ${data.assetType})
+        `;
+      }
+    });
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
 export const deleteTransaction = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string(), pin: z.string(), cascade: z.boolean().optional() }))
+  .validator(
+    z.object({
+      id: z.string(),
+      pin: z.string(),
+      cascade: z.boolean().optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     const sql = await getSql();
-    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
+    await (
+      await import("@/lib/auth/edit-pin.server")
+    ).requireEditPin(sql, data.pin);
 
-    const matchGroup = data.cascade ? await getTransactionMatchGroup(sql, data.id) : [data.id];
-    await sql.query(
-      "delete from tplus_matches where sell_tx_id = any($1::text[]) or buy_tx_id = any($1::text[])",
-      [matchGroup],
-    );
-    await sql.query(
-      "update transactions set deleted_at = now() where id = any($1::text[]) and deleted_at is null",
-      [matchGroup],
-    );
+    await sql.transaction(async (tx) => {
+      const matchGroup = data.cascade
+        ? await getTransactionMatchGroup(tx, data.id)
+        : [data.id];
+      await tx.query(
+        "delete from tplus_matches where sell_tx_id = any($1::text[]) or buy_tx_id = any($1::text[])",
+        [matchGroup],
+      );
+      await tx.query(
+        "update transactions set deleted_at = now() where id = any($1::text[]) and deleted_at is null",
+        [matchGroup],
+      );
+    });
 
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -313,7 +311,8 @@ export const checkTxLinks = createServerFn({ method: "POST" })
     const sql = await getSql();
     const matchGroup = await getTransactionMatchGroup(sql, data.id);
     const linkedIds = matchGroup.filter((id) => id !== data.id);
-    if (linkedIds.length === 0) return { linkedCount: 0, linkedTransactions: [] };
+    if (linkedIds.length === 0)
+      return { linkedCount: 0, linkedTransactions: [] };
 
     const linkedTransactions = await sql.query<{
       id: string;
@@ -321,20 +320,24 @@ export const checkTxLinks = createServerFn({ method: "POST" })
       tx_date: string;
       quantity: number | string | null;
       symbol: string | null;
-    }>(`
+    }>(
+      `
       select t.id, t.tx_type, t.tx_date::text as tx_date, t.quantity, a.symbol
       from transactions t
       left join assets a on a.id = t.asset_id
       where t.id = any($1::text[]) and t.deleted_at is null
       order by t.tx_date, t.created_at
-    `, [linkedIds]);
+    `,
+      [linkedIds],
+    );
     return {
       linkedCount: linkedTransactions.length,
       linkedTransactions: linkedTransactions.map((transaction) => ({
         id: transaction.id,
         txType: transaction.tx_type,
         txDate: transaction.tx_date,
-        quantity: transaction.quantity == null ? null : Number(transaction.quantity),
+        quantity:
+          transaction.quantity == null ? null : Number(transaction.quantity),
         symbol: transaction.symbol,
       })),
     };
@@ -358,59 +361,81 @@ export const saveBank = createServerFn({ method: "POST" })
   .validator(bankSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
-    if (data.id) await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin ?? "");
+    if (data.id)
+      await (
+        await import("@/lib/auth/edit-pin.server")
+      ).requireEditPin(sql, data.pin ?? "");
     const id = data.id ?? crypto.randomUUID();
-    if (data.id) {
-      await sql`
-        update bank_deposits set
-          bank_name = ${data.bankName},
-          principal = ${data.principal},
-          start_date = ${data.startDate},
-          term_months = ${data.termMonths},
-          interest_rate = ${data.interestRate},
-          auto_rollover = ${data.autoRollover},
-          notes = ${data.notes ?? null}
-        where id = ${id} and status = 'ACTIVE'
-      `;
-    } else {
-      await sql`
-        insert into bank_deposits (
-          id, bank_name, principal, start_date, term_months, interest_rate, auto_rollover, notes
-        ) values (
-          ${id}, ${data.bankName}, ${data.principal}, ${data.startDate}, ${data.termMonths},
-          ${data.interestRate}, ${data.autoRollover}, ${data.notes ?? null}
-        )
-      `;
-    }
-    if (data.createOriginalDeposit) {
-      await sql`
-        insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
-        values (${crypto.randomUUID()}, 'DEPOSIT', ${data.principal}, ${data.startDate}, ${null}, 'BANK')
-      `;
-    }
-    const ledger = await loadSnapshot();
+    await sql.transaction(async (tx) => {
+      if (data.id) {
+        await tx`
+          update bank_deposits set
+            bank_name = ${data.bankName},
+            principal = ${data.principal},
+            start_date = ${data.startDate},
+            term_months = ${data.termMonths},
+            interest_rate = ${data.interestRate},
+            auto_rollover = ${data.autoRollover},
+            notes = ${data.notes ?? null}
+          where id = ${id} and status = 'ACTIVE'
+        `;
+      } else {
+        await tx`
+          insert into bank_deposits (
+            id, bank_name, principal, start_date, term_months, interest_rate, auto_rollover, notes
+          ) values (
+            ${id}, ${data.bankName}, ${data.principal}, ${data.startDate}, ${data.termMonths},
+            ${data.interestRate}, ${data.autoRollover}, ${data.notes ?? null}
+          )
+        `;
+      }
+      if (data.createOriginalDeposit) {
+        await tx`
+          insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
+          values (${crypto.randomUUID()}, 'DEPOSIT', ${data.principal}, ${data.startDate}, ${null}, 'BANK')
+        `;
+      }
+    });
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
 export const confirmBankRate = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ depositId: z.string(), periodNumber: z.number().int(), interestRate: z.number(), pin: z.string() }))
+  .validator(
+    z.object({
+      depositId: z.string(),
+      periodNumber: z.number().int(),
+      interestRate: z.number(),
+      pin: z.string(),
+    }),
+  )
   .handler(async ({ data }) => {
     const sql = await getSql();
-    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
+    await (
+      await import("@/lib/auth/edit-pin.server")
+    ).requireEditPin(sql, data.pin);
     await sql`
       insert into bank_rate_updates (id, deposit_id, period_number, interest_rate)
       values (${crypto.randomUUID()}, ${data.depositId}, ${data.periodNumber}, ${data.interestRate})
       on conflict (deposit_id, period_number) do update set interest_rate = excluded.interest_rate, confirmed_at = now()
     `;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
 /** Xác nhận lãi suất từ nhắc việc: đã đăng nhập nhưng không yêu cầu PIN. */
-export const confirmBankRateFromNotification = createServerFn({ method: "POST" })
+export const confirmBankRateFromNotification = createServerFn({
+  method: "POST",
+})
   .middleware([authMiddleware])
-  .validator(z.object({ depositId: z.string(), periodNumber: z.number().int(), interestRate: z.number() }))
+  .validator(
+    z.object({
+      depositId: z.string(),
+      periodNumber: z.number().int(),
+      interestRate: z.number(),
+    }),
+  )
   .handler(async ({ data }) => {
     const sql = await getSql();
     await sql`
@@ -418,7 +443,7 @@ export const confirmBankRateFromNotification = createServerFn({ method: "POST" }
       values (${crypto.randomUUID()}, ${data.depositId}, ${data.periodNumber}, ${data.interestRate})
       on conflict (deposit_id, period_number) do update set interest_rate = excluded.interest_rate, confirmed_at = now()
     `;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -427,8 +452,10 @@ export const redeemBank = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
-    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
-    const ledger = await loadSnapshot();
+    await (
+      await import("@/lib/auth/edit-pin.server")
+    ).requireEditPin(sql, data.pin);
+    const ledger = await loadLedgerSnapshot();
     const dep = ledger.banks.find((b) => b.id === data.id);
     if (!dep) throw new Error("Không tìm thấy sổ");
     const view = replayBank(
@@ -444,7 +471,7 @@ export const redeemBank = createServerFn({ method: "POST" })
         redeemed_interest = ${view.accumulatedInterest}
       where id = ${data.id}
     `;
-    const next = await loadSnapshot();
+    const next = await loadLedgerSnapshot();
     return { ledger: next, state: replayPortfolio(next) };
   });
 
@@ -453,9 +480,11 @@ export const deleteBank = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string(), pin: z.string() }))
   .handler(async ({ data }) => {
     const sql = await getSql();
-    await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
+    await (
+      await import("@/lib/auth/edit-pin.server")
+    ).requireEditPin(sql, data.pin);
     await sql`update bank_deposits set deleted_at = now() where id = ${data.id}`;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -479,7 +508,7 @@ export const saveFees = createServerFn({ method: "POST" })
         updated_at = now()
       where profile = ${data.profile}
     `;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -492,7 +521,7 @@ export const setAssetPrice = createServerFn({ method: "POST" })
       update assets set current_price = ${data.price}, price_updated_at = now()
       where id = ${data.assetId}
     `;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
 
@@ -505,6 +534,6 @@ export const setUsdVnd = createServerFn({ method: "POST" })
       insert into app_meta (key, value, updated_at) values ('usd_vnd', ${String(data.rate)}, now())
       on conflict (key) do update set value = excluded.value, updated_at = now()
     `;
-    const ledger = await loadSnapshot();
+    const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
