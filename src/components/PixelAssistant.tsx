@@ -681,8 +681,9 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     setDragging(true);
     clearDockTimer();
 
-    // Kéo icon → đóng khung nếu đang mở
+    // Consume the icon click after closing an open chat; otherwise its click toggles it open again.
     if (open) {
+      ignoreTriggerClick.current = true;
       setOpen(false);
       openRef.current = false;
     }
