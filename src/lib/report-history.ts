@@ -209,11 +209,18 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
 
 export function filterReportRows(
   rows: ReportRow[],
-  opts: { bucket: "ALL" | CapitalBucket; kind: "ALL" | ReportKind; from: string; to: string },
+  opts: {
+    bucket: "ALL" | CapitalBucket;
+    kind: "ALL" | ReportKind;
+    symbol: string;
+    from: string;
+    to: string;
+  },
 ): ReportRow[] {
   return rows.filter((r) => {
     if (opts.bucket !== "ALL" && r.bucket !== opts.bucket) return false;
     if (opts.kind !== "ALL" && r.kind !== opts.kind) return false;
+    if (opts.symbol !== "ALL" && r.symbol !== opts.symbol) return false;
     if (opts.from && r.date < opts.from) return false;
     if (opts.to && r.date > opts.to) return false;
     return true;

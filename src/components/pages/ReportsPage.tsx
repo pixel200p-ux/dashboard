@@ -81,13 +81,18 @@ export function ReportsPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ transaction: Transaction; symbol: string } | null>(null);
   const [bucket, setBucket] = useState<"ALL" | CapitalBucket>("ALL");
   const [kind, setKind] = useState<"ALL" | ReportKind>("ALL");
+  const [symbol, setSymbol] = useState("ALL");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
   const allRows = useMemo(() => (data ? buildReportRows(data.ledger, data.state.asOf) : []), [data]);
+  const reportSymbols = useMemo(
+    () => [...new Set(allRows.map((row) => row.symbol).filter((value) => value !== "—"))].sort((a, b) => a.localeCompare(b)),
+    [allRows],
+  );
   const rows = useMemo(
-    () => filterReportRows(allRows, { bucket, kind, from, to }),
-    [allRows, bucket, kind, from, to],
+    () => filterReportRows(allRows, { bucket, kind, symbol, from, to }),
+    [allRows, bucket, kind, symbol, from, to],
   );
 
   if (isPending || !data) return <Skeleton className="h-64" />;
@@ -176,7 +181,7 @@ export function ReportsPage() {
       <Card>
 
         <CardTitle>Lịch sử</CardTitle>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1">
             <Label>Danh mục</Label>
             <Select
@@ -191,6 +196,17 @@ export function ReportsPage() {
               value={kind}
               onValueChange={(v) => setKind(v as "ALL" | ReportKind)}
               options={REPORT_KINDS}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Mã</Label>
+            <Select
+              value={symbol}
+              onValueChange={setSymbol}
+              options={[
+                { value: "ALL", label: "All" },
+                ...reportSymbols.map((value) => ({ value, label: value })),
+              ]}
             />
           </div>
           <div className="space-y-1">
@@ -216,6 +232,7 @@ export function ReportsPage() {
             onClick={() => {
               setBucket("ALL");
               setKind("ALL");
+              setSymbol("ALL");
               setFrom("");
               setTo("");
             }}
