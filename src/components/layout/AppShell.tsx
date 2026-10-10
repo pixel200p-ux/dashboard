@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  NotebookPen,
   PieChart,
   RefreshCw,
   Settings,
@@ -39,6 +40,7 @@ import { NotificationFooter, NotifyBell } from "@/components/NotificationFooter"
 import { cn } from "@/lib/utils";
 import { InteractiveDragon } from "@/components/InteractiveDragon";
 import { EditPinDialog } from "@/components/EditPinDialog";
+import { SharedNotesCard } from "@/components/SharedNotesCard";
 
 const NAV_HOME = [{ to: "/", label: "Dashboard", icon: LayoutDashboard }] as const;
 
@@ -78,6 +80,7 @@ export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobile, setMobile] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const theme = useUiStore((s) => s.theme);
   const cardOpacity = useUiStore((s) => s.cardOpacity);
   const currency = useUiStore((s) => s.currency);
@@ -106,6 +109,16 @@ export function AppShell() {
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || !event.altKey || event.ctrlKey || event.metaKey || event.code !== "Digit1") return;
+      event.preventDefault();
+      setNotesOpen((open) => !open);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   if (isPending) return <LoginScreen />;
@@ -301,6 +314,17 @@ export function AppShell() {
 
                 <NotifyBell />
 
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setNotesOpen(true)}
+                  title="Ghi chú chung · Alt+1"
+                  aria-label="Mở ghi chú chung"
+                  className={cn(pathname.startsWith("/profile") && "bg-background/80")}
+                >
+                  <NotebookPen className="h-4 w-4" />
+                </Button>
+
                 <Button size="icon" variant="outline" onClick={toggleTheme} title="Theme" className={cn(pathname.startsWith("/profile") && "bg-background/80")}>
                   {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
@@ -331,6 +355,7 @@ export function AppShell() {
       </div>
 
       <PixelAssistant portfolio={portfolio} />
+      <SharedNotesCard open={notesOpen} onOpenChange={setNotesOpen} />
 
       <TxDialog />
       <CapitalDialog />

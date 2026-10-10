@@ -404,7 +404,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   });
 
   const openRef = useRef(open);
-  const dockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragOrigin = useRef<{ x: number; y: number; pointerX: number; pointerY: number } | null>(null);
   const dragged = useRef(false);
@@ -567,11 +566,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       openRef.current = next;
       setOpen(next);
       setUnread(false);
-      if (next) {
-        clearDockTimer();
-      } else {
-        resetDockTimer();
-      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -622,35 +616,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, sending, open]);
 
-  function clearDockTimer() {
-    if (dockTimer.current) {
-      clearTimeout(dockTimer.current);
-      dockTimer.current = null;
-    }
-  }
-
-  function resetDockTimer() {
-    clearDockTimer();
-    // Chỉ nép 10% khi khung chat ĐANG ĐÓNG
-    if (openRef.current) return;
-    dockTimer.current = setTimeout(() => {
-      if (openRef.current) return; // vẫn đang mở thì bỏ qua
-      setPosition((current) => {
-        const maxX = Math.max(0, window.innerWidth - BUTTON_SIZE);
-        return {
-          x: current.x + BUTTON_SIZE / 2 < window.innerWidth / 2
-            ? -BUTTON_SIZE * 0.1
-            : maxX + BUTTON_SIZE * 0.1,
-          y: Math.min(Math.max(current.y, 16), window.innerHeight - BUTTON_SIZE - 16),
-        };
-      });
-    }, 5000); // 5 giây không đụng → nép 10%
-  }
-
   useEffect(() => {
-    resetDockTimer();
     return () => {
-      if (dockTimer.current) clearTimeout(dockTimer.current);
       if (notificationTimer.current) clearTimeout(notificationTimer.current);
     };
   }, []);
@@ -667,7 +634,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       }
       setOpen(false);
       openRef.current = false;
-      resetDockTimer();
     };
     window.addEventListener("pointerdown", handlePointerDownOutside);
     return () => window.removeEventListener("pointerdown", handlePointerDownOutside);
@@ -679,7 +645,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     dragOrigin.current = { x: position.x, y: position.y, pointerX: event.clientX, pointerY: event.clientY };
     dragged.current = false;
     setDragging(true);
-    clearDockTimer();
 
     // Consume the icon click after closing an open chat; otherwise its click toggles it open again.
     if (open) {
@@ -720,7 +685,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
       };
     });
 
-    resetDockTimer();
   }
 
   async function sendMessage(text: string) {
@@ -1004,7 +968,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                   left: panelLeft,
                   willChange: "width, height, top, left",
                 }}
-                onPointerDown={() => resetDockTimer()}
                 aria-label="Trò chuyện với Pixel"
               >
 
@@ -1023,7 +986,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
                 onClick={() => {
                   openRef.current = false;
                   setOpen(false);
-                  resetDockTimer();
                 }}
                 className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label="Đóng Pixel"
@@ -1166,11 +1128,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
           openRef.current = willOpen;
           setOpen(willOpen);
           setUnread(false);
-          if (willOpen) {
-            clearDockTimer(); // đang mở → không nép
-          } else {
-            resetDockTimer(); // đóng → sau 5s mới nép 10%
-          }
         }}
         className={cn(
           "fixed grid h-16 w-16 touch-none place-items-center rounded-full border-0 bg-transparent p-0 text-primary shadow-none transition-transform hover:scale-105 hover:shadow-none",
