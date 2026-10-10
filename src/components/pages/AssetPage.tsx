@@ -315,6 +315,8 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
           );
         }
 
+        openLots.sort((a, b) => b.txDate.localeCompare(a.txDate) || b.createdAt.localeCompare(a.createdAt));
+
         const totalQty = openLots.reduce((s, b) => s + b.remaining, 0);
         const totalCost = openLots.reduce((s, b) => s + b.remaining * (b.price || 0), 0);
         const avgCost = totalQty > 0 ? totalCost / totalQty : 0;

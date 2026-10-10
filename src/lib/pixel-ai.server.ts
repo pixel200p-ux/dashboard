@@ -2,13 +2,14 @@ import type { AIKeyProvider } from "@/lib/pixel-store";
 import type { PixelWebSource } from "@/lib/pixel-search.server";
 
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta";
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.8-flash";
 const OPENAI_COMPATIBLE: Record<Exclude<AIKeyProvider, "gemini">, { endpoint: string; model: string }> = {
-  groq: { endpoint: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile" },
+  groq: { endpoint: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b" },
   openrouter: { endpoint: "https://openrouter.ai/api/v1", model: "openai/gpt-4o-mini" },
 };
 
 type ApiError = { error?: { message?: string } };
+type CompatibleModelsResponse = { data?: { id?: string }[] };
 type GeminiResponse = ApiError & {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 };
@@ -32,11 +33,33 @@ export async function checkAIKey(provider: AIKeyProvider, value: string): Promis
   const config = configFor(provider);
   const response = config
     ? await fetch(`${config.endpoint}/models`, { headers: { Authorization: `Bearer ${value}` } })
-    : await fetch(`${GEMINI_API}/models?pageSize=1`, { headers: { "x-goog-api-key": value } });
-  if (response.ok) return true;
-  if ([400, 401, 403].includes(response.status)) return false;
+    : await fetch(`${GEMINI_API}/models/${GEMINI_MODEL}`, { headers: { "x-goog-api-key": value } });
+  if (response.ok) {
+    if (!config) return true;
+    const result = await parseJson<CompatibleModelsResponse>(response);
+    if (!Array.isArray(result.data)) {
+      throw new Error(`${provider} không trả về danh sách model hợp lệ`);
+    }
+    if (!result.data.some((model) => model.id === config.model)) {
+      throw new Error(`${provider} không có model ${config.model} khả dụng cho key này`);
+    }
+    return true;
+  }
+  if (response.status === 404 && !config) {
+    throw new Error(`Gemini không có model ${GEMINI_MODEL} khả dụng cho key này`);
+  }
+  if ([400, 401, 403, 404].includes(response.status)) return false;
   const body = (await response.json().catch(() => null)) as ApiError | null;
   throw new Error(body?.error?.message || `${provider} trả về lỗi ${response.status}`);
+}
+
+function truncateText(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
+}
+
+function isContextLimitError(status: number, message: string | undefined): boolean {
+  return status === 413
+    || /prompt tokens?.*(?:limit|exceed)|(?:context|token).*(?:limit|length|exceed)|(?:limit|exceed).*(?:context|token)/i.test(message ?? "");
 }
 
 function explicitlyRequestsMemory(prompt: string): boolean {
@@ -145,7 +168,7 @@ export async function askWithKeys({
         message = result.error?.message;
       } else {
         const config = OPENAI_COMPATIBLE[key.provider];
-        response = await fetch(`${config.endpoint}/chat/completions`, {
+        const request = (system: string, messages: PixelHistoryMessage[]) => fetch(`${config.endpoint}/chat/completions`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${key.value}`,
@@ -157,8 +180,8 @@ export async function askWithKeys({
           body: JSON.stringify({
             model: config.model,
             messages: [
-              { role: "system", content: instruction },
-              ...history.slice(-12).map((item) => ({
+              { role: "system", content: system },
+              ...messages.map((item) => ({
                 role: item.role === "pixel" ? "assistant" : "user",
                 content: item.content,
               })),
@@ -167,7 +190,31 @@ export async function askWithKeys({
             max_tokens: 700,
           }),
         });
-        const result = await parseJson<ChatResponse>(response);
+        response = await request(instruction, history.slice(-12));
+        let result = await parseJson<ChatResponse>(response);
+        if (
+          key.provider === "openrouter"
+          && !response.ok
+          && isContextLimitError(response.status, result.error?.message)
+        ) {
+          const compactInstruction = systemInstruction({
+            portfolioContext: truncateText(portfolioContextForPrompt, 2_500),
+            mandatoryRules: truncateText(mandatoryRules, 1_500),
+            memories: truncateText(memories, 500),
+            requestMemorySuggestion,
+            webSources: webSources.slice(0, 2).map((source) => ({
+              ...source,
+              content: truncateText(source.content, 400),
+            })),
+            webSearchPerformed,
+          });
+          const compactHistory = [
+            ...history.slice(-3, -1).map((item) => ({ ...item, content: truncateText(item.content, 400) })),
+            { role: "user" as const, content: prompt },
+          ];
+          response = await request(compactInstruction, compactHistory);
+          result = await parseJson<ChatResponse>(response);
+        }
         answer = result.choices?.[0]?.message?.content?.trim() ?? undefined;
         message = result.error?.message;
       }
@@ -184,7 +231,7 @@ export async function askWithKeys({
           ...(memorySuggestion ? { memorySuggestion } : {}),
         };
       }
-      if ([400, 401, 403].includes(response.status)) {
+      if ([401, 403].includes(response.status)) {
         await onKeyStatus(key.id, false);
       }
       failures.push(`${key.name} (${key.provider}): ${message || `lỗi ${response.status}`}`);
