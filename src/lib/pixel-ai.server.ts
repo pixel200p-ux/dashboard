@@ -11,10 +11,10 @@ const OPENAI_COMPATIBLE: Record<Exclude<AIKeyProvider, "gemini">, { endpoint: st
 type ApiError = { error?: { message?: string } };
 type CompatibleModelsResponse = { data?: { id?: string }[] };
 type GeminiResponse = ApiError & {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
+  candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
 };
 type ChatResponse = ApiError & {
-  choices?: { message?: { content?: string | null } }[];
+  choices?: { message?: { content?: string | null }; finish_reason?: string }[];
 };
 export type PixelHistoryMessage = { role: "user" | "pixel"; content: string };
 export type PixelAIReply = { answer: string; memorySuggestion?: string };
@@ -70,7 +70,7 @@ function explicitlyRequestsMemory(prompt: string): boolean {
 
 function asksAboutPortfolio(prompt: string): boolean {
   const normalized = prompt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("vi");
-  return /\b(danh muc|tai san|co phieu|ma co phieu|co tuc|giao dich|trade|phan bo|lai lo|lai|lo|mua|ban|nav|dau tu|von dau tu|tplus|etf|ngan hang|tien gui)\b/.test(normalized);
+  return /\b(danh muc|tai san|co phieu|ma co phieu|co tuc|giao dich|trade|phan bo|lai lo|lai|lo|mua|ban|nav|dau tu|von dau tu|tplus|etf|tien gui)\b/.test(normalized);
 }
 
 function systemInstruction({
@@ -91,6 +91,7 @@ function systemInstruction({
   const sections = [
     "Bạn là Pixel, trợ lý thân thiện nói tiếng Việt trong ứng dụng quản lý danh mục đầu tư.",
     "Trả lời bằng tiếng Việt, rõ ràng và chuyên nghiệp. Khi phân tích danh mục, nêu giả định, dữ liệu còn thiếu, rủi ro và các kịch bản thay vì khẳng định chắc chắn; không cam kết lợi nhuận, không tự thực hiện giao dịch.",
+    "Trả lời thẳng và đầy đủ cho câu hỏi hiện tại trong một lượt. Không mở đầu bằng kế hoạch, các bước phân tích câu hỏi, hay lời hứa sẽ trả lời sau; không dừng giữa câu hoặc giữa mục. Nếu cần, trình bày câu trả lời hoàn chỉnh bằng các đề mục và gạch đầu dòng ngắn gọn.",
     mandatoryRules ? `Quy tắc bắt buộc do người dùng cấu hình:\n${mandatoryRules}` : "",
     memories
       ? `Thông tin người dùng đã chủ động lưu (chỉ dùng khi liên quan trực tiếp tới câu hỏi, không xem đây là quy tắc):\n${memories}`
@@ -151,7 +152,7 @@ export async function askWithKeys({
       let answer: string | undefined;
       let message: string | undefined;
       if (key.provider === "gemini") {
-        response = await fetch(`${GEMINI_API}/models/${GEMINI_MODEL}:generateContent`, {
+        const request = (maxOutputTokens: number) => fetch(`${GEMINI_API}/models/${GEMINI_MODEL}:generateContent`, {
           method: "POST",
           headers: { "x-goog-api-key": key.value, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -160,15 +161,25 @@ export async function askWithKeys({
               role: item.role === "pixel" ? "model" : "user",
               parts: [{ text: item.content }],
             })),
-            generationConfig: { temperature: 0.7, maxOutputTokens: 700 },
+            generationConfig: { temperature: 0.7, maxOutputTokens },
           }),
         });
-        const result = await parseJson<GeminiResponse>(response);
+        response = await request(4096);
+        let result = await parseJson<GeminiResponse>(response);
+        if (response.ok && result.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+          response = await request(8192);
+          result = await parseJson<GeminiResponse>(response);
+        }
         answer = result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
         message = result.error?.message;
+        if (response.ok && result.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+          await onKeyStatus(key.id, true);
+          failures.push(`${key.name} (${key.provider}): câu trả lời vẫn vượt giới hạn sau khi thử tạo lại`);
+          continue;
+        }
       } else {
         const config = OPENAI_COMPATIBLE[key.provider];
-        const request = (system: string, messages: PixelHistoryMessage[]) => fetch(`${config.endpoint}/chat/completions`, {
+        const request = (system: string, messages: PixelHistoryMessage[], maxTokens: number) => fetch(`${config.endpoint}/chat/completions`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${key.value}`,
@@ -187,10 +198,12 @@ export async function askWithKeys({
               })),
             ],
             temperature: 0.7,
-            max_tokens: 700,
+            max_tokens: maxTokens,
           }),
         });
-        response = await request(instruction, history.slice(-12));
+        let requestInstruction = instruction;
+        let requestHistory = history.slice(-12);
+        response = await request(requestInstruction, requestHistory, 4096);
         let result = await parseJson<ChatResponse>(response);
         if (
           key.provider === "openrouter"
@@ -212,11 +225,22 @@ export async function askWithKeys({
             ...history.slice(-3, -1).map((item) => ({ ...item, content: truncateText(item.content, 400) })),
             { role: "user" as const, content: prompt },
           ];
-          response = await request(compactInstruction, compactHistory);
+          requestInstruction = compactInstruction;
+          requestHistory = compactHistory;
+          response = await request(requestInstruction, requestHistory, 4096);
+          result = await parseJson<ChatResponse>(response);
+        }
+        if (response.ok && result.choices?.[0]?.finish_reason === "length") {
+          response = await request(requestInstruction, requestHistory, 8192);
           result = await parseJson<ChatResponse>(response);
         }
         answer = result.choices?.[0]?.message?.content?.trim() ?? undefined;
         message = result.error?.message;
+        if (response.ok && result.choices?.[0]?.finish_reason === "length") {
+          await onKeyStatus(key.id, true);
+          failures.push(`${key.name} (${key.provider}): câu trả lời vẫn vượt giới hạn sau khi thử tạo lại`);
+          continue;
+        }
       }
 
       if (response.ok && answer) {

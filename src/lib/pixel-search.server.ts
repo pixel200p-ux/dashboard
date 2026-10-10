@@ -34,12 +34,21 @@ export function isWebSearchNeeded(prompt: string): boolean {
   const asksAboutUpcomingDividend = asksDividend && /(sap toi|thong tin|phat hanh|chia|lich|ngay|khi nao|co khong|du kien)/.test(normalized);
   const asksCurrentMarketNews = /(tin tuc|thong tin|hien nay|moi nhat|hom nay)/.test(normalized)
     && /(thi truong|co phieu|doanh nghiep|ma chung khoan|gia|kinh te)/.test(normalized);
-  return explicitlyAsksWeb || asksAboutUpcomingDividend || asksCurrentMarketNews;
+  const asksCurrentRates = /(hien tai|hien nay|moi nhat|hom nay|cap nhat)/.test(normalized)
+    && /(lai suat|ty gia|usd|ngoai te|lai vay|tien gui)/.test(normalized);
+  return explicitlyAsksWeb || asksAboutUpcomingDividend || asksCurrentMarketNews || asksCurrentRates;
 }
 
 export function buildPixelSearchQuery(prompt: string, symbols: string[]): string {
   const normalized = prompt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("vi");
   const tickers = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))].slice(0, 40);
+  if (/(lai suat|ty gia|usd|ngoai te|lai vay|tien gui)/.test(normalized)) {
+    return [
+      "Việt Nam lãi suất tiền gửi ngân hàng hiện nay mới nhất",
+      "tỷ giá USD VND hôm nay tại các ngân hàng Việt Nam",
+      `Câu hỏi: ${prompt}`,
+    ].join(". ").slice(0, 1200);
+  }
   if (/(co tuc|chia co phieu|phat hanh them|chot quyen)/.test(normalized)) {
     return [
       "Việt Nam thông báo cổ tức tiền mặt cổ tức cổ phiếu phát hành thêm ngày đăng ký cuối cùng ngày giao dịch không hưởng quyền sắp tới",
