@@ -6,11 +6,12 @@ import { Select } from "@/components/ui/select";
 import { useUiStore } from "@/lib/ui-store";
 import { usePortfolioMutation } from "@/lib/use-portfolio";
 import { saveCapital, updateCapital } from "@/lib/api/portfolio";
-import { parseVndAmount, formatThousandsInput } from "@/engine/money";
+import { formatUsd, parseDecimal, parseVndAmount, formatThousandsInput } from "@/engine/money";
 import { todayYmd } from "@/engine/dates";
 import type { CapitalBucket } from "@/engine/types";
 import { useEffect, useState } from "react";
 import { askEditPin } from "@/lib/edit-pin";
+import { usePortfolio } from "@/lib/use-portfolio";
 
 const BUCKETS: { value: CapitalBucket; label: string }[] = [
   { value: "DCDS", label: "DCDS" },
@@ -26,12 +27,15 @@ export function CapitalDialog() {
   const edit = useUiStore((s) => s.capitalEdit);
   const close = useUiStore((s) => s.closeCapital);
   const openTx = useUiStore((s) => s.openTx);
+  const { data } = usePortfolio();
   const [amount, setAmount] = useState("");
+  const [fxRate, setFxRate] = useState("");
   const [date, setDate] = useState(todayYmd());
   const [notes, setNotes] = useState("");
   const [bucket, setBucket] = useState<CapitalBucket | "">("");
 
   const isEdit = Boolean(edit?.id);
+  const parsedFxRate = parseDecimal(fxRate);
 
   const createMut = usePortfolioMutation(
     (d: Parameters<typeof saveCapital>[0]) => saveCapital(d),
@@ -47,16 +51,18 @@ export function CapitalDialog() {
     if (!kind) return;
     if (edit) {
       setAmount(String(Math.round(edit.amount)));
+      setFxRate(edit.fxRate != null ? String(edit.fxRate) : String(data?.state.usdVnd ?? 25000));
       setDate(edit.movementDate);
       setNotes(edit.notes ?? "");
       setBucket(edit.bucket);
     } else {
       setAmount("");
+      setFxRate(String(data?.state.usdVnd ?? 25000));
       setNotes("");
       setDate(todayYmd());
       setBucket("");
     }
-  }, [kind, edit]);
+  }, [kind, edit, data?.state.usdVnd]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,6 +71,7 @@ export function CapitalDialog() {
     if (v <= 0) return;
 
     if (!bucket) return;
+    if (bucket === "CRYPTO" && parsedFxRate <= 0) return;
     if (isEdit && edit) {
       const pin = await askEditPin();
       if (!pin) return;
@@ -74,6 +81,7 @@ export function CapitalDialog() {
             id: edit.id,
             pin,
             amount: v,
+            fxRate: bucket === "CRYPTO" ? parsedFxRate : null,
             movementDate: date,
             notes: notes || undefined,
             bucket,
@@ -85,7 +93,7 @@ export function CapitalDialog() {
     }
 
     createMut.mutate(
-      { data: { kind, amount: v, movementDate: date, notes: notes || undefined, bucket } },
+      { data: { kind, amount: v, fxRate: bucket === "CRYPTO" ? parsedFxRate : null, movementDate: date, notes: notes || undefined, bucket } },
       { onSuccess: () => close() },
     );
   }
@@ -97,6 +105,7 @@ export function CapitalDialog() {
       return;
     }
     setBucket(next);
+    if (next === "CRYPTO" && !fxRate) setFxRate(String(data?.state.usdVnd ?? 25000));
   }
 
   const title = isEdit
@@ -128,6 +137,22 @@ export function CapitalDialog() {
               required
             />
           </div>
+          {bucket === "CRYPTO" && (
+            <>
+              <div className="space-y-1">
+                <Label>Tỷ giá (VND/USD)</Label>
+                <Input
+                  value={fxRate}
+                  onChange={(e) => setFxRate(formatThousandsInput(e.target.value))}
+                  placeholder="25,000"
+                  required
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Tương đương {formatUsd(parsedFxRate > 0 ? parseVndAmount(amount) / parsedFxRate : 0)} · tỷ giá được lưu cùng giao dịch vốn gốc.
+              </p>
+            </>
+          )}
           <div className="space-y-1">
             <Label>Ngày</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

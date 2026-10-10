@@ -58,6 +58,7 @@ export const fetchPortfolio = createServerFn({ method: "GET" })
 const capitalSchema = z.object({
   kind: z.enum(["DEPOSIT", "WITHDRAW"]),
   amount: z.number().positive(),
+  fxRate: z.number().positive().nullable().optional(),
   movementDate: z.string(),
   notes: z.string().optional(),
   bucket: z.enum(["DCDS", "ETF", "VPS", "SSI", "CRYPTO", "BANK"]),
@@ -67,6 +68,9 @@ export const saveCapital = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(capitalSchema)
   .handler(async ({ data }) => {
+    if (data.bucket === "CRYPTO" && !(data.fxRate && data.fxRate > 0)) {
+      throw new Error("Vui lòng nhập tỷ giá VND/USD cho vốn Crypto.");
+    }
     const sql = await getSql();
     const id = crypto.randomUUID();
     let notes = data.notes?.trim() ? data.notes.trim() : null;
@@ -81,8 +85,8 @@ export const saveCapital = createServerFn({ method: "POST" })
       }
     }
     await sql`
-      insert into capital_movements (id, kind, amount, movement_date, notes, bucket)
-      values (${id}, ${data.kind}, ${data.amount}, ${data.movementDate}, ${notes}, ${data.bucket})
+      insert into capital_movements (id, kind, amount, fx_rate, movement_date, notes, bucket)
+      values (${id}, ${data.kind}, ${data.amount}, ${data.bucket === "CRYPTO" ? data.fxRate : null}, ${data.movementDate}, ${notes}, ${data.bucket})
     `;
     const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
@@ -105,6 +109,7 @@ const updateCapitalSchema = z.object({
   id: z.string(),
   pin: z.string(),
   amount: z.number().positive(),
+  fxRate: z.number().positive().nullable().optional(),
   movementDate: z.string(),
   notes: z.string().optional(),
   bucket: z.enum(["DCDS", "ETF", "VPS", "SSI", "CRYPTO", "BANK"]),
@@ -115,6 +120,9 @@ export const updateCapital = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(updateCapitalSchema)
   .handler(async ({ data }) => {
+    if (data.bucket === "CRYPTO" && !(data.fxRate && data.fxRate > 0)) {
+      throw new Error("Vui lòng nhập tỷ giá VND/USD cho vốn Crypto.");
+    }
     const sql = await getSql();
     await (
       await import("@/lib/auth/edit-pin.server")
@@ -123,6 +131,7 @@ export const updateCapital = createServerFn({ method: "POST" })
     await sql`
       update capital_movements set
         amount = ${data.amount},
+        fx_rate = ${data.bucket === "CRYPTO" ? data.fxRate : null},
         movement_date = ${data.movementDate},
         notes = ${notes},
         bucket = ${data.bucket}

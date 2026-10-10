@@ -161,12 +161,36 @@ export function replayOriginalByBucket(capital: CapitalMovement[]): Record<Capit
   }
   return o;
 }
+
+export function replayOriginalByBucketUsd(
+  capital: CapitalMovement[],
+  fallbackRate: number,
+): Record<CapitalBucket, number> {
+  const original = emptyBuckets();
+  const rows = capital
+    .filter((c) => !c.deletedAt)
+    .slice()
+    .sort(
+      (a, b) =>
+        a.movementDate.localeCompare(b.movementDate) ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.id.localeCompare(b.id),
+    );
+  for (const c of rows) {
+    if (!(c.bucket in original)) continue;
+    const amount = c.bucket === "CRYPTO" ? c.amount / (c.fxRate ?? fallbackRate) : c.amount;
+    if (c.kind === "DEPOSIT") original[c.bucket] += amount;
+    else original[c.bucket] = Math.max(0, original[c.bucket] - amount);
+  }
+  return original;
+}
 /**
  * Shared Calculation Engine. UI must never compute P&L / holdings itself.
  * Replay is deterministic from the ledger (soft-deleted rows excluded).
  */
 export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): PortfolioState {
     const originalByBucket = replayOriginalByBucket(ledger.capital);
+  const originalByBucketUsd = replayOriginalByBucketUsd(ledger.capital, ledger.usdVnd);
   const originalCapital = CAPITAL_BUCKETS.reduce((s, b) => s + originalByBucket[b], 0);
 
   const assets = new Map(ledger.assets.map((a) => [a.id, a]));
@@ -478,6 +502,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     asOf,
   originalCapital,
     originalByBucket,
+    originalByBucketUsd,
     nav,
     navByBucket,
     tplusByBucket,

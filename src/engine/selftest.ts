@@ -43,6 +43,7 @@ export function runTplusSpecExample(): string[] {
         id: "c1",
         kind: "DEPOSIT",
         amount: 30_000_000,
+        fxRate: null,
         movementDate: "2026-01-01",
         bucket: "VPS",
         notes: null,
@@ -116,6 +117,25 @@ export function runTplusSpecExample(): string[] {
     if (Math.abs(h.tplusProfitCompleted - 180000) > 0.51) errors.push(`tplus profit ${h.tplusProfitCompleted}`);
   }
   if (closed.originalCapital !== 30_000_000) errors.push("original capital mutated");
+
+  const cryptoOriginal = replayPortfolio(
+    {
+      ...ledger,
+      capital: [
+        {
+          ...ledger.capital[0],
+          id: "crypto-capital",
+          amount: 2_000_000,
+          fxRate: 20_000,
+          bucket: "CRYPTO",
+        },
+      ],
+    },
+    "2026-01-13",
+  );
+  if (cryptoOriginal.originalByBucketUsd.CRYPTO !== 100) {
+    errors.push(`crypto original USD ${cryptoOriginal.originalByBucketUsd.CRYPTO} != 100`);
+  }
 
   ledger.transactions.push(
     tx({

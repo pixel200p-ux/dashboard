@@ -9,6 +9,7 @@ import { formatViDate } from "@/engine/dates";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { signedClass } from "@/engine/money";
 import { displayMoney } from "@/lib/display";
+import { formatUsd } from "@/engine/money";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import { deleteCapital } from "@/lib/api/portfolio";
@@ -175,7 +176,9 @@ export function DashboardPage() {
                   </span>
                   <span className={`shrink-0 font-mono tabular-nums ${c.kind === "DEPOSIT" ? "text-profit" : "text-loss"}`}>
                     {c.kind === "DEPOSIT" ? "+" : "−"}
-                    {displayMoney(c.amount, currency, usd)}
+                    {c.bucket === "CRYPTO" && currency === "USD"
+                      ? formatUsd(c.amount / (c.fxRate ?? usd))
+                      : displayMoney(c.amount, currency, usd)}
                   </span>
                   <div className="flex shrink-0 gap-0.5">
                     <Button
@@ -189,6 +192,7 @@ export function DashboardPage() {
                           id: c.id,
                           kind: c.kind,
                           amount: c.amount,
+                          fxRate: c.fxRate,
                           movementDate: c.movementDate,
                           notes: c.notes,
                           bucket: c.bucket,

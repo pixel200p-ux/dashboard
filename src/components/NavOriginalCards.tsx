@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { formatPct } from "@/engine/money";
+import { formatPct, formatUsd } from "@/engine/money";
 import { displayMoney } from "@/lib/display";
 import { useUiStore } from "@/lib/ui-store";
 
@@ -9,16 +9,20 @@ export function NavOriginalCard({
   nav,
   original,
   usdVnd,
+  originalUsd,
 }: {
   title: string;
   originalLabel: string;
   nav: number;
   original: number;
   usdVnd: number;
+  originalUsd?: number;
 }) {
   const currency = useUiStore((s) => s.currency);
+  const originalForDisplay =
+    currency === "USD" && originalUsd != null ? originalUsd * usdVnd : original;
   const barPct =
-    original > 0 ? Math.min(100, (nav / original) * 100) : nav > 0 ? 100 : 0;
+    originalForDisplay > 0 ? Math.min(100, (nav / originalForDisplay) * 100) : nav > 0 ? 100 : 0;
 
   return (
     <Card className="flex flex-col p-4">
@@ -36,7 +40,9 @@ export function NavOriginalCard({
         <div className="min-w-0 flex-1 text-right">
           <p className="text-[11px] text-muted-foreground">{originalLabel}</p>
           <p className="truncate font-mono text-sm font-medium tabular-nums text-muted-foreground">
-            {displayMoney(original, currency, usdVnd)}
+            {currency === "USD" && originalUsd != null
+              ? formatUsd(originalUsd)
+              : displayMoney(original, currency, usdVnd)}
           </p>
         </div>
       </div>
@@ -52,7 +58,7 @@ export function NavOriginalCard({
         <span>Tỷ lệ NAV trên vốn gốc</span>
         <span className="shrink-0 font-mono tabular-nums">
           {original > 0
-            ? `${(nav / original).toLocaleString("en-US", {
+            ? `${(nav / originalForDisplay).toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}×`
@@ -68,14 +74,22 @@ export function PnlCard({
   original,
   subtitle,
   usdVnd,
+  pnlUsd,
+  originalUsd,
 }: {
   pnl: number;
   original: number;
   subtitle: string;
   usdVnd: number;
+  pnlUsd?: number;
+  originalUsd?: number;
 }) {
   const currency = useUiStore((s) => s.currency);
-  const pct = original > 0 ? (pnl / original) * 100 : 0;
+  const displayPnl =
+    currency === "USD" && pnlUsd != null ? pnlUsd : pnl;
+  const displayOriginal =
+    currency === "USD" && originalUsd != null ? originalUsd : original;
+  const pct = displayOriginal > 0 ? (displayPnl / displayOriginal) * 100 : 0;
 
   return (
     <Card className="flex flex-col p-4">
@@ -84,12 +98,14 @@ export function PnlCard({
       </p>
       <p
         className={`mt-3 font-mono text-xl font-semibold tabular-nums ${
-          pnl > 0 ? "text-profit" : pnl < 0 ? "text-loss" : ""
+          displayPnl > 0 ? "text-profit" : displayPnl < 0 ? "text-loss" : ""
         }`}
       >
-        {displayMoney(pnl, currency, usdVnd)}
+        {currency === "USD" && pnlUsd != null
+          ? formatUsd(pnlUsd)
+          : displayMoney(pnl, currency, usdVnd)}
       </p>
-      {original > 0 ? (
+      {displayOriginal > 0 ? (
         <p className="mt-1 font-mono text-sm tabular-nums text-muted-foreground">{formatPct(pct)}</p>
       ) : (
         <p className="mt-1 text-sm text-transparent">.</p>

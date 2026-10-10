@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useCollapsibleCardGroup } from "@/components/ui/collapsible-card-group-context";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatViDate } from "@/engine/dates";
-import { formatPct, formatQty, signedClass } from "@/engine/money";
+import { formatPct, formatQty, formatUsd, signedClass } from "@/engine/money";
 import { displayMoney, displayPrice } from "@/lib/display";
 import { useUiStore } from "@/lib/ui-store";
 import type { TplusCard } from "@/engine/types";
@@ -37,11 +37,13 @@ export function TplusOpenCard({
   const [localDetail, setLocalDetail] = useState(false);
   const detail = group?.open ?? localDetail;
   const c = card;
+  const displayCurrency = c.assetType === "CRYPTO" ? "USD" : currency;
+  const formatVndProfit = (amount: number) => displayMoney(amount, displayCurrency, usdVnd);
 
   const costLabel =
     c.tplusProfitCompleted > 0
-      ? `${displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)} / ${displayPrice(c.originalAvgCost, c.assetType, currency, usdVnd)}`
-      : `0 / ${displayPrice(c.originalAvgCost || c.adjustedAvgCost, c.assetType, currency, usdVnd)}`;
+      ? `${displayPrice(c.adjustedAvgCost, c.assetType, displayCurrency, usdVnd)} / ${displayPrice(c.originalAvgCost, c.assetType, displayCurrency, usdVnd)}`
+      : `0 / ${displayPrice(c.originalAvgCost || c.adjustedAvgCost, c.assetType, displayCurrency, usdVnd)}`;
 
   return (
     <Card className="flex gap-3 bg-card dark:bg-[#2b3d5b]">
@@ -64,14 +66,19 @@ export function TplusOpenCard({
         <ul className="space-y-1 text-xs text-muted-foreground">
           {c.openLots.map((l) => {
             const marketPrice = c.currentPrice ?? 0;
-            const pnl = (marketPrice - l.buyPrice) * l.qtyRemaining;
+            const pnl =
+              c.assetType === "CRYPTO"
+                ? (marketPrice * usdVnd - l.buyPrice * (l.fxRate ?? usdVnd)) *
+                  l.qtyRemaining /
+                  usdVnd
+                : (marketPrice - l.buyPrice) * l.qtyRemaining;
             const pct = l.buyPrice > 0 ? ((marketPrice - l.buyPrice) / l.buyPrice) * 100 : 0;
             return (
               <li key={l.buyTxId}>
                 OPEN {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, c.assetType)} @{" "}
-                {displayPrice(l.buyPrice, c.assetType, currency, usdVnd)}
+                {displayPrice(l.buyPrice, c.assetType, displayCurrency, usdVnd)}
                 {" · "}
-                {displayMoney(pnl, currency, usdVnd)}{" "}
+                {c.assetType === "CRYPTO" ? formatUsd(pnl) : formatVndProfit(pnl)}{" "}
                 <span className={signedClass(pct)}>{formatPct(pct)}</span>
               </li>
             );
@@ -94,17 +101,17 @@ export function TplusOpenCard({
               <div>
                 <InfoLabel 
                   label="Giá Trade" 
-                  tooltip={`${displayPrice(c.tradePrice, c.assetType, currency, usdVnd)}: Mức giá trung bình của tổng T+.\n${displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)}: Giá vốn ban đầu của Core (trước T+)`}
+                  tooltip={`${displayPrice(c.tradePrice, c.assetType, displayCurrency, usdVnd)}: Mức giá trung bình của tổng T+.\n${displayPrice(c.adjustedAvgCost, c.assetType, displayCurrency, usdVnd)}: Giá vốn ban đầu của Core (trước T+)`}
                 />
                 <dd className="font-mono tabular-nums">
-                  {displayPrice(c.tradePrice, c.assetType, currency, usdVnd)} /{" "}
-                  {displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)}
+                  {displayPrice(c.tradePrice, c.assetType, displayCurrency, usdVnd)} /{" "}
+                  {displayPrice(c.adjustedAvgCost, c.assetType, displayCurrency, usdVnd)}
                 </dd>
               </div>
               <div>
                 <InfoLabel 
                   label="Giá vốn (mới / gốc)" 
-                  tooltip={`${displayPrice(c.adjustedAvgCost, c.assetType, currency, usdVnd)}: Giá vốn sau khi đã trừ bớt lợi nhuận từ các vòng lướt T+ trước( Chưa tính vốn T+).\n${displayPrice(c.originalAvgCost || c.adjustedAvgCost, c.assetType, currency, usdVnd)}: Giá vốn ban đầu của Core (trước T+).`}
+                  tooltip={`${displayPrice(c.adjustedAvgCost, c.assetType, displayCurrency, usdVnd)}: Giá vốn sau khi đã trừ bớt lợi nhuận từ các vòng lướt T+ trước( Chưa tính vốn T+).\n${displayPrice(c.originalAvgCost || c.adjustedAvgCost, c.assetType, displayCurrency, usdVnd)}: Giá vốn ban đầu của Core (trước T+).`}
                 />
                 <dd className="font-mono tabular-nums">{costLabel}</dd>
               </div>
@@ -114,7 +121,7 @@ export function TplusOpenCard({
                   tooltip={`Đề xuất cp +3%/coin +5%. Form tự động điền sẵn giá này.`}
                 />
                 <dd className="font-mono tabular-nums">
-                  {displayPrice(c.suggestedSell, c.assetType, currency, usdVnd)}
+                  {displayPrice(c.suggestedSell, c.assetType, displayCurrency, usdVnd)}
                 </dd>
               </div>
               <div>
@@ -123,7 +130,7 @@ export function TplusOpenCard({
                   tooltip={`đóng toàn bộ lệnh ở giá này sẽ hoà vốn`}
                 />
                 <dd className="font-mono tabular-nums">
-                  {displayPrice(c.breakEvenPrice, c.assetType, currency, usdVnd)}
+                  {displayPrice(c.breakEvenPrice, c.assetType, displayCurrency, usdVnd)}
                 </dd>
               </div>
               <div>
@@ -132,7 +139,7 @@ export function TplusOpenCard({
                   tooltip={`Tổng số tiền tạm lỗ/lãi trên tổng vị thế (gốc + T+) dựa theo giá thị trường hiện tại.`}
                 />
                 <dd className={`font-mono tabular-nums ${signedClass(c.remainingUnrealized)}`}>
-                  {displayMoney(c.remainingUnrealized, currency, usdVnd)}
+                  {formatVndProfit(c.remainingUnrealized)}
                 </dd>
               </div>
             </dl>

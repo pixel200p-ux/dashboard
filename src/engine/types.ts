@@ -29,6 +29,7 @@ export interface CapitalMovement {
   id: string;
   kind: CapitalKind;
   amount: number;
+  fxRate: number | null;
   movementDate: string;
   bucket: CapitalBucket;
   notes: string | null;
@@ -216,6 +217,7 @@ export interface PortfolioState {
   asOf: string;
     originalCapital: number;
   originalByBucket: Record<CapitalBucket, number>;
+  originalByBucketUsd: Record<CapitalBucket, number>;
   nav: number;
   navByBucket: Record<CapitalBucket, number>;
   tplusByBucket: { VPS: number; SSI: number; CRYPTO: number };

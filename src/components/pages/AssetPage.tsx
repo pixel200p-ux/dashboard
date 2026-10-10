@@ -40,10 +40,12 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   const usd = state.usdVnd;
     const meta = TITLE[assetType];
     const ob = state.originalByBucket;
+  const originalByBucketUsd = state.originalByBucketUsd;
   const nb = state.navByBucket;
   const tb = state.tplusByBucket;
   let sliceNav = 0;
   let sliceOriginal = 0;
+  let sliceOriginalUsd: number | undefined;
   let sliceName = meta.title;
     const tplusSlice: { key: string; title: string; amount: number; hint: string }[] = [];
 
@@ -83,6 +85,7 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   } else if (assetType === "CRYPTO") {
     sliceNav = nb.CRYPTO;
     sliceOriginal = ob.CRYPTO;
+    sliceOriginalUsd = originalByBucketUsd.CRYPTO;
     sliceName = "Crypto";
     tplusSlice.push({
       key: "crypto",
@@ -233,12 +236,15 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
           nav={sliceNav}
           original={sliceOriginal}
           usdVnd={usd}
+          originalUsd={sliceOriginalUsd}
         />
         <PnlCard
           pnl={sliceNav - sliceOriginal}
           original={sliceOriginal}
           subtitle={`NAV − Original ${sliceName}`}
           usdVnd={usd}
+          pnlUsd={sliceOriginalUsd != null ? sliceNav / usd - sliceOriginalUsd : undefined}
+          originalUsd={sliceOriginalUsd}
         />
         {tplusSlice.map((c) => (
           <TplusLoweredCard key={c.key} title={c.title} amount={c.amount} hint={c.hint} usdVnd={usd} />

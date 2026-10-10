@@ -48,6 +48,7 @@ export function mapCapital(r: Record<string, unknown>): CapitalMovement {
     id: String(r.id),
     kind: r.kind as CapitalKind,
     amount: n(r.amount),
+    fxRate: r.fx_rate == null ? null : n(r.fx_rate),
         movementDate: String(r.movement_date).slice(0, 10),
     bucket: (r.bucket as CapitalBucket) || "DCDS",
     notes: r.notes ? String(r.notes) : null,

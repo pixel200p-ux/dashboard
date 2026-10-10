@@ -11,6 +11,7 @@ export type CapitalPrefill = {
   id: string;
   kind: "DEPOSIT" | "WITHDRAW";
   amount: number;
+  fxRate: number | null;
   movementDate: string;
   notes: string | null;
   bucket: CapitalBucket;
