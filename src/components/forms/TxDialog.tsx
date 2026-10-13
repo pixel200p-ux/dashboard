@@ -9,7 +9,7 @@ import { useUiStore } from "@/lib/ui-store";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { saveBank, saveTransaction } from "@/lib/api/portfolio";
 import { dcdsQty } from "@/engine/replay";
-import { parseBrokerPrice, parseDecimal, parseVndAmount, formatQty, formatBrokerPrice, formatThousandsInput, formatPct, signedClass } from "@/engine/money";
+import { parseBrokerPrice, parseDecimal, parseVndAmount, formatQty, formatBrokerPrice, formatThousandsInput, formatPct, formatUsd, signedClass } from "@/engine/money";
 import { todayYmd, formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
 import type { AssetType, FeeProfile, TxType } from "@/engine/types";
@@ -616,31 +616,51 @@ export function TxDialog() {
                       Trade T+ — lệnh này vào phân tích T+, không cộng vào giá vốn gốc
                     </label>
                   )}
-                                    {(kind === "STOCK" || kind === "CRYPTO") && txType === "SELL" && coreQty > 1e-12 && (
+                  {(kind === "STOCK" || kind === "CRYPTO") &&
+                    (txType === "SELL" ? coreQty : coreExcludingThis) > 1e-12 && (
                     <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-semibold text-primary">Vị thế gốc (Core)</span>
                         <span className="text-xs text-muted-foreground">
-                          {formatQty(coreQty, assetType)} {kind === "CRYPTO" ? "Unit" : "CP"} @ {displayPrice(holding?.adjustedAvgCost ?? 0, assetType, currency, usdVnd)}
+                          {formatQty(txType === "BUY" ? coreExcludingThis : coreQty, assetType)} {kind === "CRYPTO" ? "Unit" : "CP"} @ {displayPrice(holding?.adjustedAvgCost ?? 0, assetType, kind === "CRYPTO" ? "USD" : currency, usdVnd)}
                         </span>
                       </div>
                       {(() => {
+                        const corePositionQty = txType === "BUY" ? coreExcludingThis : coreQty;
                         const coreAvg = holding?.adjustedAvgCost ?? 0;
-                        const previewSellPrice = parsedPrice > 0 ? parsedPrice : (holding?.currentPrice ?? 0);
-                        const sellNotionalCore = coreQty * previewSellPrice;
-                        const estSellFeeCore = (sellNotionalCore * defaultFeePct) / 100;
-                        const estSellTaxCore = (sellNotionalCore * defaultTaxPct) / 100;
-                        const totalCostCore = coreQty * coreAvg;
-                        const pnlCore = sellNotionalCore - estSellFeeCore - estSellTaxCore - totalCostCore;
+                        const referencePrice =
+                          txType === "SELL" && parsedPrice > 0
+                            ? parsedPrice
+                            : holding?.currentPrice ?? 0;
+                        const coreMarketValue = corePositionQty * referencePrice;
+                        const estimatedSellFee =
+                          txType === "SELL"
+                            ? (coreMarketValue * defaultFeePct) / 100
+                            : 0;
+                        const estimatedSellTax =
+                          txType === "SELL"
+                            ? (coreMarketValue * defaultTaxPct) / 100
+                            : 0;
+                        const totalCostCore = corePositionQty * coreAvg;
+                        const pnlCore =
+                          coreMarketValue -
+                          estimatedSellFee -
+                          estimatedSellTax -
+                          totalCostCore;
                         const pctCore = totalCostCore > 0 ? (pnlCore / totalCostCore) * 100 : 0;
 
                         return (
-                          <div className="flex justify-between items-baseline">
-                            <span className={`text-lg font-mono font-bold ${signedClass(pnlCore)}`}>
-                              {displayMoney(pnlCore, currency, usdVnd)}
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                            <span className="text-xs text-muted-foreground">
+                              {txType === "BUY" ? "Lãi/lỗ hiện tại" : "Ước tính nếu bán"}
                             </span>
                             <span className={`font-mono font-medium ${signedClass(pctCore)}`}>
                               {formatPct(pctCore)}
+                            </span>
+                            <span className={`w-full text-lg font-mono font-bold ${signedClass(pnlCore)}`}>
+                              {kind === "CRYPTO"
+                                ? formatUsd(pnlCore)
+                                : displayMoney(pnlCore, currency, usdVnd)}
                             </span>
                           </div>
                         );
