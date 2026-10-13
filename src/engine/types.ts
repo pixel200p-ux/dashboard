@@ -1,8 +1,16 @@
-export type AccountKind = "STOCK_VPS" | "STOCK_SSI" | "CRYPTO" | "ETF" | "DCDS" | "BANK";
+export type AccountKind =
+  "STOCK_VPS" | "STOCK_SSI" | "CRYPTO" | "ETF" | "DCDS" | "BANK";
 export type AssetType = "STOCK" | "ETF" | "DCDS" | "CRYPTO";
 export type TxType = "BUY" | "SELL" | "CASH_DIVIDEND" | "STOCK_DIVIDEND";
 export type CapitalKind = "DEPOSIT" | "WITHDRAW";
-export const CAPITAL_BUCKETS = ["DCDS", "ETF", "VPS", "SSI", "CRYPTO", "BANK"] as const;
+export const CAPITAL_BUCKETS = [
+  "DCDS",
+  "ETF",
+  "VPS",
+  "SSI",
+  "CRYPTO",
+  "BANK",
+] as const;
 export type CapitalBucket = (typeof CAPITAL_BUCKETS)[number];
 export type BankStatus = "ACTIVE" | "REDEEMED";
 export type FeeProfile = "STOCK_VPS" | "STOCK_SSI" | "CRYPTO" | "DCDS" | "ETF";
@@ -123,6 +131,7 @@ export interface TplusCycleRecord {
   id: string;
   assetId: string;
   symbol: string;
+  assetType: AssetType;
   accountId: string;
   accountName: string;
   buyTxId: string;
@@ -138,6 +147,7 @@ export interface TplusCycleRecord {
   tax: number;
   grossProfit: number;
   netProfit: number;
+  cryptoNetProfitUsd?: number;
   avgCostBefore: number;
   avgCostAfter: number;
   costReduction: number;
@@ -164,13 +174,19 @@ export interface HoldingView {
   marketValue: number;
   costBasis: number;
   unrealizedPnl: number;
+  cryptoCostBasisUsd?: number;
+  cryptoUnrealizedPnlUsd?: number;
   realizedTradePnl: number;
-    cashDividend: number;
+  cashDividend: number;
   stockDividendQty: number;
   tplusProfitCompleted: number;
   totalInvested: number;
   openLots: OpenTplusLot[];
-  buyLotCosts: { buyTxId: string; remainingQty: number; adjustedPrice: number }[];
+  buyLotCosts: {
+    buyTxId: string;
+    remainingQty: number;
+    adjustedPrice: number;
+  }[];
 }
 
 export interface BankView {
@@ -209,13 +225,14 @@ export interface TplusCard {
   suggestedSell: number;
   breakEvenPrice: number;
   remainingUnrealized: number;
+  cryptoRemainingUnrealizedUsd?: number;
   tplusProfitCompleted: number;
   openLots: OpenTplusLot[];
 }
 
 export interface PortfolioState {
   asOf: string;
-    originalCapital: number;
+  originalCapital: number;
   originalByBucket: Record<CapitalBucket, number>;
   originalByBucketUsd: Record<CapitalBucket, number>;
   nav: number;

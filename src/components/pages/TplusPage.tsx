@@ -4,7 +4,7 @@ import { Card, CardTitle, CollapsibleCardGroup } from "@/components/ui/card";
 import { TplusOpenCard } from "@/components/TplusOpenCard";
 import { formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
-import { signedClass } from "@/engine/money";
+import { formatUsd, signedClass } from "@/engine/money";
 import { usePortfolio } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +16,25 @@ function exportHistory(rows: ReturnType<typeof usePortfolio>["data"]) {
   if (!rows) return;
   const h = rows.state.tplusHistory;
   const headers = [
-    "Code","Account","Buy Date","Sell Date","Holding before T+","Buy Quantity","Buy Price","Sell Quantity","Sell Price","Fees","Tax","Gross Profit","Net Profit","Average Cost Before","Average Cost After","Cost Reduction","Remaining Holding","Remaining Unrealized P/L","Status",
+    "Code",
+    "Account",
+    "Buy Date",
+    "Sell Date",
+    "Holding before T+",
+    "Buy Quantity",
+    "Buy Price",
+    "Sell Quantity",
+    "Sell Price",
+    "Fees",
+    "Tax",
+    "Gross Profit",
+    "Net Profit",
+    "Average Cost Before",
+    "Average Cost After",
+    "Cost Reduction",
+    "Remaining Holding",
+    "Remaining Unrealized P/L",
+    "Status",
   ];
   const lines = [
     headers.join(","),
@@ -44,7 +62,9 @@ function exportHistory(rows: ReturnType<typeof usePortfolio>["data"]) {
       ].join(","),
     ),
   ];
-  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["\uFEFF" + lines.join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "lich-su-T+.csv";
@@ -65,7 +85,9 @@ export function TplusPage() {
     (a, b) => (b.remainingUnrealized ?? 0) - (a.remainingUnrealized ?? 0),
   );
   const cryptoCards = [...cards.filter((c) => c.assetType === "CRYPTO")].sort(
-    (a, b) => (b.remainingUnrealized ?? 0) - (a.remainingUnrealized ?? 0),
+    (a, b) =>
+      (b.cryptoRemainingUnrealizedUsd ?? 0) -
+      (a.cryptoRemainingUnrealizedUsd ?? 0),
   );
   const vpsCards = stockCards.filter((c) => c.accountId === "vps");
   const ssiCards = stockCards.filter((c) => c.accountId === "ssi");
@@ -85,12 +107,20 @@ export function TplusPage() {
   }) {
     return (
       <Card className="space-y-3">
-        <button type="button" className="flex w-full items-center justify-between gap-2 text-left" onClick={onToggle}>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 text-left"
+          onClick={onToggle}
+        >
           <CardTitle>
             {title}{" "}
-            <span className="text-sm font-normal text-muted-foreground">· {count} mã</span>
+            <span className="text-sm font-normal text-muted-foreground">
+              · {count} mã
+            </span>
           </CardTitle>
-          <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
+          <ChevronDown
+            className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
+          />
         </button>
         {open ? children : null}
       </Card>
@@ -99,10 +129,15 @@ export function TplusPage() {
 
   function CardGrid({ list }: { list: TplusCard[] }) {
     if (list.length === 0) {
-      return <p className="text-sm text-muted-foreground">Không có lệnh T+ đang mở.</p>;
+      return (
+        <p className="text-sm text-muted-foreground">
+          Không có lệnh T+ đang mở.
+        </p>
+      );
     }
-    const rows = Array.from({ length: Math.ceil(list.length / 2) }, (_, rowIndex) =>
-      list.slice(rowIndex * 2, rowIndex * 2 + 2),
+    const rows = Array.from(
+      { length: Math.ceil(list.length / 2) },
+      (_, rowIndex) => list.slice(rowIndex * 2, rowIndex * 2 + 2),
     );
     return (
       <div className="space-y-3">
@@ -125,11 +160,15 @@ export function TplusPage() {
         <div>
           <h1 className="text-4xl font-semibold">Trade T+</h1>
           <p className="text-sm text-muted-foreground">
-            Chỉ hiện mã đang có lệnh T+ OPEN. Khớp bán chọn tay. Lãi COMPLETED mới hạ giá vốn gốc.
+            Chỉ hiện mã đang có lệnh T+ OPEN. Khớp bán chọn tay. Lãi COMPLETED
+            mới hạ giá vốn gốc.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant={history ? "default" : "outline"} onClick={() => setHistory((v) => !v)}>
+          <Button
+            variant={history ? "default" : "outline"}
+            onClick={() => setHistory((v) => !v)}
+          >
             Lịch sử T+
           </Button>
           <Button variant="outline" onClick={() => exportHistory(data)}>
@@ -140,19 +179,33 @@ export function TplusPage() {
 
       {!history && (
         <div className="space-y-3">
-          <Group title="Stock" count={stockCards.length} open={openStock} onToggle={() => setOpenStock((v) => !v)}>
+          <Group
+            title="Stock"
+            count={stockCards.length}
+            open={openStock}
+            onToggle={() => setOpenStock((v) => !v)}
+          >
             <div className="space-y-4">
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">VPS</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  VPS
+                </p>
                 <CardGrid list={vpsCards} />
               </div>
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">SSI</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  SSI
+                </p>
                 <CardGrid list={ssiCards} />
               </div>
             </div>
           </Group>
-          <Group title="Crypto" count={cryptoCards.length} open={openCrypto} onToggle={() => setOpenCrypto((v) => !v)}>
+          <Group
+            title="Crypto"
+            count={cryptoCards.length}
+            open={openCrypto}
+            onToggle={() => setOpenCrypto((v) => !v)}
+          >
             <CardGrid list={cryptoCards} />
           </Group>
         </div>
@@ -180,24 +233,48 @@ export function TplusPage() {
                     <td className="px-2 py-2 font-medium">{c.symbol}</td>
                     <td className="px-2 py-2">{c.accountName}</td>
                     <td className="px-2 py-2">
-                      {formatViDate(c.buyDate)} · {displayPrice(c.buyPrice, "STOCK", currency, usd)}
+                      {formatViDate(c.buyDate)} ·{" "}
+                      {displayPrice(
+                        c.buyPrice,
+                        c.assetType,
+                        c.assetType === "CRYPTO" ? "USD" : currency,
+                        usd,
+                      )}
                     </td>
                     <td className="px-2 py-2">
-                      {formatViDate(c.sellDate)} · {displayPrice(c.sellPrice, "STOCK", currency, usd)}
+                      {formatViDate(c.sellDate)} ·{" "}
+                      {displayPrice(
+                        c.sellPrice,
+                        c.assetType,
+                        c.assetType === "CRYPTO" ? "USD" : currency,
+                        usd,
+                      )}
                     </td>
-                    <td className="px-2 py-2 text-right font-mono">{c.sellQuantity}</td>
-                    <td className={`px-2 py-2 text-right font-mono ${signedClass(c.netProfit)}`}>
-                      {displayMoney(c.netProfit, currency, usd)}
+                    <td className="px-2 py-2 text-right font-mono">
+                      {c.sellQuantity}
+                    </td>
+                    <td
+                      className={`px-2 py-2 text-right font-mono ${signedClass(c.cryptoNetProfitUsd ?? c.netProfit)}`}
+                    >
+                      {c.assetType === "CRYPTO"
+                        ? formatUsd(c.cryptoNetProfitUsd ?? 0)
+                        : displayMoney(c.netProfit, currency, usd)}
                     </td>
                     <td className="px-2 py-2">
-                      <Badge tone={c.status === "COMPLETED" ? "profit" : "warn"}>{c.status}</Badge>
+                      <Badge
+                        tone={c.status === "COMPLETED" ? "profit" : "warn"}
+                      >
+                        {c.status}
+                      </Badge>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {data.state.tplusHistory.length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">Chưa có cycle T+ hoàn tất.</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Chưa có cycle T+ hoàn tất.
+              </p>
             )}
           </div>
         </Card>

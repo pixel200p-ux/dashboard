@@ -1,7 +1,9 @@
 import { replayPortfolio } from "./replay";
 import type { LedgerSnapshot, Transaction } from "./types";
 
-function tx(partial: Partial<Transaction> & Pick<Transaction, "id" | "txType" | "txDate">): Transaction {
+function tx(
+  partial: Partial<Transaction> & Pick<Transaction, "id" | "txType" | "txDate">,
+): Transaction {
   return {
     accountId: "vps",
     assetId: "vps:TEST",
@@ -76,7 +78,14 @@ export function runTplusSpecExample(): string[] {
     matches: [],
     banks: [],
     bankRates: [],
-    fees: [{ profile: "STOCK_VPS", buyFeePct: 0.15, sellFeePct: 0.15, sellTaxPct: 0.1 }],
+    fees: [
+      {
+        profile: "STOCK_VPS",
+        buyFeePct: 0.15,
+        sellFeePct: 0.15,
+        sellTaxPct: 0.1,
+      },
+    ],
     usdVnd: 25000,
   };
 
@@ -84,11 +93,17 @@ export function runTplusSpecExample(): string[] {
   const card = open.tplusCards[0];
   if (!card) errors.push("open T+ card missing");
   else {
-    if (card.openTplusQty !== 200) errors.push(`open qty ${card.openTplusQty} != 200`);
+    if (card.openTplusQty !== 200)
+      errors.push(`open qty ${card.openTplusQty} != 200`);
     if (card.coreQty !== 1000) errors.push(`core qty ${card.coreQty} != 1000`);
-    if (Math.abs(card.tradePrice - 25000) > 0.5) errors.push(`trade price ${card.tradePrice}`);
-    if (Math.abs(card.adjustedAvgCost - 30000) > 0.5) errors.push(`open adj cost ${card.adjustedAvgCost} (must stay 30000 while OPEN)`);
-    if (open.holdings[0]?.quantity !== 1200) errors.push(`holdings qty ${open.holdings[0]?.quantity} != 1200`);
+    if (Math.abs(card.tradePrice - 25000) > 0.5)
+      errors.push(`trade price ${card.tradePrice}`);
+    if (Math.abs(card.adjustedAvgCost - 30000) > 0.5)
+      errors.push(
+        `open adj cost ${card.adjustedAvgCost} (must stay 30000 while OPEN)`,
+      );
+    if (open.holdings[0]?.quantity !== 1200)
+      errors.push(`holdings qty ${open.holdings[0]?.quantity} != 1200`);
   }
 
   ledger.transactions.push(
@@ -103,20 +118,30 @@ export function runTplusSpecExample(): string[] {
       tradeTplus: true,
     }),
   );
-  ledger.matches.push({ id: "m1", sellTxId: "s1", buyTxId: "b1", quantity: 200 });
+  ledger.matches.push({
+    id: "m1",
+    sellTxId: "s1",
+    buyTxId: "b1",
+    quantity: 200,
+  });
 
   const closed = replayPortfolio(ledger, "2026-01-13");
-  if (closed.tplusCards.length !== 0) errors.push("closed T+ still showing card");
+  if (closed.tplusCards.length !== 0)
+    errors.push("closed T+ still showing card");
   const h = closed.holdings[0];
   if (!h) errors.push("holding missing after close");
   else {
     if (h.quantity !== 1000) errors.push(`closed qty ${h.quantity}`);
     if (h.openTplusQty !== 0) errors.push(`closed open T+ ${h.openTplusQty}`);
-    if (Math.abs(h.adjustedAvgCost - 29820) > 0.51) errors.push(`closed adj ${h.adjustedAvgCost} != 29820`);
-    if (Math.abs(h.originalAvgCost - 30000) > 0.51) errors.push(`original avg mutated ${h.originalAvgCost}`);
-    if (Math.abs(h.tplusProfitCompleted - 180000) > 0.51) errors.push(`tplus profit ${h.tplusProfitCompleted}`);
+    if (Math.abs(h.adjustedAvgCost - 29820) > 0.51)
+      errors.push(`closed adj ${h.adjustedAvgCost} != 29820`);
+    if (Math.abs(h.originalAvgCost - 30000) > 0.51)
+      errors.push(`original avg mutated ${h.originalAvgCost}`);
+    if (Math.abs(h.tplusProfitCompleted - 180000) > 0.51)
+      errors.push(`tplus profit ${h.tplusProfitCompleted}`);
   }
-  if (closed.originalCapital !== 30_000_000) errors.push("original capital mutated");
+  if (closed.originalCapital !== 30_000_000)
+    errors.push("original capital mutated");
 
   const cryptoOriginal = replayPortfolio(
     {
@@ -134,7 +159,229 @@ export function runTplusSpecExample(): string[] {
     "2026-01-13",
   );
   if (cryptoOriginal.originalByBucketUsd.CRYPTO !== 100) {
-    errors.push(`crypto original USD ${cryptoOriginal.originalByBucketUsd.CRYPTO} != 100`);
+    errors.push(
+      `crypto original USD ${cryptoOriginal.originalByBucketUsd.CRYPTO} != 100`,
+    );
+  }
+
+  const cryptoLedger: LedgerSnapshot = {
+    ...ledger,
+    accounts: [
+      { id: "crypto", name: "Crypto", kind: "CRYPTO", currency: "USD" },
+    ],
+    assets: [
+      {
+        id: "crypto:BTC",
+        accountId: "crypto",
+        symbol: "BTC",
+        name: "Bitcoin",
+        assetType: "CRYPTO",
+        currency: "USD",
+        currentPrice: 120,
+        priceUpdatedAt: null,
+      },
+    ],
+    transactions: [
+      tx({
+        id: "crypto-buy",
+        accountId: "crypto",
+        assetId: "crypto:BTC",
+        txType: "BUY",
+        txDate: "2026-01-01",
+        quantity: 1,
+        price: 100,
+        fee: 1,
+        fxRate: 20_000,
+      }),
+    ],
+    matches: [],
+    usdVnd: 25_000,
+  };
+  const cryptoOpen = replayPortfolio(cryptoLedger, "2026-01-02").holdings[0];
+  if (!cryptoOpen) errors.push("crypto holding missing");
+  else {
+    if (Math.abs(cryptoOpen.costBasis - 2_020_000) > 0.01) {
+      errors.push(`crypto VND cost basis ${cryptoOpen.costBasis} != 2020000`);
+    }
+    if (Math.abs(cryptoOpen.unrealizedPnl - 980_000) > 0.01) {
+      errors.push(
+        `crypto VND unrealized P&L ${cryptoOpen.unrealizedPnl} != 980000`,
+      );
+    }
+    if (Math.abs((cryptoOpen.cryptoCostBasisUsd ?? 0) - 101) > 0.01) {
+      errors.push(
+        `crypto USD cost basis ${cryptoOpen.cryptoCostBasisUsd} != 101`,
+      );
+    }
+    if (Math.abs((cryptoOpen.cryptoUnrealizedPnlUsd ?? 0) - 19) > 0.01) {
+      errors.push(
+        `crypto USD unrealized P&L ${cryptoOpen.cryptoUnrealizedPnlUsd} != 19`,
+      );
+    }
+  }
+
+  const editedCryptoLedger: LedgerSnapshot = {
+    ...cryptoLedger,
+    transactions: cryptoLedger.transactions.map((transaction) =>
+      transaction.id === "crypto-buy"
+        ? { ...transaction, price: 110, fxRate: 22_000 }
+        : transaction,
+    ),
+  };
+  const editedCrypto = replayPortfolio(editedCryptoLedger, "2026-01-02")
+    .holdings[0];
+  if (!editedCrypto || Math.abs(editedCrypto.costBasis - 2_442_000) > 0.01) {
+    errors.push(
+      `edited crypto cost basis ${editedCrypto?.costBasis} != 2442000`,
+    );
+  }
+  const deletedCryptoLedger: LedgerSnapshot = {
+    ...editedCryptoLedger,
+    transactions: editedCryptoLedger.transactions.map((transaction) =>
+      transaction.id === "crypto-buy"
+        ? { ...transaction, deletedAt: "2026-01-03T00:00:00Z" }
+        : transaction,
+    ),
+  };
+  if (
+    replayPortfolio(deletedCryptoLedger, "2026-01-04").holdings.length !== 0
+  ) {
+    errors.push("deleted crypto buy still affects the holding");
+  }
+
+  const cryptoCoreSellLedger: LedgerSnapshot = {
+    ...cryptoLedger,
+    transactions: [
+      ...cryptoLedger.transactions,
+      tx({
+        id: "crypto-core-sell",
+        accountId: "crypto",
+        assetId: "crypto:BTC",
+        txType: "SELL",
+        txDate: "2026-01-02",
+        quantity: 0.5,
+        price: 110,
+        fee: 0.5,
+        fxRate: 30_000,
+      }),
+    ],
+  };
+  const cryptoAfterCoreSell = replayPortfolio(
+    cryptoCoreSellLedger,
+    "2026-01-03",
+  ).holdings[0];
+  if (!cryptoAfterCoreSell)
+    errors.push("crypto holding missing after core sell");
+  else {
+    if (Math.abs(cryptoAfterCoreSell.realizedTradePnl - 625_000) > 0.01) {
+      errors.push(
+        `crypto realized P&L ${cryptoAfterCoreSell.realizedTradePnl} != 625000 VND`,
+      );
+    }
+    if (Math.abs(cryptoAfterCoreSell.costBasis - 1_010_000) > 0.01) {
+      errors.push(
+        `crypto remaining VND cost basis ${cryptoAfterCoreSell.costBasis} != 1010000`,
+      );
+    }
+    if (
+      Math.abs((cryptoAfterCoreSell.cryptoUnrealizedPnlUsd ?? 0) - 9.5) > 0.01
+    ) {
+      errors.push(
+        `crypto remaining USD unrealized P&L ${cryptoAfterCoreSell.cryptoUnrealizedPnlUsd} != 9.5`,
+      );
+    }
+  }
+
+  const cryptoTplusLedger: LedgerSnapshot = {
+    ...cryptoLedger,
+    transactions: [
+      tx({
+        id: "crypto-core-buy",
+        accountId: "crypto",
+        assetId: "crypto:BTC",
+        txType: "BUY",
+        txDate: "2026-01-01",
+        quantity: 1,
+        price: 100,
+        fee: 1,
+        fxRate: 25_000,
+      }),
+      tx({
+        id: "crypto-tplus-buy",
+        accountId: "crypto",
+        assetId: "crypto:BTC",
+        txType: "BUY",
+        txDate: "2026-01-02",
+        quantity: 0.1,
+        price: 110,
+        fee: 0.1,
+        tradeTplus: true,
+        fxRate: 25_000,
+      }),
+      tx({
+        id: "crypto-tplus-sell",
+        accountId: "crypto",
+        assetId: "crypto:BTC",
+        txType: "SELL",
+        txDate: "2026-01-03",
+        quantity: 0.1,
+        price: 120,
+        fee: 0.1,
+        fxRate: 25_000,
+      }),
+    ],
+    matches: [
+      {
+        id: "crypto-match",
+        sellTxId: "crypto-tplus-sell",
+        buyTxId: "crypto-tplus-buy",
+        quantity: 0.1,
+      },
+    ],
+  };
+  const cryptoTplus = replayPortfolio(cryptoTplusLedger, "2026-01-04")
+    .holdings[0];
+  if (!cryptoTplus) errors.push("crypto T+ holding missing");
+  else {
+    if (Math.abs(cryptoTplus.adjustedAvgCost - 100.2) > 0.01) {
+      errors.push(
+        `crypto T+ adjusted average ${cryptoTplus.adjustedAvgCost} != 100.2 USD`,
+      );
+    }
+    if (Math.abs(cryptoTplus.tplusProfitCompleted - 20_000) > 0.01) {
+      errors.push(
+        `crypto T+ profit ${cryptoTplus.tplusProfitCompleted} != 20000 VND`,
+      );
+    }
+    if (Math.abs(cryptoTplus.costBasis - 2_505_000) > 0.01) {
+      errors.push(
+        `crypto T+ VND cost basis ${cryptoTplus.costBasis} != 2505000`,
+      );
+    }
+    if (Math.abs((cryptoTplus.cryptoUnrealizedPnlUsd ?? 0) - 19.8) > 0.01) {
+      errors.push(
+        `crypto T+ USD unrealized P&L ${cryptoTplus.cryptoUnrealizedPnlUsd} != 19.8`,
+      );
+    }
+  }
+
+  const cryptoOpenTplus = replayPortfolio(
+    {
+      ...cryptoTplusLedger,
+      transactions: cryptoTplusLedger.transactions.filter(
+        (transaction) => transaction.id !== "crypto-tplus-sell",
+      ),
+      matches: [],
+    },
+    "2026-01-03",
+  ).tplusCards[0];
+  if (
+    !cryptoOpenTplus ||
+    Math.abs(cryptoOpenTplus.breakEvenPrice - 112.1 / 1.1) > 0.01
+  ) {
+    errors.push(
+      `crypto T+ break-even ${cryptoOpenTplus?.breakEvenPrice} != ${112.1 / 1.1}`,
+    );
   }
 
   ledger.transactions.push(
@@ -152,13 +399,19 @@ export function runTplusSpecExample(): string[] {
   const c3 = cycle3.tplusCards[0];
   if (!c3) errors.push("cycle-3 T+ card missing");
   else {
-    if (c3.openTplusQty !== 150) errors.push(`cycle3 open qty ${c3.openTplusQty} != 150`);
-    if (c3.coreQty !== 1000) errors.push(`cycle3 core qty ${c3.coreQty} != 1000`);
-    if (Math.abs(c3.tradePrice - 24000) > 0.5) errors.push(`cycle3 trade ${c3.tradePrice}`);
+    if (c3.openTplusQty !== 150)
+      errors.push(`cycle3 open qty ${c3.openTplusQty} != 150`);
+    if (c3.coreQty !== 1000)
+      errors.push(`cycle3 core qty ${c3.coreQty} != 1000`);
+    if (Math.abs(c3.tradePrice - 24000) > 0.5)
+      errors.push(`cycle3 trade ${c3.tradePrice}`);
     if (Math.abs(c3.adjustedAvgCost - 29820) > 0.51) {
-      errors.push(`cycle3 adj ${c3.adjustedAvgCost} != 29820 (prior T+ must keep reducing cost)`);
+      errors.push(
+        `cycle3 adj ${c3.adjustedAvgCost} != 29820 (prior T+ must keep reducing cost)`,
+      );
     }
-    if (cycle3.holdings[0]?.quantity !== 1150) errors.push(`cycle3 holdings ${cycle3.holdings[0]?.quantity} != 1150`);
+    if (cycle3.holdings[0]?.quantity !== 1150)
+      errors.push(`cycle3 holdings ${cycle3.holdings[0]?.quantity} != 1150`);
   }
 
   const dividendLedger: LedgerSnapshot = {
@@ -195,16 +448,22 @@ export function runTplusSpecExample(): string[] {
     ],
     matches: [],
   };
-  const afterCashDividend = replayPortfolio(dividendLedger, "2026-02-05").holdings[0];
+  const afterCashDividend = replayPortfolio(dividendLedger, "2026-02-05")
+    .holdings[0];
   if (!afterCashDividend) errors.push("holding missing after cash dividend");
   else {
     if (afterCashDividend.buyLotCosts.length !== 1) {
-      errors.push(`open buy lots ${afterCashDividend.buyLotCosts.length} != 1 after earlier lot was sold`);
+      errors.push(
+        `open buy lots ${afterCashDividend.buyLotCosts.length} != 1 after earlier lot was sold`,
+      );
     } else {
       const currentLot = afterCashDividend.buyLotCosts[0];
-      if (currentLot.buyTxId !== "current-buy") errors.push(`adjusted lot id ${currentLot.buyTxId} != current-buy`);
+      if (currentLot.buyTxId !== "current-buy")
+        errors.push(`adjusted lot id ${currentLot.buyTxId} != current-buy`);
       if (Math.abs(currentLot.adjustedPrice - 11000) > 0.5) {
-        errors.push(`cash dividend adjusted price ${currentLot.adjustedPrice} != 11000`);
+        errors.push(
+          `cash dividend adjusted price ${currentLot.adjustedPrice} != 11000`,
+        );
       }
     }
   }
@@ -234,13 +493,20 @@ export function runTplusSpecExample(): string[] {
       }),
     ],
   };
-  const afterStockDividend = replayPortfolio(stockDividendLedger, "2026-03-04").holdings[0];
+  const afterStockDividend = replayPortfolio(stockDividendLedger, "2026-03-04")
+    .holdings[0];
   if (!afterStockDividend) errors.push("holding missing after stock dividend");
   else {
-    const stockLot = afterStockDividend.buyLotCosts.find((lot) => lot.buyTxId === "stock-buy");
-    const paidIssueLot = afterStockDividend.buyLotCosts.find((lot) => lot.buyTxId === "paid-issuance");
+    const stockLot = afterStockDividend.buyLotCosts.find(
+      (lot) => lot.buyTxId === "stock-buy",
+    );
+    const paidIssueLot = afterStockDividend.buyLotCosts.find(
+      (lot) => lot.buyTxId === "paid-issuance",
+    );
     if (!stockLot || Math.abs(stockLot.adjustedPrice - 7500) > 0.5) {
-      errors.push(`stock dividend adjusted price ${stockLot?.adjustedPrice} != 7500`);
+      errors.push(
+        `stock dividend adjusted price ${stockLot?.adjustedPrice} != 7500`,
+      );
     }
     if (!paidIssueLot || Math.abs(paidIssueLot.adjustedPrice - 8000) > 0.5) {
       errors.push(`paid issuance price ${paidIssueLot?.adjustedPrice} != 8000`);

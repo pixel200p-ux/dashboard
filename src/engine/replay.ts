@@ -23,7 +23,9 @@ interface Pos {
   accountKind: HoldingView["accountKind"];
   coreQty: number;
   coreCostTotal: number;
+  coreCostVndTotal: number;
   tplusReduction: number;
+  tplusReductionVnd: number;
   realizedTradePnl: number;
   cashDividend: number;
   stockDividendQty: number;
@@ -42,7 +44,10 @@ function feeProfileFor(kind: string): FeeSetting["profile"] | null {
   return null;
 }
 
-function sellRates(fees: FeeSetting[], kind: string): { feePct: number; taxPct: number } {
+function sellRates(
+  fees: FeeSetting[],
+  kind: string,
+): { feePct: number; taxPct: number } {
   const p = feeProfileFor(kind);
   const row = fees.find((f) => f.profile === p);
   return { feePct: row?.sellFeePct ?? 0, taxPct: row?.sellTaxPct ?? 0 };
@@ -60,7 +65,10 @@ function originalAvg(p: Pos): number {
 
 function syncCoreLotCosts(p: Pos): void {
   const targetCost = Math.max(0, p.coreCostTotal - p.tplusReduction);
-  const currentCost = p.coreCostLots.reduce((sum, lot) => sum + lot.adjustedCost, 0);
+  const currentCost = p.coreCostLots.reduce(
+    (sum, lot) => sum + lot.adjustedCost,
+    0,
+  );
   if (currentCost > 0) {
     const ratio = targetCost / currentCost;
     for (const lot of p.coreCostLots) lot.adjustedCost *= ratio;
@@ -80,12 +88,19 @@ function openQty(p: Pos): number {
 
 function openCost(p: Pos): number {
   return p.openLots.reduce((s, l) => {
-    const feeShare = l.qtyOriginal > 0 ? (l.buyFee * l.qtyRemaining) / l.qtyOriginal : 0;
+    const feeShare =
+      l.qtyOriginal > 0 ? (l.buyFee * l.qtyRemaining) / l.qtyOriginal : 0;
     return s + l.qtyRemaining * l.buyPrice + feeShare;
   }, 0);
 }
 
-function cryptoGross(buyPrice: number, buyFx: number, sellPrice: number, sellFx: number, qty: number): number {
+function cryptoGross(
+  buyPrice: number,
+  buyFx: number,
+  sellPrice: number,
+  sellFx: number,
+  qty: number,
+): number {
   return sellPrice * sellFx * qty - buyPrice * buyFx * qty;
 }
 
@@ -104,7 +119,9 @@ function ensurePos(
     accountKind: (acc?.kind ?? "STOCK_VPS") as Pos["accountKind"],
     coreQty: 0,
     coreCostTotal: 0,
+    coreCostVndTotal: 0,
     tplusReduction: 0,
+    tplusReductionVnd: 0,
     realizedTradePnl: 0,
     cashDividend: 0,
     stockDividendQty: 0,
@@ -123,14 +140,16 @@ function sortTx(a: Transaction, b: Transaction): number {
   return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 }
 
-function applyCoreSell(p: Pos, qty: number, netProceeds: number) {
+function applyCoreSell(p: Pos, qty: number, netProceedsVnd: number) {
   if (p.coreQty <= 0 || qty <= 0) return;
   const sellQty = Math.min(qty, p.coreQty);
   const frac = sellQty / p.coreQty;
-  const cost = (p.coreCostTotal - p.tplusReduction) * frac;
-  p.realizedTradePnl += netProceeds * (sellQty / qty) - cost;
+  const costVnd = (p.coreCostVndTotal - p.tplusReductionVnd) * frac;
+  p.realizedTradePnl += netProceedsVnd * (sellQty / qty) - costVnd;
   p.coreCostTotal -= p.coreCostTotal * frac;
+  p.coreCostVndTotal -= p.coreCostVndTotal * frac;
   p.tplusReduction -= p.tplusReduction * frac;
+  p.tplusReductionVnd -= p.tplusReductionVnd * frac;
   for (const lot of p.coreCostLots) {
     lot.quantity *= 1 - frac;
     lot.adjustedCost *= 1 - frac;
@@ -143,7 +162,9 @@ export function emptyBuckets(): Record<CapitalBucket, number> {
 }
 
 /** Original từng ô: nạp cộng, rút trừ, không âm. Original Capital = tổng 6 ô. */
-export function replayOriginalByBucket(capital: CapitalMovement[]): Record<CapitalBucket, number> {
+export function replayOriginalByBucket(
+  capital: CapitalMovement[],
+): Record<CapitalBucket, number> {
   const o = emptyBuckets();
   const rows = capital
     .filter((c) => !c.deletedAt)
@@ -178,7 +199,8 @@ export function replayOriginalByBucketUsd(
     );
   for (const c of rows) {
     if (!(c.bucket in original)) continue;
-    const amount = c.bucket === "CRYPTO" ? c.amount / (c.fxRate ?? fallbackRate) : c.amount;
+    const amount =
+      c.bucket === "CRYPTO" ? c.amount / (c.fxRate ?? fallbackRate) : c.amount;
     if (c.kind === "DEPOSIT") original[c.bucket] += amount;
     else original[c.bucket] = Math.max(0, original[c.bucket] - amount);
   }
@@ -188,14 +210,26 @@ export function replayOriginalByBucketUsd(
  * Shared Calculation Engine. UI must never compute P&L / holdings itself.
  * Replay is deterministic from the ledger (soft-deleted rows excluded).
  */
-export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): PortfolioState {
-    const originalByBucket = replayOriginalByBucket(ledger.capital);
-  const originalByBucketUsd = replayOriginalByBucketUsd(ledger.capital, ledger.usdVnd);
-  const originalCapital = CAPITAL_BUCKETS.reduce((s, b) => s + originalByBucket[b], 0);
+export function replayPortfolio(
+  ledger: LedgerSnapshot,
+  asOf = todayYmd(),
+): PortfolioState {
+  const originalByBucket = replayOriginalByBucket(ledger.capital);
+  const originalByBucketUsd = replayOriginalByBucketUsd(
+    ledger.capital,
+    ledger.usdVnd,
+  );
+  const originalCapital = CAPITAL_BUCKETS.reduce(
+    (s, b) => s + originalByBucket[b],
+    0,
+  );
 
   const assets = new Map(ledger.assets.map((a) => [a.id, a]));
   const positions = new Map<string, Pos>();
-  const txs = ledger.transactions.filter((t) => !t.deletedAt).slice().sort(sortTx);
+  const txs = ledger.transactions
+    .filter((t) => !t.deletedAt)
+    .slice()
+    .sort(sortTx);
   const matchesBySell = new Map<string, typeof ledger.matches>();
   for (const m of ledger.matches) {
     const list = matchesBySell.get(m.sellTxId) ?? [];
@@ -205,7 +239,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
 
   for (const tx of txs) {
     if (!tx.assetId) continue;
-        const asset = assets.get(tx.assetId);
+    const asset = assets.get(tx.assetId);
     if (!asset) continue;
     const p = ensurePos(positions, asset, ledger.accounts);
     const qty = num(tx.quantity);
@@ -216,8 +250,9 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     if (tx.txType === "BUY") {
       const isCrypto = asset.assetType === "CRYPTO";
       const fx = tx.fxRate ?? ledger.usdVnd;
-      const buyCost = isCrypto ? qty * price * fx + fee * fx : qty * price + fee;
-      p.totalInvested += buyCost;
+      const buyCostNative = qty * price + fee;
+      const buyCostVnd = isCrypto ? buyCostNative * fx : buyCostNative;
+      p.totalInvested += buyCostVnd;
 
       const allowTplus =
         tx.tradeTplus &&
@@ -234,12 +269,13 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
           fxRate: tx.fxRate,
         });
       } else {
-        p.coreCostTotal += qty * price + fee;
+        p.coreCostTotal += buyCostNative;
+        p.coreCostVndTotal += buyCostVnd;
         p.coreQty += qty;
         p.coreCostLots.push({
           buyTxId: tx.id,
           quantity: qty,
-          adjustedCost: qty * price + fee,
+          adjustedCost: buyCostNative,
         });
         syncCoreLotCosts(p);
       }
@@ -252,16 +288,22 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
       if (net >= p.coreCostTotal) {
         const excess = net - p.coreCostTotal;
         p.coreCostTotal = 0;
+        p.coreCostVndTotal = 0;
         if (excess > 0) p.realizedTradePnl += excess;
       } else {
         p.coreCostTotal -= net;
+        p.coreCostVndTotal -= net;
       }
       syncCoreLotCosts(p);
       continue;
     }
 
     if (tx.txType === "STOCK_DIVIDEND") {
-      const add = num(tx.stockDivQty) || (num(tx.dividendPerShare) > 0 ? p.coreQty * num(tx.dividendPerShare) : qty);
+      const add =
+        num(tx.stockDivQty) ||
+        (num(tx.dividendPerShare) > 0
+          ? p.coreQty * num(tx.dividendPerShare)
+          : qty);
       const coreQtyBeforeDividend = p.coreQty;
       p.coreQty += add;
       if (coreQtyBeforeDividend > 0) {
@@ -281,26 +323,36 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     const holdingBefore = p.coreQty;
 
     for (const m of matched) {
-      const lot = p.openLots.find((l) => l.buyTxId === m.buyTxId && l.qtyRemaining > 0);
+      const lot = p.openLots.find(
+        (l) => l.buyTxId === m.buyTxId && l.qtyRemaining > 0,
+      );
       if (!lot) continue;
       const take = Math.min(m.quantity, lot.qtyRemaining, qty - matchedQty);
       if (take <= 0) continue;
 
-      const buyFeeAlloc = lot.qtyOriginal > 0 ? (lot.buyFee * take) / lot.qtyOriginal : 0;
+      const buyFeeAlloc =
+        lot.qtyOriginal > 0 ? (lot.buyFee * take) / lot.qtyOriginal : 0;
       const sellFeeAlloc = qty > 0 ? (fee * take) / qty : 0;
       const sellTaxAlloc = qty > 0 ? (tax * take) / qty : 0;
-      let gross: number;
+      const buyFx = lot.fxRate ?? ledger.usdVnd;
+      const sellFx = tx.fxRate ?? ledger.usdVnd;
+      const grossNative = (price - lot.buyPrice) * take;
+      let grossVnd: number;
       if (asset.assetType === "CRYPTO") {
-        const buyFx = lot.fxRate ?? ledger.usdVnd;
-        const sellFx = tx.fxRate ?? ledger.usdVnd;
-        gross = cryptoGross(lot.buyPrice, buyFx, price, sellFx, take);
+        grossVnd = cryptoGross(lot.buyPrice, buyFx, price, sellFx, take);
       } else {
-        gross = (price - lot.buyPrice) * take;
+        grossVnd = grossNative;
       }
-      const net = gross - buyFeeAlloc - sellFeeAlloc - sellTaxAlloc;
+      const netNative = grossNative - buyFeeAlloc - sellFeeAlloc - sellTaxAlloc;
+      const netVnd =
+        grossVnd -
+        (asset.assetType === "CRYPTO"
+          ? buyFeeAlloc * buyFx + (sellFeeAlloc + sellTaxAlloc) * sellFx
+          : buyFeeAlloc + sellFeeAlloc + sellTaxAlloc);
       lot.qtyRemaining -= take;
       matchedQty += take;
-      p.tplusReduction += net;
+      p.tplusReduction += netNative;
+      p.tplusReductionVnd += netVnd;
       syncCoreLotCosts(p);
 
       const avgAfter = adjustedAvg(p);
@@ -308,6 +360,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
         id: `${tx.id}:${lot.buyTxId}:${take}`,
         assetId: asset.id,
         symbol: asset.symbol,
+        assetType: asset.assetType,
         accountId: p.accountId,
         accountName: p.accountName,
         buyTxId: lot.buyTxId,
@@ -321,8 +374,10 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
         sellPrice: price,
         fees: buyFeeAlloc + sellFeeAlloc,
         tax: sellTaxAlloc,
-        grossProfit: gross,
-        netProfit: net,
+        grossProfit: grossVnd,
+        netProfit: netVnd,
+        cryptoNetProfitUsd:
+          asset.assetType === "CRYPTO" ? netNative : undefined,
         avgCostBefore: avgBefore || origBefore,
         avgCostAfter: avgAfter,
         costReduction: (avgBefore || origBefore) - avgAfter,
@@ -335,8 +390,14 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     p.openLots = p.openLots.filter((l) => l.qtyRemaining > 1e-12);
     const leftover = qty - matchedQty;
     if (leftover > 1e-12) {
-      const proceeds = leftover * price - (qty > 0 ? ((fee + tax) * leftover) / qty : 0);
-      applyCoreSell(p, leftover, proceeds);
+      const netProceedsNative =
+        leftover * price - (qty > 0 ? ((fee + tax) * leftover) / qty : 0);
+      const sellFx = tx.fxRate ?? ledger.usdVnd;
+      const netProceedsVnd =
+        asset.assetType === "CRYPTO"
+          ? netProceedsNative * sellFx
+          : netProceedsNative;
+      applyCoreSell(p, leftover, netProceedsVnd);
     }
   }
 
@@ -350,25 +411,45 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
     const isCrypto = p.asset.assetType === "CRYPTO";
     const fx = ledger.usdVnd;
     const mv = isCrypto ? totalQty * price * fx : totalQty * price;
-    const coreBasis = Math.max(0, p.coreCostTotal - p.tplusReduction);
+    const coreBasisNative = Math.max(0, p.coreCostTotal - p.tplusReduction);
+    const coreBasisVnd = Math.max(0, p.coreCostVndTotal - p.tplusReductionVnd);
     const tplusBasis = isCrypto
       ? p.openLots.reduce((s, l) => {
           const fxBuy = l.fxRate ?? fx;
-          const feeShare = l.qtyOriginal > 0 ? (l.buyFee * l.qtyRemaining) / l.qtyOriginal : 0;
+          const feeShare =
+            l.qtyOriginal > 0 ? (l.buyFee * l.qtyRemaining) / l.qtyOriginal : 0;
           return s + l.qtyRemaining * l.buyPrice * fxBuy + feeShare * fxBuy;
         }, 0)
       : openCost(p);
-    const costBasis = coreBasis + tplusBasis;
+    const tplusBasisNative = isCrypto
+      ? p.openLots.reduce((s, l) => {
+          const feeShare =
+            l.qtyOriginal > 0 ? (l.buyFee * l.qtyRemaining) / l.qtyOriginal : 0;
+          return s + l.qtyRemaining * l.buyPrice + feeShare;
+        }, 0)
+      : openCost(p);
+    const costBasis = coreBasisVnd + tplusBasis;
     const unreal = mv - costBasis;
+    const cryptoCostBasisUsd = isCrypto
+      ? coreBasisNative + tplusBasisNative
+      : undefined;
+    const cryptoUnrealizedPnlUsd = isCrypto
+      ? totalQty * price - (cryptoCostBasisUsd ?? 0)
+      : undefined;
     const adj = adjustedAvg(p);
     const orig = originalAvg(p);
 
-        for (const c of p.cycles) {
+    for (const c of p.cycles) {
       c.remainingUnrealized = unreal;
       tplusHistory.push(c);
     }
 
-    if (totalQty > 1e-12 || p.realizedTradePnl !== 0 || p.tplusReduction !== 0 || p.cashDividend !== 0) {
+    if (
+      totalQty > 1e-12 ||
+      p.realizedTradePnl !== 0 ||
+      p.tplusReductionVnd !== 0 ||
+      p.cashDividend !== 0
+    ) {
       holdings.push({
         assetId: p.asset.id,
         accountId: p.accountId,
@@ -387,10 +468,12 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
         marketValue: mv,
         costBasis,
         unrealizedPnl: unreal,
+        cryptoCostBasisUsd,
+        cryptoUnrealizedPnlUsd,
         realizedTradePnl: p.realizedTradePnl,
         cashDividend: p.cashDividend,
         stockDividendQty: p.stockDividendQty,
-        tplusProfitCompleted: p.tplusReduction,
+        tplusProfitCompleted: p.tplusReductionVnd,
         totalInvested: p.totalInvested,
         openLots: p.openLots,
         buyLotCosts: p.coreCostLots
@@ -414,7 +497,8 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
       let breakEven = 0;
       if (totalQtyBe > 0 && drag > 0) {
         if (isCrypto) {
-          breakEven = costBasis / (totalQtyBe * fx * drag);
+          breakEven =
+            (cryptoCostBasisUsd ?? 0) / (totalQtyBe * drag);
         } else {
           breakEven = costBasis / (totalQtyBe * drag);
         }
@@ -435,7 +519,8 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
         suggestedSell: weightedBuy * mult,
         breakEvenPrice: breakEven,
         remainingUnrealized: unreal,
-        tplusProfitCompleted: p.tplusReduction,
+        cryptoRemainingUnrealizedUsd: cryptoUnrealizedPnlUsd,
+        tplusProfitCompleted: p.tplusReductionVnd,
         openLots: p.openLots,
       });
     }
@@ -443,19 +528,41 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
 
   const activeBanks = ledger.banks
     .filter((b) => !b.deletedAt && b.status === "ACTIVE")
-    .map((b) => replayBank(b, ledger.bankRates.filter((r) => r.depositId === b.id), asOf))
-    .sort((a, b) => a.remainingDays - b.remainingDays || a.bankName.localeCompare(b.bankName));
+    .map((b) =>
+      replayBank(
+        b,
+        ledger.bankRates.filter((r) => r.depositId === b.id),
+        asOf,
+      ),
+    )
+    .sort(
+      (a, b) =>
+        a.remainingDays - b.remainingDays ||
+        a.bankName.localeCompare(b.bankName),
+    );
 
   const redeemedBanks = ledger.banks
     .filter((b) => !b.deletedAt && b.status === "REDEEMED")
-    .map((b) => replayBank(b, ledger.bankRates.filter((r) => r.depositId === b.id), asOf));
+    .map((b) =>
+      replayBank(
+        b,
+        ledger.bankRates.filter((r) => r.depositId === b.id),
+        asOf,
+      ),
+    );
 
   const bankValue = activeBanks.reduce((s, b) => s + b.currentPrincipal, 0);
   const bankInterest =
     activeBanks.reduce((s, b) => s + b.accumulatedInterest, 0) +
     redeemedBanks.reduce((s, b) => s + b.accumulatedInterest, 0);
 
-  const cat: Record<string, number> = { DCDS: 0, ETF: 0, STOCK: 0, CRYPTO: 0, BANK: bankValue };
+  const cat: Record<string, number> = {
+    DCDS: 0,
+    ETF: 0,
+    STOCK: 0,
+    CRYPTO: 0,
+    BANK: bankValue,
+  };
   for (const h of holdings) {
     if (h.assetType === "DCDS") cat.DCDS += h.marketValue;
     else if (h.assetType === "ETF") cat.ETF += h.marketValue;
@@ -465,7 +572,10 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
   const nav = cat.DCDS + cat.ETF + cat.STOCK + cat.CRYPTO + cat.BANK;
   const allocation: PortfolioState["allocation"] = {};
   for (const key of ["DCDS", "ETF", "STOCK", "CRYPTO", "BANK"]) {
-    allocation[key] = { value: cat[key], pct: nav > 0 ? (cat[key] / nav) * 100 : 0 };
+    allocation[key] = {
+      value: cat[key],
+      pct: nav > 0 ? (cat[key] / nav) * 100 : 0,
+    };
   }
 
   const realizedTradePnl = holdings.reduce((s, h) => s + h.realizedTradePnl, 0);
@@ -473,26 +583,40 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
   const cashDividend = holdings.reduce((s, h) => s + h.cashDividend, 0);
   const stockDividendQty = holdings.reduce((s, h) => s + h.stockDividendQty, 0);
   const tplusProfit = holdings.reduce((s, h) => s + h.tplusProfitCompleted, 0);
-    const navByBucket = emptyBuckets();
+  const navByBucket = emptyBuckets();
   navByBucket.DCDS = cat.DCDS;
   navByBucket.ETF = cat.ETF;
   navByBucket.CRYPTO = cat.CRYPTO;
   navByBucket.BANK = cat.BANK;
-  navByBucket.VPS = holdings.filter((h) => h.accountId === "vps").reduce((s, h) => s + h.marketValue, 0);
-  navByBucket.SSI = holdings.filter((h) => h.accountId === "ssi").reduce((s, h) => s + h.marketValue, 0);
+  navByBucket.VPS = holdings
+    .filter((h) => h.accountId === "vps")
+    .reduce((s, h) => s + h.marketValue, 0);
+  navByBucket.SSI = holdings
+    .filter((h) => h.accountId === "ssi")
+    .reduce((s, h) => s + h.marketValue, 0);
   const tplusByBucket = {
-    VPS: holdings.filter((h) => h.accountId === "vps").reduce((s, h) => s + h.tplusProfitCompleted, 0),
-    SSI: holdings.filter((h) => h.accountId === "ssi").reduce((s, h) => s + h.tplusProfitCompleted, 0),
-    CRYPTO: holdings.filter((h) => h.assetType === "CRYPTO").reduce((s, h) => s + h.tplusProfitCompleted, 0),
+    VPS: holdings
+      .filter((h) => h.accountId === "vps")
+      .reduce((s, h) => s + h.tplusProfitCompleted, 0),
+    SSI: holdings
+      .filter((h) => h.accountId === "ssi")
+      .reduce((s, h) => s + h.tplusProfitCompleted, 0),
+    CRYPTO: holdings
+      .filter((h) => h.assetType === "CRYPTO")
+      .reduce((s, h) => s + h.tplusProfitCompleted, 0),
   };
   const totalPnl = nav - originalCapital;
-  const totalReturnPct = originalCapital > 0 ? (totalPnl / originalCapital) * 100 : 0;
+  const totalReturnPct =
+    originalCapital > 0 ? (totalPnl / originalCapital) * 100 : 0;
 
   holdings.sort((a, b) => {
     const order = ["DCDS", "ETF", "STOCK", "CRYPTO"];
     const d = order.indexOf(a.assetType) - order.indexOf(b.assetType);
     if (d !== 0) return d;
-    return a.symbol.localeCompare(b.symbol) || a.accountName.localeCompare(b.accountName);
+    return (
+      a.symbol.localeCompare(b.symbol) ||
+      a.accountName.localeCompare(b.accountName)
+    );
   });
 
   tplusCards.sort((a, b) => a.symbol.localeCompare(b.symbol));
@@ -500,7 +624,7 @@ export function replayPortfolio(ledger: LedgerSnapshot, asOf = todayYmd()): Port
 
   return {
     asOf,
-  originalCapital,
+    originalCapital,
     originalByBucket,
     originalByBucketUsd,
     nav,

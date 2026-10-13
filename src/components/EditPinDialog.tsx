@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ export function EditPinDialog() {
   const [resolvers, setResolvers] = useState<PinResolver[]>([]);
   const [pin, setPin] = useState("");
   const resolver = resolvers[0];
+  const pinInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleRequest(event: Event) {
@@ -22,6 +23,12 @@ export function EditPinDialog() {
     window.addEventListener(EDIT_PIN_REQUEST_EVENT, handleRequest);
     return () => window.removeEventListener(EDIT_PIN_REQUEST_EVENT, handleRequest);
   }, []);
+
+  useEffect(() => {
+    if (!resolver) return;
+    const frame = requestAnimationFrame(() => pinInputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [resolver]);
 
   function complete(value: string | null) {
     if (!resolver) return;
@@ -42,7 +49,13 @@ export function EditPinDialog() {
         if (!open) complete(null);
       }}
     >
-      <DialogContent title="Nhập mã bảo vệ">
+      <DialogContent
+        title="Nhập mã bảo vệ"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          pinInputRef.current?.focus();
+        }}
+      >
         <form className="mx-auto max-w-sm space-y-4 py-2" onSubmit={submit}>
           <div className="text-center">
             <ShieldCheck className="mx-auto h-8 w-8 text-primary" />
@@ -50,6 +63,7 @@ export function EditPinDialog() {
             <p className="mt-1 text-sm text-muted-foreground">Mã PIN gồm 6 chữ số</p>
           </div>
           <Input
+            ref={pinInputRef}
             autoFocus
             aria-label="Mã PIN"
             autoComplete="one-time-code"

@@ -25,7 +25,7 @@ import { usePortfolioMutation } from "@/lib/use-portfolio";
 import { deleteCapital, deleteBank } from "@/lib/api/portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import { askEditPin } from "@/lib/edit-pin";
-import { Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronDown, Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
 function RealizedProfitCard({
@@ -84,6 +84,7 @@ export function ReportsPage() {
   const [symbol, setSymbol] = useState("ALL");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const allRows = useMemo(() => (data ? buildReportRows(data.ledger, data.state.asOf) : []), [data]);
   const reportSymbols = useMemo(
@@ -185,8 +186,20 @@ export function ReportsPage() {
 
       <Card>
 
-        <CardTitle>Lịch sử</CardTitle>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Lịch sử</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={filtersOpen}
+            aria-controls="report-history-filters"
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            Bộ lọc
+            <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+          </Button>
+        </div>
+        {filtersOpen && <div id="report-history-filters" className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1">
             <Label>Danh mục</Label>
             <Select
@@ -225,7 +238,7 @@ export function ReportsPage() {
             <Label>Đến ngày</Label>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-        </div>
+        </div>}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
             {rows.length} lệnh giao dịch

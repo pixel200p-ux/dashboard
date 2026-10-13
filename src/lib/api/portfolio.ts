@@ -227,8 +227,7 @@ export const saveTransaction = createServerFn({ method: "POST" })
           ${new Date().toISOString()}
         )
         on conflict (id) do update set
-          name = case when excluded.name <> excluded.symbol then excluded.name else assets.name end,
-          current_price = coalesce(excluded.current_price, assets.current_price)
+          name = case when excluded.name <> excluded.symbol then excluded.name else assets.name end
       `;
       if (data.id) {
         await tx`delete from tplus_matches where sell_tx_id = ${id}`;
