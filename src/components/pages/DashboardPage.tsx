@@ -227,8 +227,8 @@ export function DashboardPage() {
             {recent.map((t) => {
               const asset = ledger.assets.find((a) => a.id === t.assetId);
               return (
-                <li key={t.id} className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate pr-1">
+                <li key={t.id} className="flex items-start gap-2">
+                  <span className="min-w-0 flex-1 break-words pr-1 leading-5">
                     {formatViDate(t.txDate)} · {t.txType} {asset?.symbol ?? ""} {t.tradeTplus ? <Badge tone="navy">T+</Badge> : null}
                   </span>
                   <span className={`shrink-0 min-w-[3.75rem] text-right font-mono tabular-nums ${signedClass(t.txType === "SELL" ? 1 : -1)}`}>

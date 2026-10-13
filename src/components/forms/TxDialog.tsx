@@ -688,14 +688,15 @@ export function TxDialog() {
                         return (
                           <label
                             key={l.buyTxId}
-                            className={`flex items-center gap-2 text-sm ${locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                            className={`flex items-start gap-2 text-sm ${locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
                           >
                             <Checkbox
+                              className="mt-0.5 shrink-0"
                               checked={checked}
                               disabled={locked}
                               onCheckedChange={() => toggleLot(l.buyTxId)}
                             />
-                            <span className="min-w-0 truncate">
+                            <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">
                               {formatViDate(l.buyDate)} · {formatQty(l.qtyRemaining, assetType)}/{formatQty(l.qtyOriginal, assetType)} @{" "}
                               {displayPrice(l.buyPrice, assetType, currency, usdVnd)}
                               {" · "}
