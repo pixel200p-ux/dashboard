@@ -76,10 +76,7 @@ function seriesList(): Series[] {
     out.push({
       key: `pnl.${b}`,
       title: `Lãi/lỗ ${name}`,
-      read: (s) =>
-        s.navByBucket[b] -
-        (b === "CRYPTO" ? s.usdtNavValue : 0) -
-        s.originalByBucket[b],
+      read: (s) => s.navByBucket[b] - s.originalByBucket[b],
     });
   }
   return out;

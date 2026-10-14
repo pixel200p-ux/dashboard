@@ -239,7 +239,6 @@ export interface PortfolioState {
   originalByBucketUsd: Record<CapitalBucket, number>;
   nav: number;
   navByBucket: Record<CapitalBucket, number>;
-  usdtNavValue: number;
   tplusByBucket: { VPS: number; SSI: number; CRYPTO: number };
   totalPnl: number;
   totalReturnPct: number;

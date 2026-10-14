@@ -100,7 +100,7 @@ export function DashboardPage() {
         <PnlCard
           pnl={state.totalPnl}
           original={state.originalCapital}
-          subtitle="Lãi/lỗ danh mục · không tính USDT"
+          subtitle="NAV − Original Capital"
           usdVnd={usd}
         />
         <TplusLoweredCard

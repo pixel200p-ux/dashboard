@@ -4,6 +4,7 @@ import { HoldingsTable } from "@/components/HoldingsTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatViDate, formatViDayMonth } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
 import { formatPct, formatQty, signedClass } from "@/engine/money";
@@ -17,7 +18,7 @@ import { FilterMenu } from "@/components/FilterMenu";
 import { Input } from "@/components/ui/input";
 import { updateCryptoUsdtBalance } from "@/lib/api/portfolio";
 import { askEditPin } from "@/lib/edit-pin";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
 const TITLE: Record<AssetType, { title: string; sub: string }> = {
@@ -27,12 +28,24 @@ const TITLE: Record<AssetType, { title: string; sub: string }> = {
   CRYPTO: { title: "Crypto", sub: "Giá USD · tỷ giá VND khóa theo từng lệnh" },
 };
 
-function CryptoUsdtBalanceEditor({ balance }: { balance: number }) {
+function CryptoUsdtBalanceEditor({
+  balance,
+  open,
+  onOpenChange,
+}: {
+  balance: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [draft, setDraft] = useState(String(balance));
   const mutation = usePortfolioMutation(
     (d: Parameters<typeof updateCryptoUsdtBalance>[0]) => updateCryptoUsdtBalance(d),
     "Đã cập nhật số dư USDT",
   );
+
+  useEffect(() => {
+    if (open) setDraft(String(balance));
+  }, [balance, open]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,33 +55,37 @@ function CryptoUsdtBalanceEditor({ balance }: { balance: number }) {
     if (!pin) return;
     try {
       await mutation.mutateAsync({ data: { pin, amount } });
+      onOpenChange(false);
     } catch {
       // The mutation reports the server error through the shared toast handler.
     }
   }
 
   return (
-    <Card>
-      <CardTitle>Số dư USDT</CardTitle>
-      <CardDesc className="mb-3">Nhập số USD đang giữ · chỉ cộng vào NAV, không có giao dịch hoặc giá vốn</CardDesc>
-      <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => void save(event)}>
-        <label className="min-w-0 flex-1 space-y-1 text-sm font-medium">
-          Số USD
-          <Input
-            aria-label="Số dư USDT (USD)"
-            type="number"
-            min="0"
-            step="any"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            required
-          />
-        </label>
-        <Button type="submit" disabled={mutation.isPending || draft === ""}>
-          {mutation.isPending ? "Đang lưu…" : "Lưu số dư"}
-        </Button>
-      </form>
-    </Card>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent title="Sửa số dư USDT">
+        <p className="mb-3 text-sm text-muted-foreground">
+          Số USD này được cộng vào NAV Crypto.
+        </p>
+        <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => void save(event)}>
+          <label className="min-w-0 flex-1 space-y-1 text-sm font-medium">
+            Số USD
+            <Input
+              aria-label="Số dư USDT (USD)"
+              type="number"
+              min="0"
+              step="any"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              required
+            />
+          </label>
+          <Button type="submit" disabled={mutation.isPending || draft === ""}>
+            {mutation.isPending ? "Đang lưu…" : "Lưu số dư"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -82,6 +99,7 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   const [txFilterSymbols, setTxFilterSymbols] = useState<string[]>([]);
   const [showTxFilter, setShowTxFilter] = useState(false);
   const [collapsedTxYears, setCollapsedTxYears] = useState<Record<string, boolean>>({});
+  const [usdtEditOpen, setUsdtEditOpen] = useState(false);
 
   if (isPending || !data) return <Skeleton className="h-64" />;
   const { state, ledger } = data;
@@ -285,9 +303,6 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
         </Button>
         </div>
       </div>
-      {assetType === "CRYPTO" && (
-        <CryptoUsdtBalanceEditor balance={ledger.usdtBalance} />
-      )}
       <div className={kpiGrid}>
         <NavOriginalCard
           title={`NAV / Original ${sliceName}`}
@@ -298,13 +313,11 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
           originalUsd={sliceOriginalUsd}
         />
         <PnlCard
-          pnl={assetType === "CRYPTO" ? sliceNav - usdtValue - sliceOriginal : sliceNav - sliceOriginal}
+          pnl={sliceNav - sliceOriginal}
           original={sliceOriginal}
-          subtitle={assetType === "CRYPTO"
-            ? "Lãi/lỗ Crypto · không tính USDT"
-            : `NAV − Original ${sliceName}`}
+          subtitle={`NAV − Original ${sliceName}`}
           usdVnd={usd}
-          pnlUsd={sliceOriginalUsd != null ? sliceNav / usd - ledger.usdtBalance - sliceOriginalUsd : undefined}
+          pnlUsd={sliceOriginalUsd != null ? sliceNav / usd - sliceOriginalUsd : undefined}
           originalUsd={sliceOriginalUsd}
         />
         {tplusSlice.map((c) => (
@@ -443,8 +456,20 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
           description="Giá vốn đã gồm hạ vốn T+ đã COMPLETED"
           defaultOpen
         >
-          <HoldingsTable rows={holdings} usdVnd={usd} />
+          <HoldingsTable
+            rows={holdings}
+            usdVnd={usd}
+            usdtBalance={assetType === "CRYPTO" ? ledger.usdtBalance : undefined}
+            onEditUsdt={assetType === "CRYPTO" ? () => setUsdtEditOpen(true) : undefined}
+          />
         </CollapsibleCard>
+      )}
+      {assetType === "CRYPTO" && (
+        <CryptoUsdtBalanceEditor
+          balance={ledger.usdtBalance}
+          open={usdtEditOpen}
+          onOpenChange={setUsdtEditOpen}
+        />
       )}
 
       {assetType === "STOCK" && (() => {

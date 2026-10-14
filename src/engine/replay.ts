@@ -616,7 +616,7 @@ export function replayPortfolio(
       .filter((h) => h.assetType === "CRYPTO")
       .reduce((s, h) => s + h.tplusProfitCompleted, 0),
   };
-  const totalPnl = nav - usdtNav - originalCapital;
+  const totalPnl = nav - originalCapital;
   const totalReturnPct =
     originalCapital > 0 ? (totalPnl / originalCapital) * 100 : 0;
 
@@ -640,7 +640,6 @@ export function replayPortfolio(
     originalByBucketUsd,
     nav,
     navByBucket,
-    usdtNavValue: usdtNav,
     tplusByBucket,
     totalPnl,
     totalReturnPct,

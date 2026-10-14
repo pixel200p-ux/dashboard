@@ -110,8 +110,8 @@ export function runTplusSpecExample(): string[] {
     errors.push(`historical USDT NAV ${usdtOnly.nav} != 1250000`);
   if (usdtOnly.navByBucket.CRYPTO !== 1_250_000)
     errors.push(`USDT crypto NAV ${usdtOnly.navByBucket.CRYPTO}`);
-  if (usdtOnly.totalPnl !== 0 || usdtOnly.unrealizedPnl !== 0)
-    errors.push("USDT affected P&L without a cost basis");
+  if (usdtOnly.totalPnl !== 1_250_000 || usdtOnly.unrealizedPnl !== 0)
+    errors.push("USDT NAV was not included in NAV-versus-original P&L");
   if (usdtOnly.holdings.length !== 0)
     errors.push("USDT created a trade holding");
   const currentUsdt = replayPortfolio(

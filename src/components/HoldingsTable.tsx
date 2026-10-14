@@ -15,9 +15,13 @@ import { cn } from "@/lib/utils";
 export function HoldingsTable({
   rows,
   usdVnd,
+  usdtBalance,
+  onEditUsdt,
 }: {
   rows: HoldingView[];
   usdVnd: number;
+  usdtBalance?: number;
+  onEditUsdt?: () => void;
 }) {
   const currency = useUiStore((s) => s.currency);
   const openTx = useUiStore((s) => s.openTx);
@@ -31,7 +35,7 @@ export function HoldingsTable({
 
   const visibleRows = rows.filter((h) => (h.quantity ?? 0) > 1e-12);
 
-  if (visibleRows.length === 0) {
+  if (visibleRows.length === 0 && !onEditUsdt) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
         Chưa có vị thế. Ghi giao dịch Buy để mở sổ.
@@ -55,13 +59,15 @@ export function HoldingsTable({
           rows: visibleRows.filter((h) => h.accountId === "ssi"),
         },
       ].filter((group) => group.rows.length > 0)
-    : [
+    : visibleRows.length > 0
+    ? [
         {
           key: "all",
           label: visibleRows[0]?.accountName?.toUpperCase() || "CRYPTO",
           rows: visibleRows,
         },
-      ];
+      ]
+    : [{ key: "all", label: "CRYPTO", rows: [] }];
 
   return (
     <div className="space-y-8">
@@ -86,7 +92,7 @@ export function HoldingsTable({
             >
               <span>{group.label}</span>
               <span className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground">
-                {group.rows.length} mã
+                {group.rows.length + (group.key === "all" && onEditUsdt ? 1 : 0)} mã
               </span>
             </div>
 
@@ -109,6 +115,27 @@ export function HoldingsTable({
                     </tr>
                   </thead>
                   <tbody>
+                    {group.key === "all" && onEditUsdt && usdtBalance != null && (
+                      <tr className="border-b border-border/70">
+                        <td className="px-2 py-1.5">
+                          <button
+                            className="text-[12px] font-semibold hover:underline"
+                            onClick={onEditUsdt}
+                            aria-label="Sửa số dư USDT"
+                          >
+                            USDT
+                          </button>
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[12px]">-</td>
+                        <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[12px]">-</td>
+                        <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[12px]">-</td>
+                        <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[12px]">
+                          {formatUsd(usdtBalance)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[12px]">-</td>
+                        <td className="px-2 py-1.5">-</td>
+                      </tr>
+                    )}
                     {group.rows.map((h) => {
                       const pnl =
                         h.assetType === "CRYPTO"

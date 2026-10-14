@@ -4,7 +4,7 @@ Sổ cái danh mục thuần tài sản (Asset-Only Ledger) + Trade T+.
 
 - Original Capital chỉ đổi qua **Nạp / Rút vốn gốc** trên Dashboard
 - NAV = DCDS + ETF + Stock + Crypto (bao gồm số dư USDT nhập thủ công) + Bank đang hiệu lực
-- Số dư USDT chỉ cộng vào NAV, không có giá vốn/giao dịch/T+ và không tính vào P&L
+- Số dư USDT chỉ cộng vào NAV và P&L NAV − Original, không có giá vốn/giao dịch/T+
 - Trade T+ (Stock VPS/SSI, Crypto): khớp bán thủ công; lãi COMPLETED mới hạ giá vốn gốc
 - Bank: nhiều sổ, tên tùy chọn, đáo hạn / tái tục
 - UI tiếng Việt, từ khóa giữ nguyên: Dashboard, Stock, ETF, Crypto, DCDS, Bank, Buy, Sell
