@@ -28,6 +28,8 @@ export function runTplusSpecExample(): string[] {
   const errors: string[] = [];
   const ledger: LedgerSnapshot = {
     accounts: [{ id: "vps", name: "VPS", kind: "STOCK_VPS", currency: "VND" }],
+    usdtBalance: 0,
+    usdtBalanceHistory: [],
     assets: [
       {
         id: "vps:TEST",
@@ -88,6 +90,47 @@ export function runTplusSpecExample(): string[] {
     ],
     usdVnd: 25000,
   };
+
+  const usdtOnly = replayPortfolio(
+    {
+      ...ledger,
+      assets: [],
+      capital: [],
+      transactions: [],
+      matches: [],
+      usdtBalance: 100,
+      usdtBalanceHistory: [
+        { effectiveDate: "2026-01-10", amount: 50 },
+        { effectiveDate: "2026-01-12", amount: 100 },
+      ],
+    },
+    "2026-01-11",
+  );
+  if (usdtOnly.nav !== 1_250_000)
+    errors.push(`historical USDT NAV ${usdtOnly.nav} != 1250000`);
+  if (usdtOnly.navByBucket.CRYPTO !== 1_250_000)
+    errors.push(`USDT crypto NAV ${usdtOnly.navByBucket.CRYPTO}`);
+  if (usdtOnly.totalPnl !== 0 || usdtOnly.unrealizedPnl !== 0)
+    errors.push("USDT affected P&L without a cost basis");
+  if (usdtOnly.holdings.length !== 0)
+    errors.push("USDT created a trade holding");
+  const currentUsdt = replayPortfolio(
+    {
+      ...ledger,
+      assets: [],
+      capital: [],
+      transactions: [],
+      matches: [],
+      usdtBalance: 100,
+      usdtBalanceHistory: [
+        { effectiveDate: "2026-01-10", amount: 50 },
+        { effectiveDate: "2026-01-12", amount: 100 },
+      ],
+    },
+    "2026-01-13",
+  );
+  if (currentUsdt.nav !== 2_500_000)
+    errors.push(`current USDT NAV ${currentUsdt.nav} != 2500000`);
 
   const open = replayPortfolio(ledger, "2026-01-11");
   const card = open.tplusCards[0];

@@ -62,7 +62,7 @@ function seriesList(): Series[] {
   const out: Series[] = [
     { key: "nav", title: "NAV tổng", read: (s) => s.nav },
     { key: "orig", title: "Original tổng", read: (s) => s.originalCapital },
-    { key: "pnl", title: "Lãi/lỗ tổng", read: (s) => s.nav - s.originalCapital },
+    { key: "pnl", title: "Lãi/lỗ tổng", read: (s) => s.totalPnl },
     {
       key: "tplus",
       title: "Lãi T+",
@@ -76,7 +76,10 @@ function seriesList(): Series[] {
     out.push({
       key: `pnl.${b}`,
       title: `Lãi/lỗ ${name}`,
-      read: (s) => s.navByBucket[b] - s.originalByBucket[b],
+      read: (s) =>
+        s.navByBucket[b] -
+        (b === "CRYPTO" ? s.usdtNavValue : 0) -
+        s.originalByBucket[b],
     });
   }
   return out;
@@ -101,6 +104,9 @@ export function computeMilestones(
   }
   for (const c of ledger.capital) {
     if (!c.deletedAt) dateSet.add(c.movementDate);
+  }
+  for (const snapshot of ledger.usdtBalanceHistory) {
+    dateSet.add(snapshot.effectiveDate);
   }
   for (const b of ledger.banks) {
     if (b.deletedAt) continue;

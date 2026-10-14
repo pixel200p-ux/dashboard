@@ -7,14 +7,17 @@ import { Card, CardDesc, CardTitle, CollapsibleCard } from "@/components/ui/card
 import { formatViDate, formatViDayMonth } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
 import { formatPct, formatQty, signedClass } from "@/engine/money";
-import { usePortfolio } from "@/lib/use-portfolio";
+import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { useUiStore } from "@/lib/ui-store";
 import type { AssetType, Transaction } from "@/engine/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SmartDeleteTransactionDialog } from "@/components/SmartDeleteTransactionDialog";
 import { NavOriginalCard, PnlCard, TplusLoweredCard } from "@/components/NavOriginalCards";
 import { FilterMenu } from "@/components/FilterMenu";
-import { useState, useMemo } from "react";
+import { Input } from "@/components/ui/input";
+import { updateCryptoUsdtBalance } from "@/lib/api/portfolio";
+import { askEditPin } from "@/lib/edit-pin";
+import { useState, type FormEvent } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
 const TITLE: Record<AssetType, { title: string; sub: string }> = {
@@ -23,6 +26,51 @@ const TITLE: Record<AssetType, { title: string; sub: string }> = {
   STOCK: { title: "Stock", sub: "VPS và SSI độc lập về holdings, giá vốn, P&L và T+" },
   CRYPTO: { title: "Crypto", sub: "Giá USD · tỷ giá VND khóa theo từng lệnh" },
 };
+
+function CryptoUsdtBalanceEditor({ balance }: { balance: number }) {
+  const [draft, setDraft] = useState(String(balance));
+  const mutation = usePortfolioMutation(
+    (d: Parameters<typeof updateCryptoUsdtBalance>[0]) => updateCryptoUsdtBalance(d),
+    "Đã cập nhật số dư USDT",
+  );
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const amount = Number(draft);
+    if (!Number.isFinite(amount) || amount < 0) return;
+    const pin = await askEditPin();
+    if (!pin) return;
+    try {
+      await mutation.mutateAsync({ data: { pin, amount } });
+    } catch {
+      // The mutation reports the server error through the shared toast handler.
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle>Số dư USDT</CardTitle>
+      <CardDesc className="mb-3">Nhập số USD đang giữ · chỉ cộng vào NAV, không có giao dịch hoặc giá vốn</CardDesc>
+      <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => void save(event)}>
+        <label className="min-w-0 flex-1 space-y-1 text-sm font-medium">
+          Số USD
+          <Input
+            aria-label="Số dư USDT (USD)"
+            type="number"
+            min="0"
+            step="any"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            required
+          />
+        </label>
+        <Button type="submit" disabled={mutation.isPending || draft === ""}>
+          {mutation.isPending ? "Đang lưu…" : "Lưu số dư"}
+        </Button>
+      </form>
+    </Card>
+  );
+}
 
 export function AssetPage({ assetType }: { assetType: AssetType }) {
   const { data, isPending } = usePortfolio();
@@ -153,15 +201,23 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
   });
 
   const activeHoldings = holdings.filter(h => (h.quantity ?? 0) > 1e-12);
-  const totalMarketValue = activeHoldings.reduce((s, x) => s + x.marketValue, 0);
-  const pie = [...activeHoldings]
+  const cryptoHoldings = activeHoldings.filter((h) => h.marketValue > 0);
+  const usdtValue = ledger.usdtBalance * usd;
+  const cryptoTotal = cryptoHoldings.reduce((s, h) => s + h.marketValue, 0) + usdtValue;
+  const pie = [...cryptoHoldings]
     .sort((a, b) => b.marketValue - a.marketValue)
     .map((h) => ({
-      key: h.assetId,
+      key: "CRYPTO",
       label: h.symbol,
       value: h.marketValue,
-      pct: totalMarketValue > 0 ? (h.marketValue / totalMarketValue) * 100 : 0,
-    }));
+      pct: cryptoTotal > 0 ? (h.marketValue / cryptoTotal) * 100 : 0,
+    }))
+    .concat([{
+      key: "USDT",
+      label: "USDT",
+      value: usdtValue,
+      pct: cryptoTotal > 0 ? (usdtValue / cryptoTotal) * 100 : 0,
+    }]);
 
   const vpsPie = [...activeHoldings]
     .filter((h) => h.accountId === "vps")
@@ -229,6 +285,9 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
         </Button>
         </div>
       </div>
+      {assetType === "CRYPTO" && (
+        <CryptoUsdtBalanceEditor balance={ledger.usdtBalance} />
+      )}
       <div className={kpiGrid}>
         <NavOriginalCard
           title={`NAV / Original ${sliceName}`}
@@ -239,11 +298,13 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
           originalUsd={sliceOriginalUsd}
         />
         <PnlCard
-          pnl={sliceNav - sliceOriginal}
+          pnl={assetType === "CRYPTO" ? sliceNav - usdtValue - sliceOriginal : sliceNav - sliceOriginal}
           original={sliceOriginal}
-          subtitle={`NAV − Original ${sliceName}`}
+          subtitle={assetType === "CRYPTO"
+            ? "Lãi/lỗ Crypto · không tính USDT"
+            : `NAV − Original ${sliceName}`}
           usdVnd={usd}
-          pnlUsd={sliceOriginalUsd != null ? sliceNav / usd - sliceOriginalUsd : undefined}
+          pnlUsd={sliceOriginalUsd != null ? sliceNav / usd - ledger.usdtBalance - sliceOriginalUsd : undefined}
           originalUsd={sliceOriginalUsd}
         />
         {tplusSlice.map((c) => (
@@ -281,10 +342,7 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
         <CollapsibleCard title="Phân bổ mã" defaultOpen>
           <AllocChart
             usdVnd={usd}
-            data={pie.map((p) => ({
-              ...p,
-              key: "CRYPTO",
-            }))}
+            data={pie}
           />
         </CollapsibleCard>
       )}

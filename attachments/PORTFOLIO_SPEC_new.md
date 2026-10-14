@@ -93,7 +93,12 @@
     },
     "4_2_net_asset_value_nav": {
       "model": "Mô hình Thuần Tài Sản (Asset-Only Ledger): Không quản lý hay duy trì biến số Cash (Tiền mặt/Số dư khả dụng) trung gian.",
-      "formula": "NAV = SUM(Giá trị thị trường DCDS + ETF + Stock + Crypto + Active Bank Deposits)"
+      "formula": "NAV = SUM(Giá trị thị trường DCDS + ETF + Stock + Crypto (bao gồm số dư USDT nhập thủ công) + Active Bank Deposits)",
+      "usdt_balance_rules": [
+        "Người dùng có thể nhập và chỉnh sửa số dư USDT bằng USD trong tab Crypto.",
+        "Số dư USDT quy đổi theo tỷ giá USD/VND hiện tại và chỉ cộng vào NAV Crypto; không có giá vốn, giao dịch BUY/SELL hoặc Trade T+.",
+        "Số dư USDT không được tính vào P&L; USDT vẫn hiện trên biểu đồ phân bổ Crypto khi số dư bằng 0."
+      ]
     },
     "4_3_currency_storage_and_display_rules": {
       "db_storage": {

@@ -314,6 +314,10 @@ export function TxDialog() {
 
     const sym = symbol.trim().toUpperCase();
     if (!sym) return;
+    if (assetType === "CRYPTO" && sym === "USDT") {
+      toast.error("USDT chỉ dùng để nhập số dư, không hỗ trợ giao dịch.");
+      return;
+    }
     let left = computedQty;
     const matches: { buyTxId: string; quantity: number }[] = [];
     for (const id of selectedLotIds) {

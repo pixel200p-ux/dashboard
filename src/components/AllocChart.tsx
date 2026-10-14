@@ -6,6 +6,7 @@ const COLORS: Record<string, string> = {
   ETF: "var(--app-chart-etf)",
   STOCK: "var(--app-chart-stock)",
   CRYPTO: "var(--app-chart-crypto)",
+  USDT: "var(--app-chart-crypto)",
   BANK: "var(--app-chart-bank)",
   VPS: "var(--app-chart-stock)",
   SSI: "var(--app-chart-bank)",
@@ -32,7 +33,7 @@ export function AllocChart({
     const rows = data;
   const max = Math.max(...rows.map((r) => r.value), 1);
 
-  if (rows.every((r) => r.value <= 0)) {
+  if (rows.every((r) => r.value <= 0) && !rows.some((r) => r.key === "USDT")) {
     return (
       <div className="grid h-40 place-items-center text-sm text-muted-foreground">Chưa có tài sản</div>
     );
@@ -65,7 +66,9 @@ export function AllocChart({
                   }}
                 />
                 <span className="shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-foreground">
-                  {r.value > 0 ? displayMoney(r.value, currency, usdVnd) : "—"}
+                  {r.value > 0 || r.key === "USDT"
+                    ? displayMoney(r.value, currency, usdVnd)
+                    : "—"}
                 </span>
               </div>
 

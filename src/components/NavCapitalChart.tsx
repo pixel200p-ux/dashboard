@@ -33,6 +33,9 @@ function buildHistory(ledger: LedgerSnapshot, months = 6): Point[] {
   for (const t of ledger.transactions) {
     if (!t.deletedAt && t.txDate >= startDate) dateSet.add(t.txDate);
   }
+  for (const snapshot of ledger.usdtBalanceHistory) {
+    if (snapshot.effectiveDate >= startDate) dateSet.add(snapshot.effectiveDate);
+  }
   dateSet.add(end);
 
   const points: Point[] = [];

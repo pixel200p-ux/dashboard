@@ -108,6 +108,8 @@ export interface FeeSetting {
 export interface LedgerSnapshot {
   accounts: Account[];
   assets: Asset[];
+  usdtBalance: number;
+  usdtBalanceHistory: { effectiveDate: string; amount: number }[];
   capital: CapitalMovement[];
   transactions: Transaction[];
   matches: TplusMatch[];
@@ -237,6 +239,7 @@ export interface PortfolioState {
   originalByBucketUsd: Record<CapitalBucket, number>;
   nav: number;
   navByBucket: Record<CapitalBucket, number>;
+  usdtNavValue: number;
   tplusByBucket: { VPS: number; SSI: number; CRYPTO: number };
   totalPnl: number;
   totalReturnPct: number;

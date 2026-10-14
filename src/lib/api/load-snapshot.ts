@@ -14,7 +14,7 @@ import {
 
 export async function loadLedgerSnapshot(): Promise<LedgerSnapshot> {
   const sql = await getSql();
-  const [accounts, assets, capital, transactions, matches, banks, bankRates, fees, meta] =
+  const [accounts, assets, capital, transactions, matches, banks, bankRates, fees, meta, usdtMeta, usdtHistory] =
     await Promise.all([
       sql`select * from accounts order by id`,
       sql`select * from assets order by symbol`,
@@ -25,10 +25,17 @@ export async function loadLedgerSnapshot(): Promise<LedgerSnapshot> {
       sql`select * from bank_rate_updates`,
       sql`select * from fee_settings`,
       sql`select value from app_meta where key = 'usd_vnd'`,
+      sql`select value from app_meta where key = 'crypto_usdt_balance'`,
+      sql`select effective_date::text as effective_date, amount from crypto_usdt_balance_history order by effective_date`,
     ]);
   return {
     accounts: accounts.map(mapAccount),
     assets: assets.map(mapAsset),
+    usdtBalance: usdtMeta[0] ? n((usdtMeta[0] as { value: string }).value) : 0,
+    usdtBalanceHistory: usdtHistory.map((row) => ({
+      effectiveDate: String((row as { effective_date: string }).effective_date).slice(0, 10),
+      amount: n((row as { amount: unknown }).amount),
+    })),
     capital: capital.map(mapCapital),
     transactions: transactions.map(mapTx),
     matches: matches.map(mapMatch),

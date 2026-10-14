@@ -199,6 +199,8 @@ export const fetchMilestones = createServerFn({ method: "GET" })
         bankRates,
         fees,
         meta,
+        usdtMeta,
+        usdtHistory,
         snaps,
         fx,
       ] = await Promise.all([
@@ -211,12 +213,21 @@ export const fetchMilestones = createServerFn({ method: "GET" })
         sql`select * from bank_rate_updates`,
         sql`select * from fee_settings`,
         sql`select value from app_meta where key = 'usd_vnd'`,
+        sql`select value from app_meta where key = 'crypto_usdt_balance'`,
+        sql`select effective_date::text as effective_date, amount from crypto_usdt_balance_history order by effective_date`,
         sql`select asset_id, as_of::text as as_of, price from price_snapshots order by as_of, asset_id`,
         sql`select as_of::text as as_of, usd_vnd from fx_snapshots order by as_of`,
       ]);
       const ledger: LedgerSnapshot = {
         accounts: accounts.map(mapAccount),
         assets: assets.map(mapAsset),
+        usdtBalance: usdtMeta[0]
+          ? n((usdtMeta[0] as { value: string }).value)
+          : 0,
+        usdtBalanceHistory: usdtHistory.map((row) => ({
+          effectiveDate: String((row as { effective_date: string }).effective_date).slice(0, 10),
+          amount: n((row as { amount: unknown }).amount),
+        })),
         capital: capital.map(mapCapital),
         transactions: transactions.map(mapTx),
         matches: matches.map(mapMatch),

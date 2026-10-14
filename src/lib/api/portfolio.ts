@@ -55,6 +55,31 @@ export const fetchPortfolio = createServerFn({ method: "GET" })
     return { ledger, state: replayPortfolio(ledger) };
   });
 
+export const updateCryptoUsdtBalance = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ pin: z.string(), amount: z.number().finite().nonnegative() }))
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    await (
+      await import("@/lib/auth/edit-pin.server")
+    ).requireEditPin(sql, data.pin);
+    await sql.transaction(async (tx) => {
+      await tx`
+        insert into app_meta (key, value, updated_at)
+        values ('crypto_usdt_balance', ${String(data.amount)}, now())
+        on conflict (key) do update set value = excluded.value, updated_at = now()
+      `;
+      await tx`
+        insert into crypto_usdt_balance_history (effective_date, amount, updated_at)
+        values (${todayYmd()}, ${data.amount}, now())
+        on conflict (effective_date) do update
+        set amount = excluded.amount, updated_at = now()
+      `;
+    });
+    const ledger = await loadLedgerSnapshot();
+    return { ledger, state: replayPortfolio(ledger) };
+  });
+
 const capitalSchema = z.object({
   kind: z.enum(["DEPOSIT", "WITHDRAW"]),
   amount: z.number().positive(),
@@ -204,6 +229,9 @@ export const saveTransaction = createServerFn({ method: "POST" })
   .validator(txSchema)
   .handler(async ({ data }) => {
     const sql = await getSql();
+    if (data.assetType === "CRYPTO" && data.symbol.trim().toUpperCase() === "USDT") {
+      throw new Error("USDT chỉ dùng để nhập số dư, không hỗ trợ giao dịch.");
+    }
     if (
       data.createOriginalDeposit &&
       (data.txType !== "BUY" ||

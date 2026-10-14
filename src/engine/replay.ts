@@ -569,6 +569,17 @@ export function replayPortfolio(
     else if (h.assetType === "STOCK") cat.STOCK += h.marketValue;
     else if (h.assetType === "CRYPTO") cat.CRYPTO += h.marketValue;
   }
+  const usdtHistory = ledger.usdtBalanceHistory;
+  const pastUsdt = usdtHistory.filter(
+    (snapshot) => snapshot.effectiveDate <= asOf,
+  );
+  const historicalUsdt = pastUsdt[pastUsdt.length - 1];
+  const usdtBalance =
+    usdtHistory.length > 0
+      ? historicalUsdt?.amount ?? 0
+      : ledger.usdtBalance;
+  const usdtNav = usdtBalance * ledger.usdVnd;
+  cat.CRYPTO += usdtNav;
   const nav = cat.DCDS + cat.ETF + cat.STOCK + cat.CRYPTO + cat.BANK;
   const allocation: PortfolioState["allocation"] = {};
   for (const key of ["DCDS", "ETF", "STOCK", "CRYPTO", "BANK"]) {
@@ -605,7 +616,7 @@ export function replayPortfolio(
       .filter((h) => h.assetType === "CRYPTO")
       .reduce((s, h) => s + h.tplusProfitCompleted, 0),
   };
-  const totalPnl = nav - originalCapital;
+  const totalPnl = nav - usdtNav - originalCapital;
   const totalReturnPct =
     originalCapital > 0 ? (totalPnl / originalCapital) * 100 : 0;
 
@@ -629,6 +640,7 @@ export function replayPortfolio(
     originalByBucketUsd,
     nav,
     navByBucket,
+    usdtNavValue: usdtNav,
     tplusByBucket,
     totalPnl,
     totalReturnPct,
