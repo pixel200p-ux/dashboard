@@ -483,31 +483,33 @@ export function CalendarPage() {
                     <span className="min-w-0 flex-1 truncate text-xs font-medium text-[#0F172A] dark:text-white">
                       {ev.title}
                     </span>
-                    <div className="flex shrink-0 gap-1">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-6 w-6 min-h-6 rounded-md border-[#E2E8F0] bg-white p-0 text-[#0F172A] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-white dark:hover:bg-[#354969] dark:hover:text-white"
-                        title="Sửa"
-                        aria-label="Sửa"
-                        onClick={() => openEdit(ev)}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 min-h-6 rounded-md p-0 text-[#64748B] transition hover:bg-red-500/10 hover:text-red-600 dark:text-[#94A3B8] dark:hover:bg-red-500/20 dark:hover:text-red-400"
-                        title="Xóa"
-                        aria-label="Xóa"
-                        onClick={async () => {
-                          const pin = await askEditPin();
-                          if (pin) delMut.mutate({ data: { id: ev.id, pin } });
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    {ev.source !== "CORPORATE_ACTION" && (
+                      <div className="flex shrink-0 gap-1">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-6 w-6 min-h-6 rounded-md border-[#E2E8F0] bg-white p-0 text-[#0F172A] transition hover:border-[#0F172A]/30 hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-transparent dark:text-[#94A3B8] dark:hover:border-white dark:hover:bg-[#354969] dark:hover:text-white"
+                          title="Sửa"
+                          aria-label="Sửa"
+                          onClick={() => openEdit(ev)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 min-h-6 rounded-md p-0 text-[#64748B] transition hover:bg-red-500/10 hover:text-red-600 dark:text-[#94A3B8] dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                          title="Xóa"
+                          aria-label="Xóa"
+                          onClick={async () => {
+                            const pin = await askEditPin();
+                            if (pin) delMut.mutate({ data: { id: ev.id, pin } });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

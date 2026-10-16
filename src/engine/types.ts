@@ -2,6 +2,7 @@ export type AccountKind =
   "STOCK_VPS" | "STOCK_SSI" | "CRYPTO" | "ETF" | "DCDS" | "BANK";
 export type AssetType = "STOCK" | "ETF" | "DCDS" | "CRYPTO";
 export type TxType = "BUY" | "SELL" | "CASH_DIVIDEND" | "STOCK_DIVIDEND";
+export type CorporateActionType = "CASH_DIVIDEND" | "STOCK_DIVIDEND";
 export type CapitalKind = "DEPOSIT" | "WITHDRAW";
 export const CAPITAL_BUCKETS = [
   "DCDS",
@@ -62,7 +63,24 @@ export interface Transaction {
   fxRate: number | null;
   dividendPerShare: number | null;
   stockDivQty: number | null;
+  corporateActionId: string | null;
   notes: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+}
+
+export interface CorporateAction {
+  id: string;
+  symbol: string;
+  exDate: string;
+  recordDate: string | null;
+  paymentDate: string | null;
+  actionType: CorporateActionType;
+  distributionPct: number;
+  referencePrice: number;
+  notes: string | null;
+  source: "MANUAL" | "AUTO";
+  sourceKey: string | null;
   deletedAt: string | null;
   createdAt: string;
 }
@@ -112,6 +130,7 @@ export interface LedgerSnapshot {
   usdtBalanceHistory: { effectiveDate: string; amount: number }[];
   capital: CapitalMovement[];
   transactions: Transaction[];
+  corporateActions: CorporateAction[];
   matches: TplusMatch[];
   banks: BankDeposit[];
   bankRates: BankRateUpdate[];

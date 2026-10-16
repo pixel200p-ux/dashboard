@@ -15,12 +15,16 @@ export function usePortfolio() {
 export function usePortfolioMutation<TArgs>(
   fn: (args: TArgs) => Promise<PortfolioPayload>,
   ok = "Đã lưu",
+  refreshCalendar = false,
 ) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
     onSuccess: (data) => {
       qc.setQueryData(PORTFOLIO_KEY, data);
+      if (refreshCalendar) {
+        void qc.invalidateQueries({ queryKey: ["calendar"] });
+      }
       toast.success(ok);
     },
     onError: (err: Error) => {

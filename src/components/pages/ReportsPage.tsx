@@ -23,6 +23,7 @@ import {
 import { usePortfolio } from "@/lib/use-portfolio";
 import { usePortfolioMutation } from "@/lib/use-portfolio";
 import { deleteCapital, deleteBank } from "@/lib/api/portfolio";
+import { deleteCorporateAction } from "@/lib/api/corporate-actions";
 import { useUiStore } from "@/lib/ui-store";
 import { askEditPin } from "@/lib/edit-pin";
 import { ChevronDown, Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
@@ -78,6 +79,11 @@ export function ReportsPage() {
   const openBank = useUiStore((s) => s.openBank);
   const deleteCapitalMut = usePortfolioMutation((d: Parameters<typeof deleteCapital>[0]) => deleteCapital(d), "Đã xóa dòng vốn");
   const deleteBankMut = usePortfolioMutation((d: Parameters<typeof deleteBank>[0]) => deleteBank(d), "Đã xóa sổ");
+  const deleteActionMut = usePortfolioMutation(
+    (d: Parameters<typeof deleteCorporateAction>[0]) => deleteCorporateAction(d),
+    "Đã xóa sự kiện GDKHQ",
+    true,
+  );
   const [deleteTarget, setDeleteTarget] = useState<{ transaction: Transaction; symbol: string } | null>(null);
   const [bucket, setBucket] = useState<"ALL" | CapitalBucket>("ALL");
   const [kind, setKind] = useState<"ALL" | ReportKind>("ALL");
@@ -325,9 +331,27 @@ export function ReportsPage() {
                               openBank(r.id.replace(/:open$/, ""));
                               return;
                             }
+                            if (r.kind === "EX_RIGHTS" && r.corporateAction) {
+                              const action = r.corporateAction;
+                              openTx({
+                                id: action.id,
+                                formKind: "STOCK",
+                                assetType: "STOCK",
+                                txType: "EX_RIGHTS",
+                                symbol: action.symbol,
+                                name: action.notes ?? "",
+                                txDate: action.exDate,
+                                corporateActionType: action.actionType,
+                                distributionPct: action.distributionPct,
+                                referencePrice: action.referencePrice,
+                                recordDate: action.recordDate,
+                                paymentDate: action.paymentDate,
+                              });
+                              return;
+                            }
                             const t = data.ledger.transactions.find((item) => item.id === r.id);
                             const asset = t ? data.ledger.assets.find((item) => item.id === t.assetId) : undefined;
-                            if (t) openTx({ id: t.id, accountId: t.accountId, symbol: asset?.symbol, name: asset?.name, assetType: asset?.assetType, txType: t.txType, txDate: t.txDate, quantity: t.quantity, price: t.price ?? undefined, amount: t.amount, fee: t.fee, tax: t.tax, tradeTplus: t.tradeTplus, fxRate: t.fxRate, stockDivQty: t.stockDivQty, notes: t.notes, matches: data.ledger.matches.filter((m) => m.sellTxId === t.id).map((m) => ({ buyTxId: m.buyTxId, quantity: m.quantity })) });
+                            if (t) openTx({ id: t.id, accountId: t.accountId, symbol: asset?.symbol, name: asset?.name, assetType: asset?.assetType, txType: t.txType, txDate: t.txDate, quantity: t.quantity, price: t.price ?? undefined, amount: t.amount, fee: t.fee, tax: t.tax, tradeTplus: t.tradeTplus, fxRate: t.fxRate, stockDivQty: t.stockDivQty, corporateActionId: t.corporateActionId, notes: t.notes, matches: data.ledger.matches.filter((m) => m.sellTxId === t.id).map((m) => ({ buyTxId: m.buyTxId, quantity: m.quantity })) });
                           }}
                         >
                           <Pencil className="h-4 w-4" />
@@ -337,6 +361,11 @@ export function ReportsPage() {
                           className="grid h-9 w-9 place-items-center rounded-md text-destructive hover:bg-destructive/10"
                           aria-label="Xóa dòng lịch sử"
                           onClick={async () => {
+                            if (r.kind === "EX_RIGHTS") {
+                              const pin = await askEditPin();
+                              if (pin) deleteActionMut.mutate({ data: { id: r.id, pin } });
+                              return;
+                            }
                             if (r.kind !== "DEPOSIT" && r.kind !== "WITHDRAW" && r.kind !== "BANK_OPEN") {
                               const transaction = data.ledger.transactions.find((item) => item.id === r.id);
                               const asset = transaction ? data.ledger.assets.find((item) => item.id === transaction.assetId) : undefined;

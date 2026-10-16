@@ -9,6 +9,20 @@ Sổ cái danh mục thuần tài sản (Asset-Only Ledger) + Trade T+.
 - Bank: nhiều sổ, tên tùy chọn, đáo hạn / tái tục
 - UI tiếng Việt, từ khóa giữ nguyên: Dashboard, Stock, ETF, Crypto, DCDS, Bank, Buy, Sell
 
+## Sự kiện cổ tức / GDKHQ
+
+Trong form giao dịch Stock, chọn **Ngày GDKHQ** để nhập hoặc sửa sự kiện tiền
+mặt/cổ tức cổ phiếu. Replay áp dụng sự kiện cho lượng cổ phiếu đang đủ điều kiện
+trước ngày GDKHQ; các giao dịch gốc không bị sửa, còn lệnh bán sau ngày đó được
+tính lại theo giá vốn đã điều chỉnh. Giá thị trường vẫn lấy riêng từ nguồn giá
+hiện tại.
+
+Khi ghi nhận tiền cổ tức về tài khoản, liên kết khoản nhận với sự kiện GDKHQ
+tương ứng để không giảm giá vốn hai lần. Sự kiện có dòng riêng trong Reports và
+chỉ được hiển thị (không sửa/xóa) trên Calendar. Hiện sự kiện được nhập thủ
+công; chưa có API/crawler tự đồng bộ. Quyền mua chưa nằm trong phạm vi này.
+Cổ phiếu thưởng được làm tròn xuống tổng quyền lợi riêng theo từng broker.
+
 ## Chạy local
 
 ```bash

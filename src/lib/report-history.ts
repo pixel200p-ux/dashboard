@@ -1,6 +1,6 @@
 import { interestForPeriod, periodRate } from "@/engine/bank";
 import { addTermMonths, todayYmd } from "@/engine/dates";
-import type { CapitalBucket, LedgerSnapshot } from "@/engine/types";
+import type { CapitalBucket, CorporateAction, LedgerSnapshot } from "@/engine/types";
 
 export type ReportKind =
   | "DEPOSIT"
@@ -11,6 +11,7 @@ export type ReportKind =
   | "SELL_TPLUS"
   | "CASH_DIVIDEND"
   | "STOCK_DIVIDEND"
+  | "EX_RIGHTS"
   | "BANK_OPEN"
   | "BANK_ROLLOVER"
   | "BANK_REDEEM";
@@ -19,7 +20,8 @@ export type ReportRow = {
   id: string;
   date: string;
   createdAt: string;
-  bucket: CapitalBucket;
+  bucket: CapitalBucket | "ALL";
+  relatedBuckets?: CapitalBucket[];
   symbol: string;
   kind: ReportKind;
   kindLabel: string;
@@ -28,6 +30,7 @@ export type ReportRow = {
   amount: number;
   notes: string | null;
   assetType: "STOCK" | "ETF" | "DCDS" | "CRYPTO" | "BANK" | "ORIGINAL";
+  corporateAction?: CorporateAction;
 };
 
 export const REPORT_BUCKETS: { value: "ALL" | CapitalBucket; label: string }[] = [
@@ -50,6 +53,7 @@ export const REPORT_KINDS: { value: "ALL" | ReportKind; label: string }[] = [
   { value: "SELL_TPLUS", label: "Sell T+" },
   { value: "CASH_DIVIDEND", label: "Cổ tức tiền" },
   { value: "STOCK_DIVIDEND", label: "Cổ tức CP" },
+  { value: "EX_RIGHTS", label: "Ngày GDKHQ" },
   { value: "BANK_OPEN", label: "Mở sổ" },
   { value: "BANK_ROLLOVER", label: "Tái tục" },
   { value: "BANK_REDEEM", label: "Tất toán" },
@@ -64,6 +68,7 @@ const KIND_LABEL: Record<ReportKind, string> = {
   SELL_TPLUS: "Sell T+",
   CASH_DIVIDEND: "Cổ tức tiền",
   STOCK_DIVIDEND: "Cổ tức CP",
+  EX_RIGHTS: "Ngày GDKHQ",
   BANK_OPEN: "Mở sổ",
   BANK_ROLLOVER: "Tái tục",
   BANK_REDEEM: "Tất toán",
@@ -199,6 +204,47 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
     });
   }
 
+  for (const action of ledger.corporateActions) {
+    if (action.deletedAt) continue;
+    const relatedBuckets = [
+      ...new Set(
+        ledger.assets
+          .filter(
+            (asset) =>
+              asset.assetType === "STOCK" && asset.symbol === action.symbol,
+          )
+          .map((asset) => accountBucket(asset.accountId, ledger)),
+      ),
+    ];
+    const distributionLabel =
+      action.actionType === "CASH_DIVIDEND"
+        ? `Cổ tức tiền ${action.distributionPct}%`
+        : `Cổ tức cổ phiếu ${action.distributionPct}%`;
+    rows.push({
+      id: action.id,
+      date: action.exDate,
+      createdAt: action.createdAt,
+      bucket: "ALL",
+      relatedBuckets,
+      symbol: action.symbol,
+      kind: "EX_RIGHTS",
+      kindLabel: KIND_LABEL.EX_RIGHTS,
+      quantity: null,
+      price: action.referencePrice,
+      amount: 0,
+      notes: [
+        distributionLabel,
+        action.recordDate ? `Ngày ĐKCC ${action.recordDate}` : null,
+        action.paymentDate ? `Ngày thanh toán ${action.paymentDate}` : null,
+        action.notes,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      assetType: "STOCK",
+      corporateAction: action,
+    });
+  }
+
   rows.push(...bankRows(ledger, asOf));
 
   rows.sort(
@@ -218,7 +264,11 @@ export function filterReportRows(
   },
 ): ReportRow[] {
   return rows.filter((r) => {
-    if (opts.bucket !== "ALL" && r.bucket !== opts.bucket) return false;
+    if (
+      opts.bucket !== "ALL" &&
+      r.bucket !== opts.bucket &&
+      !r.relatedBuckets?.includes(opts.bucket)
+    ) return false;
     if (opts.kind !== "ALL" && r.kind !== opts.kind) return false;
     if (opts.symbol !== "ALL" && r.symbol !== opts.symbol) return false;
     if (opts.from && r.date < opts.from) return false;

@@ -9,6 +9,7 @@ import { todayYmd } from "@/engine/dates";
 import { ensureDailyPriceSnapshot } from "@/lib/api/prices";
 import { loadLedgerSnapshot } from "@/lib/api/load-snapshot";
 import type { LedgerSnapshot, PortfolioState } from "@/engine/types";
+import { validateEditedSellQuantity } from "@/lib/tx-validation.js";
 
 export type PortfolioPayload = {
   ledger: LedgerSnapshot;
@@ -216,6 +217,7 @@ const txSchema = z.object({
   fxRate: z.number().nullable(),
   dividendPerShare: z.number().nullable(),
   stockDivQty: z.number().nullable(),
+  corporateActionId: z.string().nullable().optional(),
   notes: z.string().optional(),
   currentPrice: z.number().optional(),
   matches: z
@@ -239,6 +241,28 @@ export const saveTransaction = createServerFn({ method: "POST" })
     ) {
       throw new Error("Nạp vốn gốc chỉ áp dụng cho lệnh Buy DCDS hoặc ETF.");
     }
+    if (data.corporateActionId) {
+      if (data.txType !== "CASH_DIVIDEND") {
+        throw new Error("Chỉ có thể gắn sự kiện GDKHQ với giao dịch cổ tức tiền mặt.");
+      }
+      const linkedAction = await sql`
+        select symbol, ex_date, action_type
+        from corporate_actions
+        where id = ${data.corporateActionId} and deleted_at is null
+        limit 1
+      `;
+      const action = linkedAction[0] as
+        | { symbol: string; ex_date: string; action_type: string }
+        | undefined;
+      if (
+        !action ||
+        action.action_type !== "CASH_DIVIDEND" ||
+        String(action.symbol).toUpperCase() !== data.symbol.trim().toUpperCase() ||
+        String(action.ex_date).slice(0, 10) > data.txDate
+      ) {
+        throw new Error("Sự kiện GDKHQ đã chọn không khớp mã hoặc ngày nhận cổ tức.");
+      }
+    }
     if (data.id)
       await (
         await import("@/lib/auth/edit-pin.server")
@@ -247,6 +271,41 @@ export const saveTransaction = createServerFn({ method: "POST" })
     const assetId = `${data.accountId}:${symbol}`;
     const id = data.id ?? crypto.randomUUID();
     await sql.transaction(async (tx) => {
+      const existingTransaction = data.id
+        ? await tx<{
+            tx_type: string;
+            quantity: number | string | null;
+            account_id: string;
+            asset_id: string | null;
+          }>`
+            select tx_type, quantity, account_id, asset_id
+            from transactions
+            where id = ${data.id} and deleted_at is null
+            for update
+          `
+        : [];
+      if (data.id && existingTransaction.length === 0) {
+        throw new Error("Không tìm thấy giao dịch cần sửa.");
+      }
+      const originalTransaction = existingTransaction[0];
+      const editingSell = originalTransaction?.tx_type === "SELL";
+      if (originalTransaction) {
+        const quantityCheck = validateEditedSellQuantity({
+          originalTxType: originalTransaction.tx_type,
+          txType: data.txType,
+          originalQty:
+            originalTransaction.quantity == null
+              ? null
+              : Number(originalTransaction.quantity),
+          quantity: data.quantity,
+        });
+        if (!quantityCheck.ok) throw new Error(quantityCheck.message);
+      }
+      const preserveMatches =
+        editingSell &&
+        data.txType === "SELL" &&
+        data.accountId === originalTransaction?.account_id &&
+        assetId === originalTransaction?.asset_id;
       await tx`
         insert into assets (id, account_id, symbol, name, asset_type, currency, current_price, price_updated_at)
         values (
@@ -258,7 +317,9 @@ export const saveTransaction = createServerFn({ method: "POST" })
           name = case when excluded.name <> excluded.symbol then excluded.name else assets.name end
       `;
       if (data.id) {
-        await tx`delete from tplus_matches where sell_tx_id = ${id}`;
+        if (!preserveMatches) {
+          await tx`delete from tplus_matches where sell_tx_id = ${id}`;
+        }
         await tx`
           update transactions set
             account_id = ${data.accountId},
@@ -274,6 +335,7 @@ export const saveTransaction = createServerFn({ method: "POST" })
             fx_rate = ${data.fxRate},
             dividend_per_share = ${data.dividendPerShare},
             stock_div_qty = ${data.stockDivQty},
+            corporate_action_id = ${data.corporateActionId ?? null},
             notes = ${data.notes ?? null}
           where id = ${id}
         `;
@@ -281,20 +343,24 @@ export const saveTransaction = createServerFn({ method: "POST" })
         await tx`
           insert into transactions (
             id, account_id, asset_id, tx_type, tx_date, quantity, price, amount,
-            fee, tax, trade_tplus, fx_rate, dividend_per_share, stock_div_qty, notes
+            fee, tax, trade_tplus, fx_rate, dividend_per_share, stock_div_qty,
+            corporate_action_id, notes
           ) values (
             ${id}, ${data.accountId}, ${assetId}, ${data.txType}, ${data.txDate},
             ${data.quantity}, ${data.price}, ${data.amount}, ${data.fee}, ${data.tax},
             ${data.tradeTplus}, ${data.fxRate}, ${data.dividendPerShare}, ${data.stockDivQty},
+            ${data.corporateActionId ?? null},
             ${data.notes ?? null}
           )
         `;
       }
-      for (const m of data.matches ?? []) {
-        await tx`
-          insert into tplus_matches (id, sell_tx_id, buy_tx_id, quantity)
-          values (${crypto.randomUUID()}, ${id}, ${m.buyTxId}, ${m.quantity})
-        `;
+      if (!preserveMatches) {
+        for (const m of data.matches ?? []) {
+          await tx`
+            insert into tplus_matches (id, sell_tx_id, buy_tx_id, quantity)
+            values (${crypto.randomUUID()}, ${id}, ${m.buyTxId}, ${m.quantity})
+          `;
+        }
       }
       if (data.createOriginalDeposit) {
         await tx`

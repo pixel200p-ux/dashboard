@@ -8,15 +8,21 @@ export function Select({
   placeholder,
   options,
   className,
+  disabled,
 }: {
   value: string;
   onValueChange: (v: string) => void;
   placeholder?: string;
   options: { value: string; label: string }[];
   className?: string;
+  disabled?: boolean;
 }) {
   return (
-    <SelectPrimitive.Root value={value} onValueChange={onValueChange}>
+    <SelectPrimitive.Root
+      value={value}
+      onValueChange={onValueChange}
+      disabled={disabled}
+    >
       <SelectPrimitive.Trigger
         className={cn(
           "flex h-10 min-h-10 w-full items-center justify-between rounded-md border border-input bg-card px-3 text-sm",

@@ -133,6 +133,7 @@ export function AssetPage({ assetType }: { assetType: AssetType }) {
       tax: t.tax,
       fxRate: t.fxRate,
       stockDivQty: t.stockDivQty,
+      corporateActionId: t.corporateActionId,
       notes: t.notes,
       matches: ledger.matches
         .filter((m) => m.sellTxId === t.id)

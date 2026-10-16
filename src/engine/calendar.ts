@@ -1,4 +1,5 @@
 import { remainingDays, todayYmd } from "@/engine/dates";
+import type { CorporateActionType } from "./types";
 
 export type CalendarEvent = {
   id: string;
@@ -7,6 +8,10 @@ export type CalendarEvent = {
   yearly: boolean;
   notes: string | null;
   createdAt: string;
+  source?: "MANUAL" | "CORPORATE_ACTION";
+  symbol?: string;
+  actionType?: CorporateActionType;
+  distributionPct?: number;
 };
 
 export type CalendarAlert = {

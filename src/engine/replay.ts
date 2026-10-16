@@ -5,6 +5,7 @@ import type {
   Asset,
   CapitalBucket,
   CapitalMovement,
+  CorporateAction,
   FeeSetting,
   HoldingView,
   LedgerSnapshot,
@@ -134,6 +135,57 @@ function ensurePos(
   return p;
 }
 
+export function corporateActionPriceFactor(action: CorporateAction): number {
+  if (action.actionType === "STOCK_DIVIDEND") {
+    return 1 / (1 + action.distributionPct / 100);
+  }
+  const cashPerShare = 10_000 * (action.distributionPct / 100);
+  const factor = (action.referencePrice - cashPerShare) / action.referencePrice;
+  if (!Number.isFinite(factor) || factor <= 0) {
+    throw new Error(`Tỷ lệ cổ tức tiền mặt không hợp lệ cho ${action.symbol}.`);
+  }
+  return factor;
+}
+
+function applyCorporateAction(
+  action: CorporateAction,
+  positions: Map<string, Pos>,
+): void {
+  const factor = corporateActionPriceFactor(action);
+  for (const p of positions.values()) {
+    if (p.asset.assetType !== "STOCK" || p.asset.symbol !== action.symbol) continue;
+    const eligibleQty = p.coreQty + openQty(p);
+    if (eligibleQty <= 1e-12) continue;
+
+    if (action.actionType === "CASH_DIVIDEND") {
+      p.coreCostTotal *= factor;
+      p.coreCostVndTotal *= factor;
+      p.tplusReduction *= factor;
+      p.tplusReductionVnd *= factor;
+      for (const lot of p.coreCostLots) lot.adjustedCost *= factor;
+      for (const lot of p.openLots) {
+        lot.buyPrice *= factor;
+        lot.buyFee *= factor;
+      }
+      continue;
+    }
+
+    const bonusQty = Math.floor(
+      eligibleQty * (action.distributionPct / 100) + 1e-9,
+    );
+    if (bonusQty <= 0) continue;
+    const shareFactor = (eligibleQty + bonusQty) / eligibleQty;
+    p.coreQty *= shareFactor;
+    p.stockDividendQty += bonusQty;
+    for (const lot of p.coreCostLots) lot.quantity *= shareFactor;
+    for (const lot of p.openLots) {
+      lot.qtyRemaining *= shareFactor;
+      lot.qtyOriginal *= shareFactor;
+      lot.buyPrice /= shareFactor;
+    }
+  }
+}
+
 function sortTx(a: Transaction, b: Transaction): number {
   const d = a.txDate.localeCompare(b.txDate);
   if (d !== 0) return d;
@@ -230,6 +282,32 @@ export function replayPortfolio(
     .filter((t) => !t.deletedAt)
     .slice()
     .sort(sortTx);
+  const timeline = [
+    ...ledger.corporateActions
+      .filter((action) => !action.deletedAt && action.exDate <= asOf)
+      .map((action) => ({
+        date: action.exDate,
+        priority: 0,
+        createdAt: action.createdAt,
+        id: action.id,
+        action,
+      })),
+    ...txs
+      .filter((tx) => tx.txDate <= asOf)
+      .map((tx) => ({
+        date: tx.txDate,
+        priority: 1,
+        createdAt: tx.createdAt,
+        id: tx.id,
+        transaction: tx,
+      })),
+  ].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.priority - b.priority ||
+      a.createdAt.localeCompare(b.createdAt) ||
+      a.id.localeCompare(b.id),
+  );
   const matchesBySell = new Map<string, typeof ledger.matches>();
   for (const m of ledger.matches) {
     const list = matchesBySell.get(m.sellTxId) ?? [];
@@ -237,7 +315,12 @@ export function replayPortfolio(
     matchesBySell.set(m.sellTxId, list);
   }
 
-  for (const tx of txs) {
+  for (const item of timeline) {
+    if ("action" in item) {
+      applyCorporateAction(item.action, positions);
+      continue;
+    }
+    const tx = item.transaction;
     if (!tx.assetId) continue;
     const asset = assets.get(tx.assetId);
     if (!asset) continue;
@@ -285,14 +368,22 @@ export function replayPortfolio(
     if (tx.txType === "CASH_DIVIDEND") {
       const net = Math.max(0, num(tx.amount) - tax);
       p.cashDividend += net;
-      if (net >= p.coreCostTotal) {
-        const excess = net - p.coreCostTotal;
-        p.coreCostTotal = 0;
-        p.coreCostVndTotal = 0;
-        if (excess > 0) p.realizedTradePnl += excess;
-      } else {
-        p.coreCostTotal -= net;
-        p.coreCostVndTotal -= net;
+      const hasExDateAdjustment = ledger.corporateActions.some(
+        (action) =>
+          action.id === tx.corporateActionId &&
+          action.actionType === "CASH_DIVIDEND" &&
+          !action.deletedAt,
+      );
+      if (!hasExDateAdjustment) {
+        if (net >= p.coreCostTotal) {
+          const excess = net - p.coreCostTotal;
+          p.coreCostTotal = 0;
+          p.coreCostVndTotal = 0;
+          if (excess > 0) p.realizedTradePnl += excess;
+        } else {
+          p.coreCostTotal -= net;
+          p.coreCostVndTotal -= net;
+        }
       }
       syncCoreLotCosts(p);
       continue;

@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSellQuantity, validateTplusSellSelection } from '../src/lib/tx-validation.js';
+import {
+  validateEditedSellQuantity,
+  validateSellQuantity,
+  validateTplusSellSelection,
+} from '../src/lib/tx-validation.js';
 
 test('rejects sell quantities above the currently held amount', () => {
   const result = validateSellQuantity({
@@ -10,7 +14,34 @@ test('rejects sell quantities above the currently held amount', () => {
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.message, /vượt quá số lượng hiện có/i);
+  assert.match(result.message ?? '', /vượt quá số lượng hiện có/i);
+});
+
+test('allows editing a sell while keeping its original quantity and type', () => {
+  const result = validateEditedSellQuantity({
+    originalTxType: 'SELL',
+    txType: 'SELL',
+    originalQty: 500,
+    quantity: 500,
+  });
+
+  assert.equal(result.ok, true);
+});
+
+test('rejects changing the quantity or type of an existing sell', () => {
+  for (const change of [
+    { txType: 'SELL', quantity: 400 },
+    { txType: 'BUY', quantity: 500 },
+  ]) {
+    const result = validateEditedSellQuantity({
+      originalTxType: 'SELL',
+      originalQty: 500,
+      ...change,
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.message ?? '', /Không thể đổi loại hoặc số lượng/i);
+  }
 });
 
 test('prompts to sell additional core shares when selected T+ lots are insufficient', () => {

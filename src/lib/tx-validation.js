@@ -22,6 +22,34 @@ export function validateSellQuantity({ txType, qty = 0, maxQty = 0 }) {
 
 /**
  * @param {{
+ *   originalTxType: string,
+ *   txType: string,
+ *   originalQty: number | null,
+ *   quantity: number | null,
+ * }} params
+ */
+export function validateEditedSellQuantity({
+  originalTxType,
+  txType,
+  originalQty,
+  quantity,
+}) {
+  if (originalTxType !== 'SELL') {
+    return { ok: true };
+  }
+
+  if (txType !== 'SELL' || quantity !== originalQty) {
+    return {
+      ok: false,
+      message: 'Không thể đổi loại hoặc số lượng của lệnh Sell đã ghi sổ.',
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * @param {{
  *   txType: string,
  *   matchTplus: boolean,
  *   selectedLotIds?: string[],

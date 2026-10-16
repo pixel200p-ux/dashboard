@@ -12,24 +12,60 @@ function mapEvent(r: Record<string, unknown>): CalendarEvent {
     yearly: Boolean(r.yearly),
     notes: r.notes ? String(r.notes) : null,
     createdAt: String(r.created_at),
+    source: "MANUAL",
   };
+}
+
+async function loadCalendarEvents(): Promise<CalendarEvent[]> {
+  const sql = await getSql();
+  const [rows, actions] = await Promise.all([
+    sql`
+      select * from calendar_events
+      where deleted_at is null
+      order by event_date, created_at
+    `,
+    sql`
+      select id, symbol, ex_date, action_type, distribution_pct, created_at
+      from corporate_actions
+      where deleted_at is null
+      order by ex_date, created_at
+    `,
+  ]);
+  return [
+    ...rows.map(mapEvent),
+    ...actions.map((row) => {
+      const action = row as {
+        id: string;
+        symbol: string;
+        ex_date: string;
+        action_type: string;
+        distribution_pct: number | string;
+        created_at: string;
+      };
+      const actionLabel =
+        action.action_type === "CASH_DIVIDEND"
+          ? "cổ tức tiền mặt"
+          : "cổ tức cổ phiếu";
+      return {
+        id: `corporate-action:${action.id}`,
+        title: `GDKHQ ${action.symbol} · ${actionLabel} ${String(action.distribution_pct)}%`,
+        eventDate: String(action.ex_date).slice(0, 10),
+        yearly: false,
+        notes: null,
+        createdAt: String(action.created_at),
+        source: "CORPORATE_ACTION" as const,
+        symbol: String(action.symbol),
+        actionType: action.action_type as "CASH_DIVIDEND" | "STOCK_DIVIDEND",
+        distributionPct: Number(action.distribution_pct),
+      };
+    }),
+  ];
 }
 
 export const fetchCalendar = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async (): Promise<CalendarEvent[]> => {
-    try {
-      const sql = await getSql();
-      const rows = await sql`
-        select * from calendar_events
-        where deleted_at is null
-        order by event_date, created_at
-      `;
-      return rows.map(mapEvent);
-    } catch (err) {
-      console.error("[calendar]", err);
-      return [];
-    }
+    return loadCalendarEvents();
   });
 
 const saveSchema = z.object({
@@ -65,12 +101,7 @@ export const saveCalendarEvent = createServerFn({ method: "POST" })
         values (${id}, ${title}, ${data.eventDate}, ${data.yearly}, ${notes})
       `;
     }
-    const rows = await sql`
-      select * from calendar_events
-      where deleted_at is null
-      order by event_date, created_at
-    `;
-    return rows.map(mapEvent);
+    return loadCalendarEvents();
   });
 
 export const deleteCalendarEvent = createServerFn({ method: "POST" })
@@ -80,10 +111,5 @@ export const deleteCalendarEvent = createServerFn({ method: "POST" })
     const sql = await getSql();
     await (await import("@/lib/auth/edit-pin.server")).requireEditPin(sql, data.pin);
     await sql`update calendar_events set deleted_at = now() where id = ${data.id}`;
-    const rows = await sql`
-      select * from calendar_events
-      where deleted_at is null
-      order by event_date, created_at
-    `;
-    return rows.map(mapEvent);
+    return loadCalendarEvents();
   });

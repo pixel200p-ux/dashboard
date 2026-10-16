@@ -8,16 +8,18 @@ import { Switch } from "@/components/ui/switch";
 import { useUiStore } from "@/lib/ui-store";
 import { usePortfolio, usePortfolioMutation } from "@/lib/use-portfolio";
 import { saveBank, saveTransaction } from "@/lib/api/portfolio";
+import { saveCorporateAction } from "@/lib/api/corporate-actions";
 import { dcdsQty } from "@/engine/replay";
 import { parseBrokerPrice, parseDecimal, parseVndAmount, formatQty, formatBrokerPrice, formatThousandsInput, formatPct, formatUsd, signedClass } from "@/engine/money";
 import { todayYmd, formatViDate } from "@/engine/dates";
 import { displayMoney, displayPrice } from "@/lib/display";
-import type { AssetType, FeeProfile, TxType } from "@/engine/types";
+import type { AssetType, CorporateActionType, FeeProfile, TxType } from "@/engine/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { validateSellQuantity, validateTplusSellSelection } from "@/lib/tx-validation.js";
 import { defaultSymbolForKind } from "@/lib/tx-defaults.js";
 import { askEditPin } from "@/lib/edit-pin";
+import type { TxEntryType } from "@/lib/ui-store";
 
 type FormKind = AssetType | "BANK";
 
@@ -50,10 +52,15 @@ export function TxDialog() {
   const { data } = usePortfolio();
   const mut = usePortfolioMutation((d: Parameters<typeof saveTransaction>[0]) => saveTransaction(d), "Đã ghi giao dịch");
   const bankMut = usePortfolioMutation((d: Parameters<typeof saveBank>[0]) => saveBank(d), "Đã mở sổ tiết kiệm");
+  const actionMut = usePortfolioMutation(
+    (d: Parameters<typeof saveCorporateAction>[0]) => saveCorporateAction(d),
+    "Đã lưu sự kiện GDKHQ",
+    true,
+  );
 
   const [kind, setKind] = useState<FormKind>("STOCK");
   const [stockAccount, setStockAccount] = useState("vps");
-  const [txType, setTxType] = useState<TxType>("BUY");
+  const [txType, setTxType] = useState<TxEntryType>("BUY");
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [date, setDate] = useState(todayYmd());
@@ -70,6 +77,13 @@ export function TxDialog() {
   const [fx, setFx] = useState("");
   const [divTotal, setDivTotal] = useState("");
   const [stockDivQty, setStockDivQty] = useState("");
+  const [corporateActionId, setCorporateActionId] = useState<string | null>(null);
+  const [corporateActionType, setCorporateActionType] =
+    useState<CorporateActionType>("CASH_DIVIDEND");
+  const [distributionPct, setDistributionPct] = useState("");
+  const [referencePrice, setReferencePrice] = useState("");
+  const [recordDate, setRecordDate] = useState("");
+  const [paymentDate, setPaymentDate] = useState("");
   const [feeOverride, setFeeOverride] = useState("");
   const [taxOverride, setTaxOverride] = useState("");
   const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
@@ -82,8 +96,9 @@ export function TxDialog() {
   const [bankRollover, setBankRollover] = useState(true);
   const [saveOriginal, setSaveOriginal] = useState(false);
 
-    const editing = Boolean(prefill?.id);
-      function setGrouped(setter: (v: string) => void) {
+  const editing = Boolean(prefill?.id);
+  const editingSell = editing && prefill?.txType === "SELL";
+  function setGrouped(setter: (v: string) => void) {
     return (e: React.ChangeEvent<HTMLInputElement>) => setter(formatThousandsInput(e.target.value));
   }
 
@@ -103,6 +118,18 @@ export function TxDialog() {
     setTaxOverride(prefill.id && prefill.tax != null ? formatThousandsInput(String(prefill.tax)) : "");
     setDivTotal(prefill.txType === "CASH_DIVIDEND" && prefill.amount != null ? formatThousandsInput(String(prefill.amount)) : "");
     setStockDivQty(prefill.stockDivQty != null ? formatThousandsInput(String(prefill.stockDivQty)) : "");
+    setCorporateActionId(prefill.corporateActionId ?? null);
+    setCorporateActionType(prefill.corporateActionType ?? "CASH_DIVIDEND");
+    setDistributionPct(
+      prefill.distributionPct != null ? String(prefill.distributionPct) : "",
+    );
+    setReferencePrice(
+      prefill.referencePrice != null
+        ? formatBrokerPrice(prefill.referencePrice)
+        : "",
+    );
+    setRecordDate(prefill.recordDate ?? "");
+    setPaymentDate(prefill.paymentDate ?? "");
     setBankPrincipal("");
     setSaveOriginal(Boolean(prefill.createOriginalDeposit));
 
@@ -131,6 +158,7 @@ export function TxDialog() {
   }, [prefill, data?.state.usdVnd]);
 
   const isBank = kind === "BANK";
+  const isCorporateAction = txType === "EX_RIGHTS";
   const assetType: AssetType = isBank ? "STOCK" : kind;
   const isOriginalEligible = isBank || ((kind === "DCDS" || kind === "ETF") && txType === "BUY");
   const canSaveOriginal = isOriginalEligible;
@@ -218,6 +246,19 @@ export function TxDialog() {
   const coreExcludingThis = Math.max(0, (holding?.coreQty ?? 0) - thisBuyQty);
     const canTplus = (kind === "STOCK" || kind === "CRYPTO") && txType === "BUY" && coreExcludingThis > 1e-12;
   const canOfferTplusSell = (kind === "STOCK" || kind === "CRYPTO") && txType === "SELL";
+  const stockSymbols = [
+    ...new Set(
+      (data?.ledger.assets ?? [])
+        .filter((asset) => asset.assetType === "STOCK")
+        .map((asset) => asset.symbol),
+    ),
+  ].sort();
+  const eligibleCashActions = (data?.ledger.corporateActions ?? []).filter(
+    (action) =>
+      action.actionType === "CASH_DIVIDEND" &&
+      action.symbol === symbol.trim().toUpperCase() &&
+      action.exDate <= date,
+  );
   const sellHoldings = (data?.state.holdings ?? []).filter(
     (h) => h.assetType === assetType && h.accountId === acc.id && h.quantity > 1e-12,
   );
@@ -233,6 +274,36 @@ export function TxDialog() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (isCorporateAction) {
+      const sym = symbol.trim().toUpperCase();
+      const pct = parseDecimal(distributionPct);
+      const refPrice = parseBrokerPrice(referencePrice);
+      if (!sym || pct <= 0 || refPrice <= 0) {
+        toast.error("Vui lòng nhập mã, tỷ lệ cổ tức và giá tham chiếu hợp lệ.");
+        return;
+      }
+      const pin = editing ? await askEditPin() : null;
+      if (editing && !pin) return;
+      actionMut.mutate(
+        {
+          data: {
+            id: prefill?.id,
+            pin: editing ? pin ?? undefined : undefined,
+            symbol: sym,
+            exDate: date,
+            recordDate: recordDate || null,
+            paymentDate: paymentDate || null,
+            actionType: corporateActionType,
+            distributionPct: pct,
+            referencePrice: refPrice,
+            notes: name.trim() || undefined,
+          },
+        },
+        { onSuccess: () => close() },
+      );
+      return;
+    }
 
     let createOriginalDeposit = canSaveOriginal && saveOriginal;
     if (canSaveOriginal && !createOriginalDeposit) {
@@ -278,37 +349,39 @@ export function TxDialog() {
       return;
     }
 
-    const sellQuantityValidation = validateSellQuantity({
-      txType,
-      qty: parsedQty,
-      maxQty: maxSellQty,
-    });
+    if (!editingSell) {
+      const sellQuantityValidation = validateSellQuantity({
+        txType: txType as TxType,
+        qty: parsedQty,
+        maxQty: maxSellQty,
+      });
 
-    if (!sellQuantityValidation.ok) {
-      toast.error(sellQuantityValidation.message ?? "Số lượng bán vượt quá số lượng hiện có.");
-      return;
-    }
+      if (!sellQuantityValidation.ok) {
+        toast.error(sellQuantityValidation.message ?? "Số lượng bán vượt quá số lượng hiện có.");
+        return;
+      }
 
-    const validation = validateTplusSellSelection({
-      txType,
-      matchTplus,
-      selectedLotIds,
-      openLots,
-      parsedQty,
-    });
+      const validation = validateTplusSellSelection({
+        txType,
+        matchTplus,
+        selectedLotIds,
+        openLots,
+        parsedQty,
+      });
 
-    if (!validation.ok) {
-      if (validation.needsCoreSellConfirmation) {
-        const confirmed = window.confirm(
-          validation.message ?? "Số lượng chọn bán hiện tại chưa đủ. Có bán thêm cổ phiếu gốc không?",
-        );
-        if (!confirmed) {
-          toast.error(validation.message ?? "Số lượng chọn bán hiện tại chưa đủ.");
+      if (!validation.ok) {
+        if (validation.needsCoreSellConfirmation) {
+          const confirmed = window.confirm(
+            validation.message ?? "Số lượng chọn bán hiện tại chưa đủ. Có bán thêm cổ phiếu gốc không?",
+          );
+          if (!confirmed) {
+            toast.error(validation.message ?? "Số lượng chọn bán hiện tại chưa đủ.");
+            return;
+          }
+        } else {
+          toast.error(validation.message ?? "Bạn phải chọn lô T+ trước khi lưu giao dịch Sell.");
           return;
         }
-      } else {
-        toast.error(validation.message ?? "Bạn phải chọn lô T+ trước khi lưu giao dịch Sell.");
-        return;
       }
     }
 
@@ -353,6 +426,8 @@ export function TxDialog() {
           fxRate: kind === "CRYPTO" ? parseDecimal(fx) || usdVnd : null,
           dividendPerShare: null,
           stockDivQty: txType === "STOCK_DIVIDEND" ? parseDecimal(stockDivQty) : null,
+          corporateActionId:
+            txType === "CASH_DIVIDEND" ? corporateActionId : null,
           currentPrice: parsedPrice || undefined,
           matches: txType === "SELL" ? matches : undefined,
           createOriginalDeposit,
@@ -369,17 +444,29 @@ export function TxDialog() {
           { value: "SELL", label: "Sell" },
           { value: "CASH_DIVIDEND", label: "Cổ tức tiền mặt" },
           { value: "STOCK_DIVIDEND", label: "Cổ tức cổ phiếu" },
+          { value: "EX_RIGHTS", label: "Ngày GDKHQ" },
         ]
       : [
           { value: "BUY", label: "Buy" },
           { value: "SELL", label: "Sell" },
         ];
 
-  const saving = mut.isPending || bankMut.isPending;
+  const saving = mut.isPending || bankMut.isPending || actionMut.isPending;
 
   return (
     <Dialog open={!!prefill} onOpenChange={(o) => !o && close()}>
-        <DialogContent title={editing ? "Sửa giao dịch" : "Giao dịch"} className="max-w-xl">
+        <DialogContent
+          title={
+            isCorporateAction
+              ? editing
+                ? "Sửa sự kiện GDKHQ"
+                : "Ghi sự kiện GDKHQ"
+              : editing
+                ? "Sửa giao dịch"
+                : "Giao dịch"
+          }
+          className="max-w-xl"
+        >
         <form className="space-y-3" onSubmit={submit}>
         {!editing && !prefill?.assetType && (
           <div className="flex flex-wrap gap-1">
@@ -456,7 +543,7 @@ export function TxDialog() {
             </>
           ) : (
             <>
-              {kind === "STOCK" && (
+              {kind === "STOCK" && !isCorporateAction && (
                 <div className="flex gap-2">
                   {(["vps", "ssi"] as const).map((id) => (
                     <button
@@ -474,7 +561,12 @@ export function TxDialog() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Loại</Label>
-                  <Select value={txType} onValueChange={(v) => setTxType(v as TxType)} options={txOptions} />
+                  <Select
+                    value={txType}
+                    onValueChange={(v) => setTxType(v as TxEntryType)}
+                    options={txOptions}
+                    disabled={editingSell}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>Ngày</Label>
@@ -485,19 +577,33 @@ export function TxDialog() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Mã</Label>
-                  {txType === "SELL" || txType === "CASH_DIVIDEND" || txType === "STOCK_DIVIDEND" ? (
+                  {txType === "SELL" ||
+                  txType === "CASH_DIVIDEND" ||
+                  txType === "STOCK_DIVIDEND" ||
+                  isCorporateAction ? (
                     <Select
                       value={symbol}
                       onValueChange={(v) => {
                         setSymbol(v);
                         const h = sellHoldings.find((x) => x.symbol === v);
+                        const asset = data?.ledger.assets.find(
+                          (item) => item.assetType === "STOCK" && item.symbol === v,
+                        );
                         if (h) setName(h.name);
+                        else if (asset) setName(asset.name);
                       }}
-                      placeholder="Chọn mã đang giữ"
-                      options={sellHoldings.map((h) => ({
-                        value: h.symbol,
-                        label: h.symbol,
-                      }))}
+                      placeholder={
+                        isCorporateAction || txType === "CASH_DIVIDEND"
+                          ? "Chọn mã cổ phiếu"
+                          : "Chọn mã đang giữ"
+                      }
+                      options={(
+                        isCorporateAction || txType === "CASH_DIVIDEND"
+                          ? stockSymbols
+                          : sellHoldings.map((h) => h.symbol)
+                      ).map(
+                        (value) => ({ value, label: value }),
+                      )}
                     />
                   ) : (
                     <Input
@@ -513,6 +619,69 @@ export function TxDialog() {
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tùy chọn" />
                 </div>
               </div>
+
+              {isCorporateAction && (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <p className="text-sm text-muted-foreground">
+                    Sự kiện chỉ điều chỉnh giá vốn của các lô đủ điều kiện; giá thị trường vẫn lấy từ nguồn giá hiện tại.
+                    {corporateActionType === "STOCK_DIVIDEND" &&
+                      " Cổ phiếu thưởng được làm tròn xuống riêng theo từng broker."}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Loại phân phối</Label>
+                      <Select
+                        value={corporateActionType}
+                        onValueChange={(value) =>
+                          setCorporateActionType(value as CorporateActionType)
+                        }
+                        disabled={editing}
+                        options={[
+                          { value: "CASH_DIVIDEND", label: "Cổ tức tiền mặt" },
+                          { value: "STOCK_DIVIDEND", label: "Cổ tức cổ phiếu" },
+                        ]}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Tỷ lệ cổ tức (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={distributionPct}
+                        onChange={(e) => setDistributionPct(e.target.value)}
+                        placeholder="Ví dụ: 10"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Giá tham chiếu trước GDKHQ (13.5 = 13.500đ)</Label>
+                      <Input
+                        value={referencePrice}
+                        onChange={setGrouped(setReferencePrice)}
+                        placeholder="..."
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Ngày đăng ký cuối cùng</Label>
+                      <Input
+                        type="date"
+                        value={recordDate}
+                        onChange={(e) => setRecordDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Ngày thanh toán</Label>
+                      <Input
+                        type="date"
+                        value={paymentDate}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {txType === "CASH_DIVIDEND" && (
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -531,8 +700,29 @@ export function TxDialog() {
                     </p>
                   </div>
                   <div className="col-span-2">
+                    <Label>Gắn với sự kiện GDKHQ (tránh giảm vốn hai lần)</Label>
+                    <Select
+                      value={corporateActionId ?? "NONE"}
+                      onValueChange={(value) =>
+                        setCorporateActionId(value === "NONE" ? null : value)
+                      }
+                      options={[
+                        { value: "NONE", label: "Không liên kết" },
+                        ...eligibleCashActions.map((action) => ({
+                          value: action.id,
+                          label: `${action.symbol} · ${action.exDate} · ${action.distributionPct}%`,
+                        })),
+                      ]}
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Chỉ liên kết khi đây là khoản chi trả của sự kiện đã nhập ở trên.
+                    </p>
+                  </div>
+                  <div className="col-span-2">
                     <p className="text-xs text-muted-foreground">
-                      Trừ khỏi vốn của mã (tử số). Original Capital không đổi. Nếu cổ tức lớn hơn vốn còn lại, giá vốn = 0, phần dư là lãi.
+                      {corporateActionId
+                        ? "Sự kiện GDKHQ đã điều chỉnh giá vốn; khoản nhận này chỉ ghi nhận cổ tức, không trừ vốn lần nữa."
+                        : "Trừ khỏi vốn của mã (tử số). Original Capital không đổi. Nếu cổ tức lớn hơn vốn còn lại, giá vốn = 0, phần dư là lãi."}
                     </p>
                   </div>
                 </div>
@@ -586,9 +776,15 @@ export function TxDialog() {
                         <Input
                           value={qty}
                           onChange={(e) => clampSellQty(e.target.value)}
+                          readOnly={editingSell}
                           placeholder="..."
                           required
                         />
+                        {editingSell && (
+                          <p className="text-xs text-muted-foreground">
+                            Số lượng bán đã ghi sổ không thể chỉnh sửa.
+                          </p>
+                        )}
                                                 {txType === "SELL" && (
                           <p className="text-xs text-muted-foreground">
                             tối đa {formatQty(maxSellQty, assetType)} ({formatQty(coreQty, assetType)} gốc + {formatQty(tplusQty, assetType)} T+)
@@ -756,7 +952,17 @@ export function TxDialog() {
           )}
 
           <Button type="submit" className="w-full" disabled={saving}>
-          {saving ? "Đang lưu..." : editing ? "Lưu sửa" : isBank ? "Lưu sổ" : "Ghi sổ"}
+            {saving
+              ? "Đang lưu..."
+              : isCorporateAction
+                ? editing
+                  ? "Lưu sự kiện"
+                  : "Lưu sự kiện GDKHQ"
+                : editing
+                  ? "Lưu sửa"
+                  : isBank
+                    ? "Lưu sổ"
+                    : "Ghi sổ"}
           </Button>
         </form>
       </DialogContent>

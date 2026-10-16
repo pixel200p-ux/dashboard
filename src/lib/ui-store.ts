@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AssetType, CapitalBucket, TxType } from "@/engine/types";
+import type { AssetType, CapitalBucket, CorporateActionType, TxType } from "@/engine/types";
 
 export type ThemeMode = "light" | "dark";
 export type DisplayCurrency = "VND" | "USD";
@@ -17,6 +17,8 @@ export type CapitalPrefill = {
   bucket: CapitalBucket;
 };
 
+export type TxEntryType = TxType | "EX_RIGHTS";
+
 export type TxPrefill = {
   id?: string;
   accountId?: string;
@@ -25,7 +27,7 @@ export type TxPrefill = {
   assetType?: AssetType;
   formKind?: AssetType | "BANK";
   createOriginalDeposit?: boolean;
-  txType?: TxType;
+  txType?: TxEntryType;
   tradeTplus?: boolean;
   price?: number;
   txDate?: string;
@@ -35,6 +37,12 @@ export type TxPrefill = {
   tax?: number;
   fxRate?: number | null;
   stockDivQty?: number | null;
+  corporateActionId?: string | null;
+  corporateActionType?: CorporateActionType;
+  distributionPct?: number;
+  referencePrice?: number;
+  recordDate?: string | null;
+  paymentDate?: string | null;
   notes?: string | null;
   matches?: { buyTxId: string; quantity: number }[];
   matchAllOpen?: boolean;

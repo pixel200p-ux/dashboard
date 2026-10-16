@@ -9,6 +9,7 @@ import {
   mapBank,
   mapBankRate,
   mapCapital,
+  mapCorporateAction,
   mapFee,
   mapMatch,
   mapTx,
@@ -149,6 +150,7 @@ export const resetApplication = createServerFn({ method: "POST" })
 
     await sql.transaction(async (tx) => {
       await tx`delete from tplus_matches`;
+      await tx`delete from corporate_actions`;
       await tx`delete from bank_rate_updates`;
       await tx`delete from transactions`;
       await tx`delete from capital_movements`;
@@ -194,6 +196,7 @@ export const fetchMilestones = createServerFn({ method: "GET" })
         assets,
         capital,
         transactions,
+        corporateActions,
         matches,
         banks,
         bankRates,
@@ -208,6 +211,7 @@ export const fetchMilestones = createServerFn({ method: "GET" })
         sql`select * from assets order by symbol`,
         sql`select * from capital_movements where deleted_at is null order by movement_date, created_at`,
         sql`select * from transactions where deleted_at is null order by tx_date, created_at`,
+        sql`select * from corporate_actions where deleted_at is null order by ex_date, created_at`,
         sql`select * from tplus_matches`,
         sql`select * from bank_deposits where deleted_at is null order by start_date`,
         sql`select * from bank_rate_updates`,
@@ -230,6 +234,7 @@ export const fetchMilestones = createServerFn({ method: "GET" })
         })),
         capital: capital.map(mapCapital),
         transactions: transactions.map(mapTx),
+        corporateActions: corporateActions.map(mapCorporateAction),
         matches: matches.map(mapMatch),
         banks: banks.map(mapBank),
         bankRates: bankRates.map(mapBankRate),

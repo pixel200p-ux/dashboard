@@ -10,6 +10,8 @@ import type {
   CapitalBucket,
   CapitalKind,
   CapitalMovement,
+  CorporateAction,
+  CorporateActionType,
   FeeProfile,
   FeeSetting,
   TplusMatch,
@@ -75,7 +77,26 @@ export function mapTx(r: Record<string, unknown>): Transaction {
     fxRate: r.fx_rate == null ? null : n(r.fx_rate),
     dividendPerShare: r.dividend_per_share == null ? null : n(r.dividend_per_share),
     stockDivQty: r.stock_div_qty == null ? null : n(r.stock_div_qty),
+    corporateActionId: r.corporate_action_id ? String(r.corporate_action_id) : null,
     notes: r.notes ? String(r.notes) : null,
+    deletedAt: r.deleted_at ? String(r.deleted_at) : null,
+    createdAt: String(r.created_at),
+  };
+}
+
+export function mapCorporateAction(r: Record<string, unknown>): CorporateAction {
+  return {
+    id: String(r.id),
+    symbol: String(r.symbol),
+    exDate: String(r.ex_date).slice(0, 10),
+    recordDate: r.record_date ? String(r.record_date).slice(0, 10) : null,
+    paymentDate: r.payment_date ? String(r.payment_date).slice(0, 10) : null,
+    actionType: r.action_type as CorporateActionType,
+    distributionPct: n(r.distribution_pct),
+    referencePrice: n(r.reference_price),
+    notes: r.notes ? String(r.notes) : null,
+    source: r.source === "AUTO" ? "AUTO" : "MANUAL",
+    sourceKey: r.source_key ? String(r.source_key) : null,
     deletedAt: r.deleted_at ? String(r.deleted_at) : null,
     createdAt: String(r.created_at),
   };
