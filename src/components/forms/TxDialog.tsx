@@ -81,7 +81,6 @@ export function TxDialog() {
   const [corporateActionType, setCorporateActionType] =
     useState<CorporateActionType>("CASH_DIVIDEND");
   const [distributionPct, setDistributionPct] = useState("");
-  const [referencePrice, setReferencePrice] = useState("");
   const [subscriptionPrice, setSubscriptionPrice] = useState("");
   const [vpsSubscribedQty, setVpsSubscribedQty] = useState("");
   const [ssiSubscribedQty, setSsiSubscribedQty] = useState("");
@@ -125,11 +124,6 @@ export function TxDialog() {
     setCorporateActionType(prefill.corporateActionType ?? "CASH_DIVIDEND");
     setDistributionPct(
       prefill.distributionPct != null ? String(prefill.distributionPct) : "",
-    );
-    setReferencePrice(
-      prefill.referencePrice != null
-        ? formatBrokerPrice(prefill.referencePrice)
-        : "",
     );
     setSubscriptionPrice(
       prefill.subscriptionPrice != null
@@ -296,14 +290,12 @@ export function TxDialog() {
     if (isCorporateAction) {
       const sym = symbol.trim().toUpperCase();
       const pct = parseDecimal(distributionPct);
-      const refPrice = parseBrokerPrice(referencePrice);
       const subscribedPrice = parseBrokerPrice(subscriptionPrice);
       const vpsQty = parseDecimal(vpsSubscribedQty);
       const ssiQty = parseDecimal(ssiSubscribedQty);
       if (
         !sym ||
         pct <= 0 ||
-        (corporateActionType === "CASH_DIVIDEND" && refPrice <= 0) ||
         (corporateActionType === "RIGHTS_ISSUE" &&
           (subscribedPrice <= 0 ||
             !Number.isInteger(vpsQty) ||
@@ -327,8 +319,6 @@ export function TxDialog() {
             paymentDate: paymentDate || null,
             actionType: corporateActionType,
             distributionPct: pct,
-            referencePrice:
-              corporateActionType === "CASH_DIVIDEND" ? refPrice : null,
             subscriptionPrice:
               corporateActionType === "RIGHTS_ISSUE" ? subscribedPrice : null,
             vpsSubscribedQty:
@@ -710,17 +700,6 @@ export function TxDialog() {
                         required
                       />
                     </div>
-                    {corporateActionType === "CASH_DIVIDEND" && (
-                      <div className="space-y-1">
-                        <Label>Giá tham chiếu trước GDKHQ (13.5 = 13.500đ)</Label>
-                        <Input
-                          value={referencePrice}
-                          onChange={setGrouped(setReferencePrice)}
-                          placeholder="..."
-                          required
-                        />
-                      </div>
-                    )}
                     {corporateActionType === "RIGHTS_ISSUE" && (
                       <>
                         <div className="space-y-1">

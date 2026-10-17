@@ -18,7 +18,9 @@ Sự kiện được đưa tự động lên Calendar sau khi nhập.
 
 Sự kiện là nguồn duy nhất để ghi nhận cổ tức mới; không tạo thêm giao dịch cổ
 tức tiền mặt/cổ phiếu. Cổ tức tiền mặt được tính gộp theo lượng nắm giữ trước
-GDKHQ nhân tỷ lệ trên mệnh giá 10.000đ/cổ phiếu; số này là trước thuế và chưa
+GDKHQ nhân tỷ lệ trên mệnh giá 10.000đ/cổ phiếu; giá vốn mỗi cổ phiếu đủ điều
+kiện giảm trực tiếp một khoản bằng cổ tức/CP, không thấp hơn 0. Không cần nhập
+giá tham chiếu trước GDKHQ. Tiền cổ tức hiển thị là số gộp trước thuế, chưa
 đối chiếu khoản tiền thực nhận. Cổ tức cổ phiếu làm tăng lượng cổ phiếu đủ điều
 kiện, làm tròn xuống riêng theo từng broker và giữ nguyên tổng giá vốn của lô.
 Các khoản cổ tức giao dịch cũ vẫn được giữ để xem/sửa/xóa; khoản cũ gắn với sự

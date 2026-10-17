@@ -114,10 +114,9 @@ function tx(id, txType, txDate, quantity, price, extra = {}) {
 /**
  * @param {CorporateActionType} actionType
  * @param {number} distributionPct
- * @param {number} [referencePrice]
  * @returns {CorporateAction}
  */
-function action(actionType, distributionPct, referencePrice = 20_000) {
+function action(actionType, distributionPct) {
   return {
     id: "ca-1",
     symbol: "ABC",
@@ -126,7 +125,6 @@ function action(actionType, distributionPct, referencePrice = 20_000) {
     paymentDate: null,
     actionType,
     distributionPct,
-    referencePrice,
     subscriptionPrice: null,
     vpsSubscribedQty: 0,
     ssiSubscribedQty: 0,
@@ -224,7 +222,7 @@ test("stock action increases only shares held before ex-date", () => {
         stockDivQty: 1,
       }),
     ],
-    { ...action("STOCK_DIVIDEND", 10, 10_000), paymentDate: "2026-01-04" },
+    { ...action("STOCK_DIVIDEND", 10), paymentDate: "2026-01-04" },
   );
   const asset = snapshot.assets[0];
   if (!asset) throw new Error("Expected the test stock asset.");
@@ -257,7 +255,7 @@ test("stock entitlement is rounded down separately for each broker account", () 
         assetId: "ssi:ABC",
       }),
     ],
-    action("STOCK_DIVIDEND", 10, 10_000),
+    action("STOCK_DIVIDEND", 10),
   );
   snapshot.accounts.push({
     id: "ssi",
@@ -295,6 +293,34 @@ test("cash action recognizes gross dividend from ex-date eligible shares only", 
   assert.equal(holdingFrom(state).cashDividend, 100_000);
 });
 
+test("cash action directly reduces each eligible share's cost basis by face-value dividend", () => {
+  const snapshot = ledger(
+    [
+      tx("high-cost", "BUY", "2026-01-01", 100, 30_000),
+      tx("low-cost", "BUY", "2026-01-02", 100, 5_000),
+    ],
+    action("CASH_DIVIDEND", 10),
+  );
+  const holding = holdingFrom(replay(snapshot, "2026-01-04"));
+
+  assert.equal(adjustedLotPrice(holding, "high-cost"), 29_000);
+  assert.equal(adjustedLotPrice(holding, "low-cost"), 4_000);
+  assert.equal(holding.adjustedAvgCost, 16_500);
+  assert.equal(holding.cashDividend, 200_000);
+});
+
+test("cash cost basis cannot go below zero", () => {
+  const snapshot = ledger(
+    [tx("low-cost", "BUY", "2026-01-01", 10, 500)],
+    action("CASH_DIVIDEND", 10),
+  );
+  const holding = holdingFrom(replay(snapshot, "2026-01-04"));
+
+  assert.equal(adjustedLotPrice(holding, "low-cost"), 0);
+  assert.equal(holding.adjustedAvgCost, 0);
+  assert.equal(holding.cashDividend, 10_000);
+});
+
 test("cash corporate-action report row shows gross entitlement", () => {
   if (!buildReportRows) throw new Error("Report history module was not loaded.");
   const snapshot = ledger(
@@ -305,6 +331,7 @@ test("cash corporate-action report row shows gross entitlement", () => {
   const row = buildReportRows(snapshot).find((item) => item.id === "ca-1");
   assert.equal(row?.quantity, 100);
   assert.equal(row?.amount, 100_000);
+  assert.equal(row?.price, 1_000);
 });
 
 test("rights subscriptions add account-specific shares and cost on payment date", () => {

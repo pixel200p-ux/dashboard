@@ -40,7 +40,6 @@ export type TxPrefill = {
   corporateActionId?: string | null;
   corporateActionType?: CorporateActionType;
   distributionPct?: number;
-  referencePrice?: number;
   subscriptionPrice?: number;
   vpsSubscribedQty?: number;
   ssiSubscribedQty?: number;

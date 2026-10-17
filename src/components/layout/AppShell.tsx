@@ -2,6 +2,7 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   BarChart3,
   Building2,
+  Calculator,
   CalendarDays,
   UserRound,
   CandlestickChart,
@@ -68,11 +69,11 @@ function formatPriceAgoShort(iso: string | null): string {
   const ms = Date.now() - then;
   if (ms < 60_000) return "vừa xong";
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `${minutes} phút trước`;
+  if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} tiếng trước`;
+  if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  return `${days} ngày trước`;
+  return `${days}d`;
 }
 
 export function AppShell() {
@@ -87,7 +88,7 @@ export function AppShell() {
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const toggleCurrency = useUiStore((s) => s.toggleCurrency);
   const qc = useQueryClient();
-  const { data: portfolio } = usePortfolio();
+  const { data: portfolio, refetch: refetchPortfolio } = usePortfolio();
 
   const lastPriceAt = useMemo(() => {
     const times = (portfolio?.ledger.assets ?? [])
@@ -101,6 +102,7 @@ export function AppShell() {
 
   const stale = lastPriceAt != null && Date.now() - new Date(lastPriceAt).getTime() > 24 * 60 * 60 * 1000;
   const [refreshing, setRefreshing] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
@@ -150,6 +152,23 @@ export function AppShell() {
       toast.error(e instanceof Error ? e.message : "Không cập nhật được giá");
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function onRecalculatePortfolio() {
+    setRecalculating(true);
+    try {
+      const result = await refetchPortfolio();
+      if (result.isError) {
+        throw result.error ?? new Error("Không thể tính lại danh mục");
+      }
+      toast.success("Đã tính lại danh mục từ toàn bộ sổ giao dịch");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Không thể tính lại danh mục",
+      );
+    } finally {
+      setRecalculating(false);
     }
   }
 
@@ -287,15 +306,13 @@ export function AppShell() {
                   variant="outline"
                   onClick={onRefresh}
                   disabled={refreshing}
-                  className={cn("relative gap-1.5", pathname.startsWith("/profile") && "bg-background/80")}
+                  aria-label="Cập nhật giá thị trường"
+                  title={`Cập nhật giá thị trường${lastPriceAt ? ` · lần gần nhất ${formatPriceAgoShort(lastPriceAt)}` : ""}`}
+                  className={cn("relative h-9 min-h-9 gap-1.5 px-2.5", pathname.startsWith("/profile") && "bg-background/80")}
                 >
                   <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-                  <span className="hidden sm:inline">
-                    {refreshing
-                      ? "Đang cập nhật..."
-                      : lastPriceAt
-                        ? `Cập nhật giá (${formatPriceAgoShort(lastPriceAt)})`
-                        : "Cập nhật giá"}
+                  <span className="text-xs tabular-nums">
+                    {refreshing ? "…" : formatPriceAgoShort(lastPriceAt) || "Giá"}
                   </span>
                   <span
                     className={cn(
@@ -304,6 +321,21 @@ export function AppShell() {
                     )}
                     aria-hidden
                   />
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onRecalculatePortfolio}
+                  disabled={recalculating}
+                  aria-label="Tính lại danh mục từ toàn bộ giao dịch"
+                  title="Tính lại danh mục từ đầu theo toàn bộ sổ giao dịch"
+                  className={cn("h-9 min-h-9 gap-1.5 px-2.5", pathname.startsWith("/profile") && "bg-background/80")}
+                >
+                  <Calculator className={cn("h-4 w-4", recalculating && "animate-pulse")} />
+                  <span className="text-xs">
+                    {recalculating ? "Đang tính…" : "Tính lại"}
+                  </span>
                 </Button>
 
                 <Button size="sm" variant="outline" onClick={toggleCurrency} title="Chuyển VND / USD" className={cn(pathname.startsWith("/profile") && "bg-background/80")}>

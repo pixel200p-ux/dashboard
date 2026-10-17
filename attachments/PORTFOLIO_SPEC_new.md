@@ -131,7 +131,7 @@
       "dividend_transactions": {
         "restriction": "Phần cổ tức chỉ có ở Cổ phiếu; cổ tức mới được ghi nhận bằng sự kiện GDKHQ, không tạo giao dịch cổ tức riêng.",
         "types": {
-          "cash_dividend": "Sự kiện GDKHQ tính tổng cổ tức gộp = lượng cổ phiếu đủ điều kiện × tỷ lệ trên mệnh giá 10.000đ/CP; chưa trừ thuế hoặc đối chiếu tiền thực nhận.",
+          "cash_dividend": "Sự kiện GDKHQ tính tổng cổ tức gộp = lượng cổ phiếu đủ điều kiện × tỷ lệ trên mệnh giá 10.000đ/CP; giá vốn/CP giảm trực tiếp bằng cổ tức/CP nhưng không thấp hơn 0. Không cần giá tham chiếu; chưa trừ thuế hoặc đối chiếu tiền thực nhận.",
           "stock_dividend": "Sự kiện GDKHQ tăng Holdings theo tỷ lệ cổ phiếu thưởng (làm tròn xuống riêng theo broker), giữ nguyên tổng giá vốn và tính lại giá vốn/CP."
         }
       },

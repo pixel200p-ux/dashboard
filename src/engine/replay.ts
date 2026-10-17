@@ -135,25 +135,10 @@ function ensurePos(
   return p;
 }
 
-export function corporateActionPriceFactor(action: CorporateAction): number {
-  if (action.actionType === "STOCK_DIVIDEND") {
-    return 1 / (1 + action.distributionPct / 100);
-  }
-  if (action.actionType === "RIGHTS_ISSUE") return 1;
-  const cashPerShare = 10_000 * (action.distributionPct / 100);
-  const referencePrice = action.referencePrice ?? 0;
-  const factor = (referencePrice - cashPerShare) / referencePrice;
-  if (!Number.isFinite(factor) || factor <= 0) {
-    throw new Error(`Tỷ lệ cổ tức tiền mặt không hợp lệ cho ${action.symbol}.`);
-  }
-  return factor;
-}
-
 function applyCorporateAction(
   action: CorporateAction,
   positions: Map<string, Pos>,
 ): void {
-  const factor = corporateActionPriceFactor(action);
   for (const p of positions.values()) {
     if (p.asset.assetType !== "STOCK" || p.asset.symbol !== action.symbol) continue;
     if (action.actionType === "RIGHTS_ISSUE") {
@@ -182,16 +167,25 @@ function applyCorporateAction(
     if (eligibleQty <= 1e-12) continue;
 
     if (action.actionType === "CASH_DIVIDEND") {
-      p.cashDividend +=
-        eligibleQty * 10_000 * (action.distributionPct / 100);
-      p.coreCostTotal *= factor;
-      p.coreCostVndTotal *= factor;
-      p.tplusReduction *= factor;
-      p.tplusReductionVnd *= factor;
-      for (const lot of p.coreCostLots) lot.adjustedCost *= factor;
+      const cashPerShare = 10_000 * (action.distributionPct / 100);
+      p.cashDividend += eligibleQty * cashPerShare;
+      let coreCostReduction = 0;
+      for (const lot of p.coreCostLots) {
+        if (lot.quantity <= 1e-12) continue;
+        const reduction = Math.min(
+          lot.adjustedCost,
+          cashPerShare * lot.quantity,
+        );
+        lot.adjustedCost -= reduction;
+        coreCostReduction += reduction;
+      }
+      p.coreCostTotal = Math.max(0, p.coreCostTotal - coreCostReduction);
+      p.coreCostVndTotal = Math.max(
+        0,
+        p.coreCostVndTotal - coreCostReduction,
+      );
       for (const lot of p.openLots) {
-        lot.buyPrice *= factor;
-        lot.buyFee *= factor;
+        lot.buyPrice = Math.max(0, lot.buyPrice - cashPerShare);
       }
       continue;
     }

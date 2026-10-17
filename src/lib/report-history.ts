@@ -266,7 +266,9 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
       price:
         action.actionType === "RIGHTS_ISSUE"
           ? action.subscriptionPrice
-          : action.referencePrice,
+          : action.actionType === "CASH_DIVIDEND"
+            ? 10_000 * (action.distributionPct / 100)
+            : null,
       amount:
         action.actionType === "CASH_DIVIDEND" ? grossCashDividend : 0,
       notes: [

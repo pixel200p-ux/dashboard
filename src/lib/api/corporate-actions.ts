@@ -15,7 +15,6 @@ const actionSchema = z.object({
   paymentDate: z.string().date().nullable(),
   actionType: z.enum(["CASH_DIVIDEND", "STOCK_DIVIDEND", "RIGHTS_ISSUE"]),
   distributionPct: z.number().positive(),
-  referencePrice: z.number().positive().nullable(),
   subscriptionPrice: z.number().positive().nullable(),
   vpsSubscribedQty: z.number().int().nonnegative(),
   ssiSubscribedQty: z.number().int().nonnegative(),
@@ -45,12 +44,6 @@ export const saveCorporateAction = createServerFn({ method: "POST" })
     `;
     if (assets.length === 0) {
       throw new Error(`Không tìm thấy mã cổ phiếu ${symbol} trong danh mục.`);
-    }
-    if (data.actionType === "CASH_DIVIDEND") {
-      const cashPerShare = 10_000 * (data.distributionPct / 100);
-      if (!data.referencePrice || cashPerShare >= data.referencePrice) {
-        throw new Error("Cổ tức tiền mặt phải thấp hơn giá tham chiếu trước GDKHQ.");
-      }
     }
     if (
       data.actionType === "RIGHTS_ISSUE" &&
@@ -156,7 +149,7 @@ export const saveCorporateAction = createServerFn({ method: "POST" })
             record_date = ${data.recordDate},
             payment_date = ${data.paymentDate},
             distribution_pct = ${data.distributionPct},
-            reference_price = ${data.referencePrice},
+            reference_price = null,
             subscription_price = ${data.subscriptionPrice},
             vps_subscribed_qty = ${data.vpsSubscribedQty},
             ssi_subscribed_qty = ${data.ssiSubscribedQty},
@@ -172,7 +165,7 @@ export const saveCorporateAction = createServerFn({ method: "POST" })
             vps_subscribed_qty, ssi_subscribed_qty, notes, source
           ) values (
             ${id}, ${symbol}, ${data.exDate}, ${data.recordDate}, ${data.paymentDate},
-            ${data.actionType}, ${data.distributionPct}, ${data.referencePrice},
+            ${data.actionType}, ${data.distributionPct}, null,
             ${data.subscriptionPrice}, ${data.vpsSubscribedQty}, ${data.ssiSubscribedQty},
             ${notes}, 'MANUAL'
           )
