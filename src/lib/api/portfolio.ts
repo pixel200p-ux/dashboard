@@ -288,6 +288,16 @@ export const saveTransaction = createServerFn({ method: "POST" })
         throw new Error("Không tìm thấy giao dịch cần sửa.");
       }
       const originalTransaction = existingTransaction[0];
+      if (
+        (data.txType === "CASH_DIVIDEND" ||
+          data.txType === "STOCK_DIVIDEND") &&
+        (!originalTransaction ||
+          originalTransaction.tx_type !== data.txType)
+      ) {
+        throw new Error(
+          "Cổ tức được ghi nhận từ sự kiện GDKHQ; không tạo giao dịch cổ tức riêng.",
+        );
+      }
       const editingSell = originalTransaction?.tx_type === "SELL";
       if (originalTransaction) {
         const quantityCheck = validateEditedSellQuantity({

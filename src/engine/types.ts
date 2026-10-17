@@ -2,7 +2,10 @@ export type AccountKind =
   "STOCK_VPS" | "STOCK_SSI" | "CRYPTO" | "ETF" | "DCDS" | "BANK";
 export type AssetType = "STOCK" | "ETF" | "DCDS" | "CRYPTO";
 export type TxType = "BUY" | "SELL" | "CASH_DIVIDEND" | "STOCK_DIVIDEND";
-export type CorporateActionType = "CASH_DIVIDEND" | "STOCK_DIVIDEND";
+export type CorporateActionType =
+  | "CASH_DIVIDEND"
+  | "STOCK_DIVIDEND"
+  | "RIGHTS_ISSUE";
 export type CapitalKind = "DEPOSIT" | "WITHDRAW";
 export const CAPITAL_BUCKETS = [
   "DCDS",
@@ -77,7 +80,10 @@ export interface CorporateAction {
   paymentDate: string | null;
   actionType: CorporateActionType;
   distributionPct: number;
-  referencePrice: number;
+  referencePrice: number | null;
+  subscriptionPrice: number | null;
+  vpsSubscribedQty: number;
+  ssiSubscribedQty: number;
   notes: string | null;
   source: "MANUAL" | "AUTO";
   sourceKey: string | null;

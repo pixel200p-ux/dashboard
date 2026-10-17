@@ -129,11 +129,19 @@
         "stock_dividend": "Tổng số lượng/giá trị cổ phiếu thưởng thực nhận"
       },
       "dividend_transactions": {
-        "restriction": "Phần cổ tức chỉ có ở Cổ phiếu",
+        "restriction": "Phần cổ tức chỉ có ở Cổ phiếu; cổ tức mới được ghi nhận bằng sự kiện GDKHQ, không tạo giao dịch cổ tức riêng.",
         "types": {
-          "cash_dividend": "Nhập số tiền/CP hoặc Tổng tiền thực nhận -> Hạch toán thẳng vào chỉ số Cổ Tức Tiền Mặt lũy kế.",
-          "stock_dividend": "Nhập tỷ lệ hoặc Số lượng CP thực nhận -> Tăng Holdings cổ phiếu gốc, tự động tính toán lại Giá vốn trung bình do pha loãng."
+          "cash_dividend": "Sự kiện GDKHQ tính tổng cổ tức gộp = lượng cổ phiếu đủ điều kiện × tỷ lệ trên mệnh giá 10.000đ/CP; chưa trừ thuế hoặc đối chiếu tiền thực nhận.",
+          "stock_dividend": "Sự kiện GDKHQ tăng Holdings theo tỷ lệ cổ phiếu thưởng (làm tròn xuống riêng theo broker), giữ nguyên tổng giá vốn và tính lại giá vốn/CP."
         }
+      },
+      "rights_issue": {
+        "formula": "Giá vốn mới = (Số CP cũ × Giá vốn cũ + Số CP đăng ký mua × Giá mua ưu đãi) / Tổng số CP sau khi mua",
+        "rules": [
+          "Lưu tỷ lệ quyền, giá mua ưu đãi và số CP đăng ký riêng cho từng broker.",
+          "Số đăng ký không vượt quyền ước tính từ lượng sở hữu trước GDKHQ.",
+          "Cộng lượng CP mua và giá vốn vào danh mục tại ngày thanh toán; nếu thiếu ngày thanh toán thì dùng ngày GDKHQ."
+        ]
       }
     },
     "5_2_trade_t_plus": {

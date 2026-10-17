@@ -139,8 +139,10 @@ export function corporateActionPriceFactor(action: CorporateAction): number {
   if (action.actionType === "STOCK_DIVIDEND") {
     return 1 / (1 + action.distributionPct / 100);
   }
+  if (action.actionType === "RIGHTS_ISSUE") return 1;
   const cashPerShare = 10_000 * (action.distributionPct / 100);
-  const factor = (action.referencePrice - cashPerShare) / action.referencePrice;
+  const referencePrice = action.referencePrice ?? 0;
+  const factor = (referencePrice - cashPerShare) / referencePrice;
   if (!Number.isFinite(factor) || factor <= 0) {
     throw new Error(`Tỷ lệ cổ tức tiền mặt không hợp lệ cho ${action.symbol}.`);
   }
@@ -154,10 +156,34 @@ function applyCorporateAction(
   const factor = corporateActionPriceFactor(action);
   for (const p of positions.values()) {
     if (p.asset.assetType !== "STOCK" || p.asset.symbol !== action.symbol) continue;
+    if (action.actionType === "RIGHTS_ISSUE") {
+      const subscribedQty =
+        p.accountId === "vps"
+          ? action.vpsSubscribedQty
+          : p.accountId === "ssi"
+            ? action.ssiSubscribedQty
+            : 0;
+      const subscriptionPrice = action.subscriptionPrice ?? 0;
+      if (subscribedQty <= 0 || subscriptionPrice <= 0) continue;
+      const subscriptionCost = subscribedQty * subscriptionPrice;
+      p.coreQty += subscribedQty;
+      p.coreCostTotal += subscriptionCost;
+      p.coreCostVndTotal += subscriptionCost;
+      p.totalInvested += subscriptionCost;
+      p.coreCostLots.push({
+        buyTxId: `rights:${action.id}:${p.accountId}`,
+        quantity: subscribedQty,
+        adjustedCost: subscriptionCost,
+      });
+      syncCoreLotCosts(p);
+      continue;
+    }
     const eligibleQty = p.coreQty + openQty(p);
     if (eligibleQty <= 1e-12) continue;
 
     if (action.actionType === "CASH_DIVIDEND") {
+      p.cashDividend +=
+        eligibleQty * 10_000 * (action.distributionPct / 100);
       p.coreCostTotal *= factor;
       p.coreCostVndTotal *= factor;
       p.tplusReduction *= factor;
@@ -284,9 +310,18 @@ export function replayPortfolio(
     .sort(sortTx);
   const timeline = [
     ...ledger.corporateActions
-      .filter((action) => !action.deletedAt && action.exDate <= asOf)
+      .filter(
+        (action) =>
+          !action.deletedAt &&
+          (action.actionType === "RIGHTS_ISSUE"
+            ? (action.paymentDate ?? action.exDate) <= asOf
+            : action.exDate <= asOf),
+      )
       .map((action) => ({
-        date: action.exDate,
+        date:
+          action.actionType === "RIGHTS_ISSUE"
+            ? action.paymentDate ?? action.exDate
+            : action.exDate,
         priority: 0,
         createdAt: action.createdAt,
         id: action.id,
@@ -367,14 +402,16 @@ export function replayPortfolio(
 
     if (tx.txType === "CASH_DIVIDEND") {
       const net = Math.max(0, num(tx.amount) - tax);
-      p.cashDividend += net;
-      const hasExDateAdjustment = ledger.corporateActions.some(
+      const coveredByCorporateAction = ledger.corporateActions.some(
         (action) =>
-          action.id === tx.corporateActionId &&
+          !action.deletedAt &&
           action.actionType === "CASH_DIVIDEND" &&
-          !action.deletedAt,
+          action.symbol === asset.symbol &&
+          (action.id === tx.corporateActionId ||
+            action.paymentDate === tx.txDate),
       );
-      if (!hasExDateAdjustment) {
+      if (!coveredByCorporateAction) p.cashDividend += net;
+      if (!coveredByCorporateAction) {
         if (net >= p.coreCostTotal) {
           const excess = net - p.coreCostTotal;
           p.coreCostTotal = 0;
@@ -390,6 +427,14 @@ export function replayPortfolio(
     }
 
     if (tx.txType === "STOCK_DIVIDEND") {
+      const coveredByCorporateAction = ledger.corporateActions.some(
+        (action) =>
+          !action.deletedAt &&
+          action.actionType === "STOCK_DIVIDEND" &&
+          action.symbol === asset.symbol &&
+          (action.paymentDate ?? action.exDate) === tx.txDate,
+      );
+      if (coveredByCorporateAction) continue;
       const add =
         num(tx.stockDivQty) ||
         (num(tx.dividendPerShare) > 0

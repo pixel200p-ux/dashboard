@@ -1,5 +1,6 @@
 import { interestForPeriod, periodRate } from "@/engine/bank";
 import { addTermMonths, todayYmd } from "@/engine/dates";
+import { replayPortfolio } from "@/engine/replay";
 import type { CapitalBucket, CorporateAction, LedgerSnapshot } from "@/engine/types";
 
 export type ReportKind =
@@ -82,6 +83,12 @@ function accountBucket(accountId: string, ledger: LedgerSnapshot): CapitalBucket
   if (kind === "ETF") return "ETF";
   if (kind === "DCDS") return "DCDS";
   return "BANK";
+}
+
+function previousDate(ymd: string): string {
+  const date = new Date(`${ymd}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function bankRows(ledger: LedgerSnapshot, asOf: string): ReportRow[] {
@@ -206,6 +213,25 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
 
   for (const action of ledger.corporateActions) {
     if (action.deletedAt) continue;
+    const eligibleHoldings =
+      action.actionType === "RIGHTS_ISSUE"
+        ? []
+        : replayPortfolio(ledger, previousDate(action.exDate)).holdings.filter(
+            (holding) =>
+              holding.assetType === "STOCK" &&
+              holding.symbol === action.symbol,
+          );
+    const eligibleQty = eligibleHoldings.reduce(
+      (sum, holding) => sum + holding.quantity,
+      0,
+    );
+    const stockBonusQty = eligibleHoldings.reduce(
+      (sum, holding) =>
+        sum + Math.floor(holding.quantity * (action.distributionPct / 100) + 1e-9),
+      0,
+    );
+    const grossCashDividend =
+      eligibleQty * 10_000 * (action.distributionPct / 100);
     const relatedBuckets = [
       ...new Set(
         ledger.assets
@@ -218,8 +244,10 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
     ];
     const distributionLabel =
       action.actionType === "CASH_DIVIDEND"
-        ? `Cổ tức tiền ${action.distributionPct}%`
-        : `Cổ tức cổ phiếu ${action.distributionPct}%`;
+        ? `Cổ tức tiền gộp trước thuế ${action.distributionPct}%`
+        : action.actionType === "STOCK_DIVIDEND"
+          ? `Cổ tức cổ phiếu ${action.distributionPct}%`
+          : `Quyền mua ${action.distributionPct}%`;
     rows.push({
       id: action.id,
       date: action.exDate,
@@ -229,13 +257,28 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
       symbol: action.symbol,
       kind: "EX_RIGHTS",
       kindLabel: KIND_LABEL.EX_RIGHTS,
-      quantity: null,
-      price: action.referencePrice,
-      amount: 0,
+      quantity:
+        action.actionType === "RIGHTS_ISSUE"
+          ? action.vpsSubscribedQty + action.ssiSubscribedQty
+          : action.actionType === "CASH_DIVIDEND"
+            ? eligibleQty
+            : stockBonusQty,
+      price:
+        action.actionType === "RIGHTS_ISSUE"
+          ? action.subscriptionPrice
+          : action.referencePrice,
+      amount:
+        action.actionType === "CASH_DIVIDEND" ? grossCashDividend : 0,
       notes: [
         distributionLabel,
         action.recordDate ? `Ngày ĐKCC ${action.recordDate}` : null,
         action.paymentDate ? `Ngày thanh toán ${action.paymentDate}` : null,
+        action.actionType === "RIGHTS_ISSUE" && action.subscriptionPrice != null
+          ? `Giá đăng ký ${action.subscriptionPrice}`
+          : null,
+        action.actionType === "RIGHTS_ISSUE"
+          ? `Đăng ký VPS ${action.vpsSubscribedQty} CP · SSI ${action.ssiSubscribedQty} CP`
+          : null,
         action.notes,
       ]
         .filter(Boolean)

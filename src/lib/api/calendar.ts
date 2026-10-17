@@ -45,7 +45,9 @@ async function loadCalendarEvents(): Promise<CalendarEvent[]> {
       const actionLabel =
         action.action_type === "CASH_DIVIDEND"
           ? "cổ tức tiền mặt"
-          : "cổ tức cổ phiếu";
+          : action.action_type === "STOCK_DIVIDEND"
+            ? "cổ tức cổ phiếu"
+            : "quyền mua";
       return {
         id: `corporate-action:${action.id}`,
         title: `GDKHQ ${action.symbol} · ${actionLabel} ${String(action.distribution_pct)}%`,
@@ -55,7 +57,10 @@ async function loadCalendarEvents(): Promise<CalendarEvent[]> {
         createdAt: String(action.created_at),
         source: "CORPORATE_ACTION" as const,
         symbol: String(action.symbol),
-        actionType: action.action_type as "CASH_DIVIDEND" | "STOCK_DIVIDEND",
+        actionType: action.action_type as
+          | "CASH_DIVIDEND"
+          | "STOCK_DIVIDEND"
+          | "RIGHTS_ISSUE",
         distributionPct: Number(action.distribution_pct),
       };
     }),

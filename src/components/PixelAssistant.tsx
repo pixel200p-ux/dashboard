@@ -102,6 +102,19 @@ function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string 
         stockDividendQuantity: transaction.stockDivQty,
         notes: transaction.notes,
       })),
+    corporateActions: portfolio.ledger.corporateActions
+      .filter((action) => !action.deletedAt)
+      .map((action) => ({
+        symbol: action.symbol,
+        type: action.actionType,
+        exDate: action.exDate,
+        recordDate: action.recordDate,
+        paymentDate: action.paymentDate,
+        distributionPct: action.distributionPct,
+        subscriptionPrice: action.subscriptionPrice,
+        vpsSubscribedQty: action.vpsSubscribedQty,
+        ssiSubscribedQty: action.ssiSubscribedQty,
+      })),
     recentTransactions: transactions.slice(-50).map((transaction) => ({
       type: transaction.txType,
       date: transaction.txDate,

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { resolve } from "node:path";
 import { createServer } from "vite";
 
 /** @typedef {import("../src/engine/types").LedgerSnapshot} LedgerSnapshot */
@@ -7,20 +8,25 @@ import { createServer } from "vite";
 /** @typedef {import("../src/engine/types").CorporateAction} CorporateAction */
 /** @typedef {import("../src/engine/types").CorporateActionType} CorporateActionType */
 /** @typedef {import("../src/engine/types").PortfolioState} PortfolioState */
+/** @typedef {import("../src/lib/report-history").ReportRow} ReportRow */
 
 /** @type {import("vite").ViteDevServer | undefined} */
 let vite;
 /** @type {((snapshot: LedgerSnapshot, asOf?: string) => PortfolioState) | undefined} */
 let replayPortfolio;
+/** @type {((snapshot: LedgerSnapshot, asOf?: string) => ReportRow[]) | undefined} */
+let buildReportRows;
 
 before(async () => {
   vite = await createServer({
     configFile: false,
     root: process.cwd(),
     appType: "custom",
+    resolve: { alias: { "@": resolve(process.cwd(), "src") } },
     server: { middlewareMode: true },
   });
   ({ replayPortfolio } = await vite.ssrLoadModule("/src/engine/replay.ts"));
+  ({ buildReportRows } = await vite.ssrLoadModule("/src/lib/report-history.ts"));
 });
 
 after(async () => {
@@ -121,6 +127,9 @@ function action(actionType, distributionPct, referencePrice = 20_000) {
     actionType,
     distributionPct,
     referencePrice,
+    subscriptionPrice: null,
+    vpsSubscribedQty: 0,
+    ssiSubscribedQty: 0,
     notes: null,
     source: "MANUAL",
     sourceKey: null,
@@ -186,13 +195,36 @@ test("linked cash payment does not reduce cost basis a second time", () => {
   assert.equal(holding.cashDividend, 100_000);
 });
 
+test("legacy unlinked cash payment on the action payment date is not double-counted", () => {
+  const cashAction = { ...action("CASH_DIVIDEND", 10), paymentDate: "2026-01-04" };
+  const state = replay(
+    ledger(
+      [
+        tx("buy-before", "BUY", "2026-01-01", 100, 20_000),
+        tx("cash-payment", "CASH_DIVIDEND", "2026-01-04", null, null, {
+          amount: 100_000,
+        }),
+      ],
+      cashAction,
+    ),
+    "2026-01-05",
+  );
+
+  const holding = holdingFrom(state);
+  assert.equal(holding.cashDividend, 100_000);
+  assert.equal(holding.adjustedAvgCost, 19_000);
+});
+
 test("stock action increases only shares held before ex-date", () => {
   const snapshot = ledger(
     [
       tx("buy-before", "BUY", "2026-01-01", 15, 10_000),
       tx("buy-on-ex-date", "BUY", "2026-01-03", 10, 10_000),
+      tx("legacy-stock-dividend", "STOCK_DIVIDEND", "2026-01-04", 1, null, {
+        stockDivQty: 1,
+      }),
     ],
-    action("STOCK_DIVIDEND", 10, 10_000),
+    { ...action("STOCK_DIVIDEND", 10, 10_000), paymentDate: "2026-01-04" },
   );
   const asset = snapshot.assets[0];
   if (!asset) throw new Error("Expected the test stock asset.");
@@ -209,6 +241,11 @@ test("stock action increases only shares held before ex-date", () => {
     ) < 1e-8,
   );
   assert.equal(adjustedLotPrice(holding, "buy-on-ex-date"), 10_000);
+  if (!buildReportRows) throw new Error("Report history module was not loaded.");
+  assert.equal(
+    buildReportRows(snapshot).find((item) => item.id === "ca-1")?.quantity,
+    1,
+  );
 });
 
 test("stock entitlement is rounded down separately for each broker account", () => {
@@ -241,4 +278,81 @@ test("stock entitlement is rounded down separately for each broker account", () 
   assert.equal(holdings.length, 2);
   assert.ok(holdings.every((holding) => holding.quantity === 9));
   assert.ok(holdings.every((holding) => holding.stockDividendQty === 0));
+});
+
+test("cash action recognizes gross dividend from ex-date eligible shares only", () => {
+  const state = replay(
+    ledger(
+      [
+        tx("buy-before", "BUY", "2026-01-01", 100, 20_000),
+        tx("buy-on-ex-date", "BUY", "2026-01-03", 20, 20_000),
+      ],
+      action("CASH_DIVIDEND", 10),
+    ),
+    "2026-01-04",
+  );
+
+  assert.equal(holdingFrom(state).cashDividend, 100_000);
+});
+
+test("cash corporate-action report row shows gross entitlement", () => {
+  if (!buildReportRows) throw new Error("Report history module was not loaded.");
+  const snapshot = ledger(
+    [tx("buy-before", "BUY", "2026-01-01", 100, 20_000)],
+    action("CASH_DIVIDEND", 10),
+  );
+
+  const row = buildReportRows(snapshot).find((item) => item.id === "ca-1");
+  assert.equal(row?.quantity, 100);
+  assert.equal(row?.amount, 100_000);
+});
+
+test("rights subscriptions add account-specific shares and cost on payment date", () => {
+  const rightsAction = {
+    ...action("RIGHTS_ISSUE", 50),
+    paymentDate: "2026-01-06",
+    subscriptionPrice: 10_000,
+    vpsSubscribedQty: 25,
+    ssiSubscribedQty: 5,
+  };
+  const snapshot = ledger(
+    [
+      tx("buy-before", "BUY", "2026-01-01", 100, 20_000),
+      tx("ssi-buy", "BUY", "2026-01-01", 50, 8_000, {
+        accountId: "ssi",
+        assetId: "ssi:ABC",
+      }),
+    ],
+    rightsAction,
+  );
+  snapshot.accounts.push({
+    id: "ssi",
+    name: "SSI",
+    kind: "STOCK_SSI",
+    currency: "VND",
+  });
+  const vpsAsset = snapshot.assets[0];
+  if (!vpsAsset) throw new Error("Expected the VPS test stock asset.");
+  snapshot.assets.push({ ...vpsAsset, id: "ssi:ABC", accountId: "ssi" });
+
+  const beforePayment = replay(snapshot, "2026-01-05").holdings;
+  assert.equal(
+    beforePayment.find((holding) => holding.accountId === "vps")?.quantity,
+    100,
+  );
+  assert.equal(
+    beforePayment.find((holding) => holding.accountId === "ssi")?.quantity,
+    50,
+  );
+
+  const afterPayment = replay(snapshot, "2026-01-06").holdings;
+  const vpsHolding = afterPayment.find((holding) => holding.accountId === "vps");
+  const ssiHolding = afterPayment.find((holding) => holding.accountId === "ssi");
+  if (!vpsHolding || !ssiHolding) throw new Error("Expected both broker holdings.");
+  assert.equal(vpsHolding.quantity, 125);
+  assert.equal(vpsHolding.adjustedAvgCost, 18_000);
+  assert.equal(adjustedLotPrice(vpsHolding, "rights:ca-1:vps"), 10_000);
+  assert.equal(ssiHolding.quantity, 55);
+  assert.ok(Math.abs(ssiHolding.adjustedAvgCost - 8_181.8181818) < 1e-6);
+  assert.equal(adjustedLotPrice(ssiHolding, "rights:ca-1:ssi"), 10_000);
 });

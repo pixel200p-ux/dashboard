@@ -343,7 +343,10 @@ export function ReportsPage() {
                                 txDate: action.exDate,
                                 corporateActionType: action.actionType,
                                 distributionPct: action.distributionPct,
-                                referencePrice: action.referencePrice,
+                                referencePrice: action.referencePrice ?? undefined,
+                                subscriptionPrice: action.subscriptionPrice ?? undefined,
+                                vpsSubscribedQty: action.vpsSubscribedQty,
+                                ssiSubscribedQty: action.ssiSubscribedQty,
                                 recordDate: action.recordDate,
                                 paymentDate: action.paymentDate,
                               });

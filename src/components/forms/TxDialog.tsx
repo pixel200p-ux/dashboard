@@ -82,6 +82,9 @@ export function TxDialog() {
     useState<CorporateActionType>("CASH_DIVIDEND");
   const [distributionPct, setDistributionPct] = useState("");
   const [referencePrice, setReferencePrice] = useState("");
+  const [subscriptionPrice, setSubscriptionPrice] = useState("");
+  const [vpsSubscribedQty, setVpsSubscribedQty] = useState("");
+  const [ssiSubscribedQty, setSsiSubscribedQty] = useState("");
   const [recordDate, setRecordDate] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [feeOverride, setFeeOverride] = useState("");
@@ -126,6 +129,21 @@ export function TxDialog() {
     setReferencePrice(
       prefill.referencePrice != null
         ? formatBrokerPrice(prefill.referencePrice)
+        : "",
+    );
+    setSubscriptionPrice(
+      prefill.subscriptionPrice != null
+        ? formatBrokerPrice(prefill.subscriptionPrice)
+        : "",
+    );
+    setVpsSubscribedQty(
+      prefill.vpsSubscribedQty != null
+        ? formatThousandsInput(String(prefill.vpsSubscribedQty))
+        : "",
+    );
+    setSsiSubscribedQty(
+      prefill.ssiSubscribedQty != null
+        ? formatThousandsInput(String(prefill.ssiSubscribedQty))
         : "",
     );
     setRecordDate(prefill.recordDate ?? "");
@@ -279,8 +297,21 @@ export function TxDialog() {
       const sym = symbol.trim().toUpperCase();
       const pct = parseDecimal(distributionPct);
       const refPrice = parseBrokerPrice(referencePrice);
-      if (!sym || pct <= 0 || refPrice <= 0) {
-        toast.error("Vui lòng nhập mã, tỷ lệ cổ tức và giá tham chiếu hợp lệ.");
+      const subscribedPrice = parseBrokerPrice(subscriptionPrice);
+      const vpsQty = parseDecimal(vpsSubscribedQty);
+      const ssiQty = parseDecimal(ssiSubscribedQty);
+      if (
+        !sym ||
+        pct <= 0 ||
+        (corporateActionType === "CASH_DIVIDEND" && refPrice <= 0) ||
+        (corporateActionType === "RIGHTS_ISSUE" &&
+          (subscribedPrice <= 0 ||
+            !Number.isInteger(vpsQty) ||
+            !Number.isInteger(ssiQty) ||
+            vpsQty < 0 ||
+            ssiQty < 0))
+      ) {
+        toast.error("Vui lòng kiểm tra mã và các thông số của sự kiện.");
         return;
       }
       const pin = editing ? await askEditPin() : null;
@@ -296,7 +327,14 @@ export function TxDialog() {
             paymentDate: paymentDate || null,
             actionType: corporateActionType,
             distributionPct: pct,
-            referencePrice: refPrice,
+            referencePrice:
+              corporateActionType === "CASH_DIVIDEND" ? refPrice : null,
+            subscriptionPrice:
+              corporateActionType === "RIGHTS_ISSUE" ? subscribedPrice : null,
+            vpsSubscribedQty:
+              corporateActionType === "RIGHTS_ISSUE" ? vpsQty : 0,
+            ssiSubscribedQty:
+              corporateActionType === "RIGHTS_ISSUE" ? ssiQty : 0,
             notes: name.trim() || undefined,
           },
         },
@@ -442,9 +480,13 @@ export function TxDialog() {
       ? [
           { value: "BUY", label: "Buy" },
           { value: "SELL", label: "Sell" },
-          { value: "CASH_DIVIDEND", label: "Cổ tức tiền mặt" },
-          { value: "STOCK_DIVIDEND", label: "Cổ tức cổ phiếu" },
           { value: "EX_RIGHTS", label: "Ngày GDKHQ" },
+          ...(editing && prefill?.txType === "CASH_DIVIDEND"
+            ? [{ value: "CASH_DIVIDEND", label: "Cổ tức tiền mặt (dữ liệu cũ)" }]
+            : []),
+          ...(editing && prefill?.txType === "STOCK_DIVIDEND"
+            ? [{ value: "STOCK_DIVIDEND", label: "Cổ tức cổ phiếu (dữ liệu cũ)" }]
+            : []),
         ]
       : [
           { value: "BUY", label: "Buy" },
@@ -578,8 +620,9 @@ export function TxDialog() {
                 <div className="space-y-1">
                   <Label>Mã</Label>
                   {txType === "SELL" ||
-                  txType === "CASH_DIVIDEND" ||
-                  txType === "STOCK_DIVIDEND" ||
+                  (editing &&
+                    (txType === "CASH_DIVIDEND" ||
+                      txType === "STOCK_DIVIDEND")) ||
                   isCorporateAction ? (
                     <Select
                       value={symbol}
@@ -593,12 +636,14 @@ export function TxDialog() {
                         else if (asset) setName(asset.name);
                       }}
                       placeholder={
-                        isCorporateAction || txType === "CASH_DIVIDEND"
+                        isCorporateAction ||
+                        (editing && txType === "CASH_DIVIDEND")
                           ? "Chọn mã cổ phiếu"
                           : "Chọn mã đang giữ"
                       }
                       options={(
-                        isCorporateAction || txType === "CASH_DIVIDEND"
+                        isCorporateAction ||
+                        (editing && txType === "CASH_DIVIDEND")
                           ? stockSymbols
                           : sellHoldings.map((h) => h.symbol)
                       ).map(
@@ -623,7 +668,9 @@ export function TxDialog() {
               {isCorporateAction && (
                 <div className="space-y-3 rounded-lg border border-border p-3">
                   <p className="text-sm text-muted-foreground">
-                    Sự kiện chỉ điều chỉnh giá vốn của các lô đủ điều kiện; giá thị trường vẫn lấy từ nguồn giá hiện tại.
+                    {corporateActionType === "RIGHTS_ISSUE"
+                      ? "Nhập lượng đăng ký riêng theo VPS/SSI. Cổ phiếu mua thêm được cộng vào danh mục theo ngày thanh toán (hoặc ngày GDKHQ nếu chưa nhập ngày thanh toán)."
+                      : "Sự kiện GDKHQ là nguồn duy nhất ghi nhận cổ tức; tiền mặt được tính gộp trước thuế và cổ phiếu theo lượng đủ điều kiện trước ngày GDKHQ."}
                     {corporateActionType === "STOCK_DIVIDEND" &&
                       " Cổ phiếu thưởng được làm tròn xuống riêng theo từng broker."}
                   </p>
@@ -639,30 +686,77 @@ export function TxDialog() {
                         options={[
                           { value: "CASH_DIVIDEND", label: "Cổ tức tiền mặt" },
                           { value: "STOCK_DIVIDEND", label: "Cổ tức cổ phiếu" },
+                          { value: "RIGHTS_ISSUE", label: "Quyền mua phát hành thêm" },
                         ]}
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Tỷ lệ cổ tức (%)</Label>
+                      <Label>
+                        {corporateActionType === "RIGHTS_ISSUE"
+                          ? "Tỷ lệ quyền mua (% số CP đang sở hữu)"
+                          : "Tỷ lệ cổ tức (%)"}
+                      </Label>
                       <Input
                         type="number"
                         min="0"
                         step="any"
                         value={distributionPct}
                         onChange={(e) => setDistributionPct(e.target.value)}
-                        placeholder="Ví dụ: 10"
+                        placeholder={
+                          corporateActionType === "RIGHTS_ISSUE"
+                            ? "Ví dụ: 50 (2 CP cũ mua 1 CP mới)"
+                            : "Ví dụ: 10"
+                        }
                         required
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label>Giá tham chiếu trước GDKHQ (13.5 = 13.500đ)</Label>
-                      <Input
-                        value={referencePrice}
-                        onChange={setGrouped(setReferencePrice)}
-                        placeholder="..."
-                        required
-                      />
-                    </div>
+                    {corporateActionType === "CASH_DIVIDEND" && (
+                      <div className="space-y-1">
+                        <Label>Giá tham chiếu trước GDKHQ (13.5 = 13.500đ)</Label>
+                        <Input
+                          value={referencePrice}
+                          onChange={setGrouped(setReferencePrice)}
+                          placeholder="..."
+                          required
+                        />
+                      </div>
+                    )}
+                    {corporateActionType === "RIGHTS_ISSUE" && (
+                      <>
+                        <div className="space-y-1">
+                          <Label>Giá mua ưu đãi (13.5 = 13.500đ)</Label>
+                          <Input
+                            value={subscriptionPrice}
+                            onChange={setGrouped(setSubscriptionPrice)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Số CP đăng ký mua — VPS</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={vpsSubscribedQty}
+                            onChange={(event) =>
+                              setVpsSubscribedQty(event.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Số CP đăng ký mua — SSI</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={ssiSubscribedQty}
+                            onChange={(event) =>
+                              setSsiSubscribedQty(event.target.value)
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
                     <div className="space-y-1">
                       <Label>Ngày đăng ký cuối cùng</Label>
                       <Input
@@ -683,7 +777,7 @@ export function TxDialog() {
                 </div>
               )}
 
-              {txType === "CASH_DIVIDEND" && (
+              {editing && txType === "CASH_DIVIDEND" && (
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className="space-y-1">
                     <Label>Cổ tức trước thuế (VND)</Label>
@@ -728,7 +822,7 @@ export function TxDialog() {
                 </div>
               )}
 
-              {txType === "STOCK_DIVIDEND" && (
+              {editing && txType === "STOCK_DIVIDEND" && (
                 <div className="space-y-1">
                   <Label>Số lượng CP thưởng thực nhận</Label>
                   <Input value={stockDivQty} onChange={setGrouped(setStockDivQty)} />

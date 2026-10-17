@@ -93,7 +93,11 @@ export function mapCorporateAction(r: Record<string, unknown>): CorporateAction 
     paymentDate: r.payment_date ? String(r.payment_date).slice(0, 10) : null,
     actionType: r.action_type as CorporateActionType,
     distributionPct: n(r.distribution_pct),
-    referencePrice: n(r.reference_price),
+    referencePrice: r.reference_price == null ? null : n(r.reference_price),
+    subscriptionPrice:
+      r.subscription_price == null ? null : n(r.subscription_price),
+    vpsSubscribedQty: n(r.vps_subscribed_qty),
+    ssiSubscribedQty: n(r.ssi_subscribed_qty),
     notes: r.notes ? String(r.notes) : null,
     source: r.source === "AUTO" ? "AUTO" : "MANUAL",
     sourceKey: r.source_key ? String(r.source_key) : null,

@@ -11,17 +11,26 @@ Sổ cái danh mục thuần tài sản (Asset-Only Ledger) + Trade T+.
 
 ## Sự kiện cổ tức / GDKHQ
 
-Trong form giao dịch Stock, chọn **Ngày GDKHQ** để nhập hoặc sửa sự kiện tiền
-mặt/cổ tức cổ phiếu. Replay áp dụng sự kiện cho lượng cổ phiếu đang đủ điều kiện
-trước ngày GDKHQ; các giao dịch gốc không bị sửa, còn lệnh bán sau ngày đó được
-tính lại theo giá vốn đã điều chỉnh. Giá thị trường vẫn lấy riêng từ nguồn giá
-hiện tại.
+Trong form giao dịch Stock, chọn **Ngày GDKHQ** để nhập hoặc sửa sự kiện cổ tức
+tiền mặt, cổ tức cổ phiếu hoặc quyền mua. Ngày GDKHQ phải được nhập theo thông
+báo chính thức của doanh nghiệp/VSDC; ứng dụng chưa tự tra cứu hoặc đồng bộ ngày.
+Sự kiện được đưa tự động lên Calendar sau khi nhập.
 
-Khi ghi nhận tiền cổ tức về tài khoản, liên kết khoản nhận với sự kiện GDKHQ
-tương ứng để không giảm giá vốn hai lần. Sự kiện có dòng riêng trong Reports và
-chỉ được hiển thị (không sửa/xóa) trên Calendar. Hiện sự kiện được nhập thủ
-công; chưa có API/crawler tự đồng bộ. Quyền mua chưa nằm trong phạm vi này.
-Cổ phiếu thưởng được làm tròn xuống tổng quyền lợi riêng theo từng broker.
+Sự kiện là nguồn duy nhất để ghi nhận cổ tức mới; không tạo thêm giao dịch cổ
+tức tiền mặt/cổ phiếu. Cổ tức tiền mặt được tính gộp theo lượng nắm giữ trước
+GDKHQ nhân tỷ lệ trên mệnh giá 10.000đ/cổ phiếu; số này là trước thuế và chưa
+đối chiếu khoản tiền thực nhận. Cổ tức cổ phiếu làm tăng lượng cổ phiếu đủ điều
+kiện, làm tròn xuống riêng theo từng broker và giữ nguyên tổng giá vốn của lô.
+Các khoản cổ tức giao dịch cũ vẫn được giữ để xem/sửa/xóa; khoản cũ gắn với sự
+kiện (hoặc cùng ngày thanh toán đã nhập) không bị tính hai lần. Không tạo thêm
+khoản giao dịch cổ tức mới.
+
+Với quyền mua, nhập tỷ lệ quyền, giá mua ưu đãi và số lượng thực đăng ký riêng
+cho VPS/SSI. Số đăng ký không được vượt quyền ước tính tại GDKHQ. Cổ phiếu mua
+thêm và giá vốn tương ứng được cộng vào danh mục từ ngày thanh toán (hoặc ngày
+GDKHQ nếu chưa nhập ngày thanh toán); giá vốn mới là bình quân trọng số của cổ
+phiếu đang giữ và lượng mua thêm. Sự kiện có dòng riêng trong Reports và chỉ
+được hiển thị (không sửa/xóa) trên Calendar.
 
 ## Chạy local
 
