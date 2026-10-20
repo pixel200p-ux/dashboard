@@ -4,7 +4,8 @@ import { persist } from "zustand/middleware";
 export type GeminiKeyStatus = "untested" | "active" | "inactive";
 export type AIKeyProvider = "gemini" | "groq" | "openrouter";
 export type SearchKeyProvider = "tavily" | "jina";
-export type PixelKeyProvider = AIKeyProvider | SearchKeyProvider;
+export type VoiceKeyProvider = "elevenlabs";
+export type PixelKeyProvider = AIKeyProvider | SearchKeyProvider | VoiceKeyProvider;
 
 export const PIXEL_KEY_PROVIDERS: { value: PixelKeyProvider; label: string }[] = [
   { value: "gemini", label: "Gemini" },
@@ -12,6 +13,7 @@ export const PIXEL_KEY_PROVIDERS: { value: PixelKeyProvider; label: string }[] =
   { value: "openrouter", label: "OpenRouter" },
   { value: "tavily", label: "Tavily Search" },
   { value: "jina", label: "Jina Reader" },
+  { value: "elevenlabs", label: "ElevenLabs Voice" },
 ];
 
 export type GeminiKey = {

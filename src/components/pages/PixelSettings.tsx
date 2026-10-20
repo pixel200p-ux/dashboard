@@ -324,8 +324,8 @@ export function PixelSettings() {
                 {isPending
                   ? "Đang tải…"
                   : keys.length > 0
-                    ? `${keys.length} API key đã lưu`
-                    : "Chưa có API key"}
+                    ? `${keys.length} API key đã lưu · Thêm ElevenLabs để chọn giọng đọc cho Pixel`
+                    : "Chưa có API key · Thêm ElevenLabs để bật giọng nói"}
               </p>
             </div>
             <Button type="button" size="sm" onClick={() => void openSection("api")}>
@@ -441,7 +441,7 @@ export function PixelSettings() {
               })}
               {!isPending && keys.length === 0 && !adding && (
                 <p className="rounded-xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-                  Chưa có key. Thêm Gemini/Groq/OpenRouter để chat và Tavily/Jina để Pixel tra cứu web khi cần.
+                  Chưa có key. Thêm Gemini/Groq/OpenRouter để chat, ElevenLabs để bật giọng nói, và Tavily/Jina để Pixel tra cứu web khi cần.
                 </p>
               )}
             </div>

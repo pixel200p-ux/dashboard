@@ -4,11 +4,14 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import type { AIKeyProvider, GeminiKeyStatus, PixelKeyProvider, SearchKeyProvider } from "@/lib/pixel-store";
 
-const providerSchema = z.enum(["gemini", "groq", "openrouter", "tavily", "jina"]);
+const providerSchema = z.enum(["gemini", "groq", "openrouter", "tavily", "jina", "elevenlabs"]);
 const keyIdSchema = z.string().min(1).max(100);
 const SHARED_OWNER = "shared";
 const isAIProvider = (provider: PixelKeyProvider): provider is AIKeyProvider =>
   provider === "gemini" || provider === "groq" || provider === "openrouter";
+const isSearchProvider = (provider: PixelKeyProvider): provider is SearchKeyProvider =>
+  provider === "tavily" || provider === "jina";
+const isVoiceProvider = (provider: PixelKeyProvider) => provider === "elevenlabs";
 
 export const PIXEL_SETTINGS_QUERY_KEY = ["pixel-settings"] as const;
 
@@ -25,6 +28,13 @@ export type PixelSettingsPayload = {
   keys: PixelKeyMetadata[];
   mandatoryRules: string;
   memories: string;
+};
+
+export type PixelVoiceOption = {
+  id: string;
+  name: string;
+  category?: string;
+  labels: Record<string, string>;
 };
 
 export type PixelConversationSummary = {
@@ -174,7 +184,11 @@ export const testPixelKey = createServerFn({ method: "POST" })
     });
     const active = isAIProvider(provider)
       ? await (await import("@/lib/pixel-ai.server")).checkAIKey(provider, key)
-      : await (await import("@/lib/pixel-search.server")).checkSearchKey(provider as SearchKeyProvider, key);
+      : isVoiceProvider(provider)
+        ? await (await import("@/lib/pixel-voice.server")).checkElevenLabsKey(key)
+        : isSearchProvider(provider)
+          ? await (await import("@/lib/pixel-search.server")).checkSearchKey(provider, key)
+          : false;
     const checkedAt = new Date().toISOString();
     const status: GeminiKeyStatus = active ? "active" : "inactive";
     await sql`
@@ -208,7 +222,11 @@ export const testAllPixelKeys = createServerFn({ method: "POST" })
         });
         const active = isAIProvider(provider)
           ? await (await import("@/lib/pixel-ai.server")).checkAIKey(provider, key)
-          : await (await import("@/lib/pixel-search.server")).checkSearchKey(provider as SearchKeyProvider, key);
+          : isVoiceProvider(provider)
+            ? await (await import("@/lib/pixel-voice.server")).checkElevenLabsKey(key)
+            : isSearchProvider(provider)
+              ? await (await import("@/lib/pixel-search.server")).checkSearchKey(provider, key)
+              : false;
         const checkedAt = new Date().toISOString();
         const status: GeminiKeyStatus = active ? "active" : "inactive";
         await sql`
@@ -253,6 +271,15 @@ export const savePixelPreferences = createServerFn({ method: "POST" })
       mandatoryRules: String(preferences[0]?.mandatory_rules ?? ""),
       memories: String(preferences[0]?.memories ?? ""),
     };
+  });
+
+export const fetchPixelVoices = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async (): Promise<PixelVoiceOption[]> => {
+    const voiceServer = await import("@/lib/pixel-voice.server");
+    const key = await voiceServer.getSharedElevenLabsKey();
+    const elevenLabsVoices = await voiceServer.listElevenLabsVoices(key);
+    return [...elevenLabsVoices, ...voiceServer.pixelEdgeVoices()];
   });
 
 export const savePixelMemorySuggestion = createServerFn({ method: "POST" })
@@ -440,7 +467,7 @@ export const sendPixelMessage = createServerFn({ method: "POST" })
       };
     });
     const aiKeys = decryptedKeys.filter((key): key is typeof key & { provider: AIKeyProvider } => isAIProvider(key.provider));
-    const searchRows = keyRows.filter((row) => !isAIProvider(String((row as Record<string, unknown>).provider) as PixelKeyProvider));
+    const searchRows = keyRows.filter((row) => isSearchProvider(String((row as Record<string, unknown>).provider) as PixelKeyProvider));
     const searchKeys = searchRows.map((row) => {
       const value = row as Record<string, unknown>;
       return {
