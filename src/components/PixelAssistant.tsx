@@ -69,6 +69,7 @@ function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string 
   const accounts = new Map(portfolio.ledger.accounts.map((account) => [account.id, account.name]));
   const assets = new Map(portfolio.ledger.assets.map((asset) => [asset.id, asset]));
   const transactions = portfolio.ledger.transactions;
+  const shortenNote = (note: string | null) => note?.slice(0, 200) ?? null;
   const payload = {
     asOf: portfolio.state.asOf,
     summary: {
@@ -83,18 +84,28 @@ function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string 
       bankInterest: portfolio.state.bankInterest,
       allocation: portfolio.state.allocation,
     },
-    allHoldings: portfolio.state.holdings.map(({ openLots: _openLots, ...holding }) => holding),
-    activeBankDeposits: portfolio.state.banks,
-    redeemedBankDeposits: portfolio.state.redeemedBanks,
-    openTplusTrades: portfolio.state.tplusCards,
+    allHoldings: portfolio.state.holdings.map(({
+      openLots: _openLots,
+      buyLotCosts: _buyLotCosts,
+      ...holding
+    }) => holding),
+    activeBankDeposits: portfolio.state.banks.map((bank) => ({
+      ...bank,
+      notes: shortenNote(bank.notes),
+    })),
+    redeemedBankDeposits: portfolio.state.redeemedBanks.slice(-50).map((bank) => ({
+      ...bank,
+      notes: shortenNote(bank.notes),
+    })),
+    openTplusTrades: portfolio.state.tplusCards.map(({ openLots: _openLots, ...trade }) => trade),
     completedTplusHistory: portfolio.state.tplusHistory.slice(-50),
-    assets: portfolio.ledger.assets,
     transactionCounts: transactions.reduce<Record<string, number>>((counts, transaction) => {
       counts[transaction.txType] = (counts[transaction.txType] ?? 0) + 1;
       return counts;
     }, {}),
     dividendTransactions: transactions
       .filter((transaction) => transaction.txType === "CASH_DIVIDEND" || transaction.txType === "STOCK_DIVIDEND")
+      .slice(-50)
       .map((transaction) => ({
         type: transaction.txType,
         date: transaction.txDate,
@@ -103,10 +114,11 @@ function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string 
         quantity: transaction.quantity,
         cashAmount: transaction.amount,
         stockDividendQuantity: transaction.stockDivQty,
-        notes: transaction.notes,
+        notes: shortenNote(transaction.notes),
       })),
     corporateActions: portfolio.ledger.corporateActions
       .filter((action) => !action.deletedAt)
+      .slice(-50)
       .map((action) => ({
         symbol: action.symbol,
         type: action.actionType,
@@ -128,19 +140,39 @@ function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string 
       amount: transaction.amount,
       fees: transaction.fee,
       tax: transaction.tax,
-      notes: transaction.notes,
+      notes: shortenNote(transaction.notes),
     })),
   };
   const serialized = JSON.stringify(payload);
-  if (serialized.length > 58_000) {
-    const compactPayload = {
-      ...payload,
-      completedTplusHistory: payload.completedTplusHistory.slice(-20),
-      recentTransactions: payload.recentTransactions.slice(-25),
-    };
-    return JSON.stringify(compactPayload);
-  }
-  return serialized;
+  if (serialized.length <= 50_000) return serialized;
+
+  const compactPayload = {
+    ...payload,
+    allHoldings: payload.allHoldings.slice(-75),
+    activeBankDeposits: payload.activeBankDeposits.slice(-30),
+    redeemedBankDeposits: payload.redeemedBankDeposits.slice(-20),
+    openTplusTrades: payload.openTplusTrades.slice(-30),
+    completedTplusHistory: payload.completedTplusHistory.slice(-20),
+    dividendTransactions: payload.dividendTransactions.slice(-25),
+    corporateActions: payload.corporateActions.slice(-25),
+    recentTransactions: payload.recentTransactions.slice(-25),
+  };
+  const compactSerialized = JSON.stringify(compactPayload);
+  if (compactSerialized.length <= 50_000) return compactSerialized;
+
+  const leanPayload = {
+    ...payload,
+    allHoldings: payload.allHoldings.slice(-30),
+    activeBankDeposits: payload.activeBankDeposits.slice(-15),
+    redeemedBankDeposits: payload.redeemedBankDeposits.slice(-10),
+    openTplusTrades: payload.openTplusTrades.slice(-15),
+    completedTplusHistory: payload.completedTplusHistory.slice(-10),
+    dividendTransactions: payload.dividendTransactions.slice(-15),
+    corporateActions: payload.corporateActions.slice(-15),
+    recentTransactions: payload.recentTransactions.slice(-15),
+    omittedDetailsForLength: true,
+  };
+  return JSON.stringify(leanPayload);
 }
 
 function parseStoredSources(content: string): { text: string; sources?: PixelSource[] } {
