@@ -93,7 +93,13 @@
     },
     "4_2_net_asset_value_nav": {
       "model": "Mô hình Thuần Tài Sản (Asset-Only Ledger): Không quản lý hay duy trì biến số Cash (Tiền mặt/Số dư khả dụng) trung gian.",
-      "formula": "NAV = SUM(Giá trị thị trường DCDS + ETF + Stock + Crypto (bao gồm số dư USDT nhập thủ công) + Active Bank Deposits)",
+      "formula": "NAV = SUM(Giá trị thị trường DCDS + ETF + Stock + Crypto (bao gồm số dư USDT nhập thủ công) + giá trị sổ Bank đang hiệu lực, trong đó gốc hiện tại bao gồm lãi đã nhập gốc ở các kỳ trước; không cộng lãi của kỳ hiện tại chưa đáo hạn)",
+      "bank_interest_rules": [
+        "Lãi tiền gửi tính theo ACT/365.",
+        "Lãi đã nhập gốc khi tái tục tiếp tục nằm trong gốc hiện tại và được tính vào NAV.",
+        "Không cộng phần lãi đang dồn của kỳ tiền gửi hiện tại vào NAV trước khi đáo hạn.",
+        "Sau ngày tất toán, gốc và lãi được loại khỏi NAV vì hệ thống không theo dõi ví tiền mặt."
+      ],
       "usdt_balance_rules": [
         "Người dùng có thể nhập và chỉnh sửa số dư USDT bằng USD trong tab Crypto.",
         "Số dư USDT quy đổi theo tỷ giá USD/VND hiện tại và chỉ cộng vào NAV Crypto; không có giá vốn, giao dịch BUY/SELL hoặc Trade T+.",

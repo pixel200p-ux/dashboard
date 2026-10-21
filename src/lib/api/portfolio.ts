@@ -5,8 +5,7 @@ import { getSql, type SqlQuery } from "@/lib/db";
 import { replayOriginalByBucket, replayPortfolio } from "@/engine/replay";
 import { formatVnd } from "@/engine/money";
 import { replayBank } from "@/engine/bank";
-import { todayYmd } from "@/engine/dates";
-import { ensureDailyPriceSnapshot } from "@/lib/api/prices";
+import { todayVnYmd, todayYmd } from "@/engine/dates";
 import { loadLedgerSnapshot } from "@/lib/api/load-snapshot";
 import type { LedgerSnapshot, PortfolioState } from "@/engine/types";
 import { validateEditedSellQuantity } from "@/lib/tx-validation.js";
@@ -15,6 +14,15 @@ export type PortfolioPayload = {
   ledger: LedgerSnapshot;
   state: PortfolioState;
 };
+
+function notFutureDate(label: string) {
+  return z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine((date) => date <= todayVnYmd(), {
+      message: `${label} không được ở tương lai.`,
+    });
+}
 
 async function getTransactionMatchGroup(
   sql: SqlQuery,
@@ -51,7 +59,6 @@ async function getTransactionMatchGroup(
 export const fetchPortfolio = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async (): Promise<PortfolioPayload> => {
-    await ensureDailyPriceSnapshot();
     const ledger = await loadLedgerSnapshot();
     return { ledger, state: replayPortfolio(ledger) };
   });
@@ -85,7 +92,7 @@ const capitalSchema = z.object({
   kind: z.enum(["DEPOSIT", "WITHDRAW"]),
   amount: z.number().positive(),
   fxRate: z.number().positive().nullable().optional(),
-  movementDate: z.string(),
+  movementDate: notFutureDate("Ngày vốn"),
   notes: z.string().optional(),
   bucket: z.enum(["DCDS", "ETF", "VPS", "SSI", "CRYPTO", "BANK"]),
 });
@@ -136,7 +143,7 @@ const updateCapitalSchema = z.object({
   pin: z.string(),
   amount: z.number().positive(),
   fxRate: z.number().positive().nullable().optional(),
-  movementDate: z.string(),
+  movementDate: notFutureDate("Ngày vốn"),
   notes: z.string().optional(),
   bucket: z.enum(["DCDS", "ETF", "VPS", "SSI", "CRYPTO", "BANK"]),
 });
@@ -207,7 +214,7 @@ const txSchema = z.object({
   assetType: z.enum(["STOCK", "ETF", "DCDS", "CRYPTO"]),
   currency: z.string(),
   txType: z.enum(["BUY", "SELL", "CASH_DIVIDEND", "STOCK_DIVIDEND"]),
-  txDate: z.string(),
+  txDate: notFutureDate("Ngày giao dịch"),
   quantity: z.number().nullable(),
   price: z.number().nullable(),
   amount: z.number(),
@@ -460,7 +467,7 @@ const bankSchema = z.object({
   pin: z.string().optional(),
   bankName: z.string().min(1),
   principal: z.number().positive(),
-  startDate: z.string(),
+  startDate: notFutureDate("Ngày gửi"),
   termMonths: z.number().int().positive(),
   interestRate: z.number().nonnegative(),
   autoRollover: z.boolean(),

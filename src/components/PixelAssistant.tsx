@@ -7,6 +7,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { getBearerToken } from "@/lib/auth/client";
+import type { CapitalBucket } from "@/engine/types";
+import {
+  portfolioCategoriesForPrompt,
+  portfolioPromptForFollowup,
+  type PortfolioCategory,
+} from "@/lib/pixel-prompt";
 import {
   deletePixelConversations,
   fetchPixelConversation,
@@ -64,7 +70,9 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string {
+function portfolioContextForAI(portfolio: PortfolioPayload | undefined, prompt: string): string {
+  const requestedCategories = portfolioCategoriesForPrompt(prompt);
+  if (requestedCategories?.length === 0) return "";
   if (!portfolio) return "Danh mục chưa tải xong.";
   const accounts = new Map(portfolio.ledger.accounts.map((account) => [account.id, account.name]));
   const assets = new Map(portfolio.ledger.assets.map((asset) => [asset.id, asset]));
@@ -143,6 +151,84 @@ function portfolioContextForAI(portfolio: PortfolioPayload | undefined): string 
       notes: shortenNote(transaction.notes),
     })),
   };
+  if (requestedCategories) {
+    const categories = new Set(requestedCategories);
+    const categoryAssets = portfolio.ledger.assets.filter((asset) => categories.has(asset.assetType));
+    const categoryAssetIds = new Set(categoryAssets.map((asset) => asset.id));
+    const categorySymbols = new Set(categoryAssets.map((asset) => asset.symbol));
+    const categoryTransactions = transactions.filter((transaction) =>
+      transaction.assetId !== null && categoryAssetIds.has(transaction.assetId),
+    );
+    const bucketByCategory: Record<PortfolioCategory, CapitalBucket[]> = {
+      STOCK: ["VPS", "SSI"],
+      ETF: ["ETF"],
+      DCDS: ["DCDS"],
+      CRYPTO: ["CRYPTO"],
+      BANK: ["BANK"],
+    };
+    const buckets = requestedCategories.flatMap((category) => bucketByCategory[category] ?? []);
+    const originalCapital = buckets.reduce((sum, bucket) => sum + portfolio.state.originalByBucket[bucket], 0);
+    const nav = buckets.reduce((sum, bucket) => sum + portfolio.state.navByBucket[bucket], 0);
+    const categoryPayload = {
+      asOf: portfolio.state.asOf,
+      requestedCategories,
+      summary: { originalCapital, nav, pnl: nav - originalCapital },
+      holdings: payload.allHoldings.filter((holding) => categories.has(holding.assetType)),
+      activeBankDeposits: categories.has("BANK") ? payload.activeBankDeposits : [],
+      redeemedBankDeposits: categories.has("BANK") ? payload.redeemedBankDeposits : [],
+      openTplusTrades: portfolio.state.tplusCards
+        .filter((trade) => categories.has(trade.assetType))
+        .map(({ openLots: _openLots, ...trade }) => trade),
+      completedTplusHistory: portfolio.state.tplusHistory
+        .filter((trade) => categories.has(trade.assetType))
+        .slice(-50),
+      transactionCounts: categoryTransactions.reduce<Record<string, number>>((counts, transaction) => {
+        counts[transaction.txType] = (counts[transaction.txType] ?? 0) + 1;
+        return counts;
+      }, {}),
+      dividendTransactions: categoryTransactions
+        .filter((transaction) => transaction.txType === "CASH_DIVIDEND" || transaction.txType === "STOCK_DIVIDEND")
+        .slice(-50)
+        .map((transaction) => ({
+          type: transaction.txType,
+          date: transaction.txDate,
+          symbol: transaction.assetId ? assets.get(transaction.assetId)?.symbol ?? "unknown" : "unknown",
+          account: accounts.get(transaction.accountId) ?? transaction.accountId,
+          quantity: transaction.quantity,
+          cashAmount: transaction.amount,
+          stockDividendQuantity: transaction.stockDivQty,
+          notes: shortenNote(transaction.notes),
+        })),
+      corporateActions: portfolio.ledger.corporateActions
+        .filter((action) => !action.deletedAt && categorySymbols.has(action.symbol))
+        .slice(-50)
+        .map((action) => ({
+          symbol: action.symbol,
+          type: action.actionType,
+          exDate: action.exDate,
+          recordDate: action.recordDate,
+          paymentDate: action.paymentDate,
+          distributionPct: action.distributionPct,
+          subscriptionPrice: action.subscriptionPrice,
+          vpsSubscribedQty: action.vpsSubscribedQty,
+          ssiSubscribedQty: action.ssiSubscribedQty,
+        })),
+      recentTransactions: categoryTransactions.slice(-50).map((transaction) => ({
+        type: transaction.txType,
+        date: transaction.txDate,
+        symbol: transaction.assetId ? assets.get(transaction.assetId)?.symbol ?? "unknown" : "unknown",
+        account: accounts.get(transaction.accountId) ?? transaction.accountId,
+        quantity: transaction.quantity,
+        price: transaction.price,
+        amount: transaction.amount,
+        fees: transaction.fee,
+        tax: transaction.tax,
+        notes: shortenNote(transaction.notes),
+      })),
+    };
+    return JSON.stringify(categoryPayload);
+  }
+
   const serialized = JSON.stringify(payload);
   if (serialized.length <= 50_000) return serialized;
 
@@ -366,15 +452,6 @@ function BlackHoleIcon({
       }
     };
 
-    const rotate = (px: number, py: number, x: number, y: number, angle: number) => {
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      return [
-        cos * (x - px) + sin * (y - py) + px,
-        cos * (y - py) - sin * (x - px) + py,
-      ];
-    };
-
     const animate = () => {
       if (document.visibilityState !== "visible") return;
       currentTime = (Date.now() - startTime) / 50;
@@ -422,15 +499,19 @@ function BlackHoleIcon({
         ctx.strokeStyle = star.color;
         ctx.lineWidth = lineWidth;
         ctx.beginPath();
-        const oldPos = rotate(0, 0, star.prevX, star.prevY, -star.prevR);
-        ctx.moveTo(centerX + oldPos[0], centerY + oldPos[1]);
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(star.rotation);
-        ctx.translate(-centerX, -centerY);
-        ctx.lineTo(centerX + star.x, centerY + star.y);
+        const previousCos = Math.cos(star.prevR);
+        const previousSin = Math.sin(star.prevR);
+        ctx.moveTo(
+          centerX + previousCos * star.prevX - previousSin * star.prevY,
+          centerY + previousSin * star.prevX + previousCos * star.prevY,
+        );
+        const currentCos = Math.cos(star.rotation);
+        const currentSin = Math.sin(star.rotation);
+        ctx.lineTo(
+          centerX + currentCos * star.x - currentSin * star.y,
+          centerY + currentSin * star.x + currentCos * star.y,
+        );
         ctx.stroke();
-        ctx.restore();
 
         star.prevR = star.rotation;
         star.prevX = star.x;
@@ -791,10 +872,6 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
     .slice(0, 3)
     .map(([name, value]) => `${name}: ${value.pct.toFixed(0)}%`)
     .join(" · ");
-  const portfolioContext = portfolioContextForAI(portfolio);
-  const heldSymbols = (portfolio?.state.holdings ?? [])
-    .filter((holding) => holding.quantity > 0)
-    .map((holding) => holding.symbol);
   const assetSummary = (portfolio?.state.holdings ?? [])
     .map((holding) => `${holding.symbol}: ${holding.quantity.toLocaleString("vi-VN")} đơn vị`)
     .join("; ");
@@ -1049,6 +1126,7 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
   async function sendMessage(text: string) {
     const prompt = text.trim();
     if (!prompt || sending) return;
+    const portfolioPrompt = portfolioPromptForFollowup(prompt, messages);
     stopSpeech();
     setDraft("");
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", text: prompt }]);
@@ -1095,8 +1173,13 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
         data: {
           conversationId: conversationId ?? undefined,
           prompt,
-          portfolioContext,
-          portfolioSymbols: heldSymbols,
+          portfolioContext: portfolioContextForAI(portfolio, portfolioPrompt),
+          portfolioSymbols: (portfolio?.state.holdings ?? [])
+            .filter((holding) => {
+              const categories = portfolioCategoriesForPrompt(portfolioPrompt);
+              return holding.quantity > 0 && (!categories || categories.includes(holding.assetType));
+            })
+            .map((holding) => holding.symbol),
         },
       });
       setConversationId(result.conversationId);

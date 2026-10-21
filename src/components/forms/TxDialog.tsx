@@ -551,7 +551,13 @@ export function TxDialog() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Ngày gửi</Label>
-                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                  <Input
+                    type="date"
+                    value={date}
+                    max={todayYmd()}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>Kỳ hạn (tháng)</Label>
@@ -602,7 +608,13 @@ export function TxDialog() {
                 </div>
                 <div className="space-y-1">
                   <Label>Ngày</Label>
-                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                  <Input
+                    type="date"
+                    value={date}
+                    max={isCorporateAction ? undefined : todayYmd()}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 

@@ -54,7 +54,9 @@ function PetScene({
 
     const parts: PetPart[] = [];
     const bounds = svg.getBoundingClientRect();
-    const point = { x: bounds.width / 2, y: bounds.height / 2 };
+    let width = Math.max(1, bounds.width);
+    let height = Math.max(1, bounds.height);
+    const point = { x: width / 2, y: height / 2 };
     const head = { ...point };
     let frame = 0;
     let frm = Math.random();
@@ -71,7 +73,7 @@ function PetScene({
     const spin = { cx: 0, cy: 0, r: 40, angle: 0, speed: 0.08 };
     const glide = { cx: 0, cy: 0, ax: 120, ay: 50, t: 0, speed: 0.02 };
     const gate = { x: 0, y: 0, dx: 1, dy: 0, from: 1, to: 1, armed: false };
-    const headTarget = { x: bounds.width / 2, y: bounds.height / 2 };
+    const headTarget = { x: width / 2, y: height / 2 };
 
     for (let i = 1; i <= DRAGON_PARTS; i++) {
       const elem = document.createElementNS(SVG_NS, "use");
@@ -84,9 +86,11 @@ function PetScene({
 
     const resize = () => {
       const rect = svg.getBoundingClientRect();
+      width = Math.max(1, rect.width);
+      height = Math.max(1, rect.height);
       svg.setAttribute(
         "viewBox",
-        `0 0 ${Math.max(1, rect.width)} ${Math.max(1, rect.height)}`,
+        `0 0 ${width} ${height}`,
       );
     };
 
@@ -270,11 +274,11 @@ function PetScene({
     window.addEventListener("pointermove", onPointerMove);
 
     const run = () => {
-      if (!running) return;
+      if (!running || document.visibilityState !== "visible") {
+        frame = 0;
+        return;
+      }
       frame = window.requestAnimationFrame(run);
-      const rect = svg.getBoundingClientRect();
-      const width = Math.max(1, rect.width);
-      const height = Math.max(1, rect.height);
       const scaleFactor = home ? 0.2 : size;
       const box = playBox(width, height);
 
@@ -322,10 +326,21 @@ function PetScene({
       }
     };
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (frame === 0) frame = window.requestAnimationFrame(run);
+      } else {
+        window.cancelAnimationFrame(frame);
+        frame = 0;
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
     run();
     return () => {
       running = false;
       window.cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pointermove", onPointerMove);
       observer.disconnect();
       svg.replaceChildren();

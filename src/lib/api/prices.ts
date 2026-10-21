@@ -105,12 +105,11 @@ async function writeDailySnapshot(asOf: string) {
   `;
 }
 
-export async function ensureDailyPriceSnapshot(): Promise<void> {
-  try {
+export async function ensureDailyPriceSnapshot(): Promise<boolean> {
   const sql = await getSql();
   const asOf = todayVnYmd();
   const existing = await sql`select 1 from fx_snapshots where as_of = ${asOf} limit 1`;
-  if (existing.length > 0) return;
+  if (existing.length > 0) return false;
 
   const ledger = await loadLedgerSnapshot();
   const usd = await fetchUsdVnd();
@@ -134,10 +133,17 @@ export async function ensureDailyPriceSnapshot(): Promise<void> {
     }
   }
   await writeDailySnapshot(asOf);
-  } catch (err) {
-    console.error("[price snapshot]", err);
-  }
+  return true;
 }
+
+export const ensurePortfolioPriceSnapshot = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async () => {
+    const updated = await ensureDailyPriceSnapshot();
+    if (!updated) return null;
+    const ledger = await loadLedgerSnapshot();
+    return { ledger, state: replayPortfolio(ledger) };
+  });
 
 export const refreshMarketPrices = createServerFn({ method: "POST" })
   .middleware([authMiddleware])

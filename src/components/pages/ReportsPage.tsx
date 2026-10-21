@@ -59,7 +59,7 @@ function RealizedProfitCard({
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground border-t border-border/50 pt-2">
         <div>
-          <span>Vốn: </span>
+          <span>Tổng giá trị mua: </span>
           <span className="font-mono">{displayMoney(holding.totalInvested, currency, usd)}</span>
         </div>
         <div className="text-right">
@@ -114,12 +114,15 @@ export function ReportsPage() {
   const sumIn = rows.filter((r) => r.kind === "DEPOSIT").reduce((n, r) => n + r.amount, 0);
   const sumOut = rows.filter((r) => r.kind === "WITHDRAW").reduce((n, r) => n + r.amount, 0);
 
-  // Filter holdings with quantity = 0 and have some trading activity
-  const liquidatedHoldings = s.holdings.filter((h) => Math.abs(h.quantity) < 1e-12 && h.totalInvested > 0);
+  const realizedHoldings = s.holdings.filter(
+    (h) =>
+      h.totalInvested > 0 &&
+      Math.abs(h.realizedTradePnl + h.tplusProfitCompleted) > 1e-12,
+  );
 
-  const vpsLiquidated = liquidatedHoldings.filter((h) => h.accountId === "vps");
-  const ssiLiquidated = liquidatedHoldings.filter((h) => h.accountId === "ssi");
-  const cryptoLiquidated = liquidatedHoldings.filter((h) => h.assetType === "CRYPTO");
+  const vpsRealized = realizedHoldings.filter((h) => h.accountId === "vps");
+  const ssiRealized = realizedHoldings.filter((h) => h.accountId === "ssi");
+  const cryptoRealized = realizedHoldings.filter((h) => h.assetType === "CRYPTO");
 
   return (
     <div className="space-y-5">
@@ -150,9 +153,12 @@ export function ReportsPage() {
         </div>
       </div>
 
-      {liquidatedHoldings.length > 0 && (
+      {realizedHoldings.length > 0 && (
         <Card className="p-4">
-          <CardTitle className="mb-4">Báo cáo mã đã tất toán (Realized P&L)</CardTitle>
+          <CardTitle className="mb-4">Lãi/lỗ đã chốt lũy kế (Realized P&L)</CardTitle>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Cộng dồn các lệnh đã chốt theo mã; vị thế đang mở không tính lãi/lỗ chưa thực hiện.
+          </p>
           <Tabs defaultValue="vps">
             <TabsList className="mb-4">
               <TabsTrigger value="vps">Stock (VPS)</TabsTrigger>
@@ -161,28 +167,28 @@ export function ReportsPage() {
             </TabsList>
             <TabsContent value="vps">
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                {vpsLiquidated.length > 0 ? (
-                  vpsLiquidated.map((h) => <RealizedProfitCard key={h.assetId} holding={h} currency={currency} usd={usd} />)
+                {vpsRealized.length > 0 ? (
+                  vpsRealized.map((h) => <RealizedProfitCard key={h.assetId} holding={h} currency={currency} usd={usd} />)
                 ) : (
-                  <p className="text-sm text-muted-foreground col-span-full py-4 text-center">Chưa có mã VPS nào tất toán</p>
+                  <p className="text-sm text-muted-foreground col-span-full py-4 text-center">Chưa có lãi/lỗ đã chốt ở VPS</p>
                 )}
               </div>
             </TabsContent>
             <TabsContent value="ssi">
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                {ssiLiquidated.length > 0 ? (
-                  ssiLiquidated.map((h) => <RealizedProfitCard key={h.assetId} holding={h} currency={currency} usd={usd} />)
+                {ssiRealized.length > 0 ? (
+                  ssiRealized.map((h) => <RealizedProfitCard key={h.assetId} holding={h} currency={currency} usd={usd} />)
                 ) : (
-                  <p className="text-sm text-muted-foreground col-span-full py-4 text-center">Chưa có mã SSI nào tất toán</p>
+                  <p className="text-sm text-muted-foreground col-span-full py-4 text-center">Chưa có lãi/lỗ đã chốt ở SSI</p>
                 )}
               </div>
             </TabsContent>
             <TabsContent value="crypto">
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                {cryptoLiquidated.length > 0 ? (
-                  cryptoLiquidated.map((h) => <RealizedProfitCard key={h.assetId} holding={h} currency={currency} usd={usd} />)
+                {cryptoRealized.length > 0 ? (
+                  cryptoRealized.map((h) => <RealizedProfitCard key={h.assetId} holding={h} currency={currency} usd={usd} />)
                 ) : (
-                  <p className="text-sm text-muted-foreground col-span-full py-4 text-center">Chưa có mã Crypto nào tất toán</p>
+                  <p className="text-sm text-muted-foreground col-span-full py-4 text-center">Chưa có lãi/lỗ đã chốt ở Crypto</p>
                 )}
               </div>
             </TabsContent>

@@ -3,10 +3,11 @@
 Sổ cái danh mục thuần tài sản (Asset-Only Ledger) + Trade T+.
 
 - Original Capital chỉ đổi qua **Nạp / Rút vốn gốc** trên Dashboard
-- NAV = DCDS + ETF + Stock + Crypto (bao gồm số dư USDT nhập thủ công) + Bank đang hiệu lực
+- NAV = DCDS + ETF + Stock + Crypto (bao gồm số dư USDT nhập thủ công) + giá trị sổ Bank đang hiệu lực; lãi đã nhập gốc ở kỳ trước nằm trong gốc, lãi kỳ hiện tại chưa tính vào NAV
 - Số dư USDT chỉ cộng vào NAV và P&L NAV − Original, không có giá vốn/giao dịch/T+
 - Trade T+ (Stock VPS/SSI, Crypto): khớp bán thủ công; lãi COMPLETED mới hạ giá vốn gốc
-- Bank: nhiều sổ, tên tùy chọn, đáo hạn / tái tục
+- Bank: nhiều sổ, tên tùy chọn, đáo hạn / tái tục; lãi ACT/365 đã nhập gốc qua các kỳ được giữ trong NAV, lãi kỳ hiện tại chưa đáo hạn không tính vào NAV; tiền tất toán bị loại khỏi NAV
+- Không cho ngày tương lai ở vốn, giao dịch hoặc ngày mở sổ; ngày sự kiện GDKHQ có thể ở tương lai
 - UI tiếng Việt, từ khóa giữ nguyên: Dashboard, Stock, ETF, Crypto, DCDS, Bank, Buy, Sell
 
 ## Sự kiện cổ tức / GDKHQ
@@ -123,12 +124,15 @@ hoặc gặp lỗi, Jina Search được dùng làm phương án dự phòng. C�
 kết nguồn. Pixel chỉ tìm khi câu hỏi có dấu hiệu cần thông tin mới; không chạy
 crawler nền hoặc gửi cảnh báo cổ tức tự động.
 
-Khi câu hỏi liên quan đến danh mục, Pixel nhận toàn bộ vị thế hiện tại, các sổ
-ngân hàng, lịch sử cổ tức, tối đa 50 giao dịch T+ đã chốt và 50 giao dịch gần
-nhất để phân tích; các câu hỏi không liên quan không gửi ảnh chụp danh mục.
-Dữ liệu liên quan và tối đa 12 tin nhắn gần nhất được gửi tới nhà cung cấp AI
-đã cấu hình. Gợi ý trade là phân tích tham khảo, không phải lệnh giao dịch hay
-bảo đảm lợi nhuận.
+Khi câu hỏi liên quan đến danh mục, Pixel chỉ gửi dữ liệu của phần được hỏi
+(ví dụ Stock chỉ gồm vị thế Stock, các giao dịch và sự kiện liên quan); câu hỏi
+không liên quan đến danh mục không gửi ảnh chụp danh mục. Câu hỏi tổng quan có
+thể dùng nhiều loại tài sản. Khi được yêu cầu xem danh sách vị thế, Pixel có
+thể dùng mã, số lượng, giá vốn, giá hiện tại, giá trị và lãi/lỗ đã lưu để đánh
+giá. Pixel được hướng dẫn trả lời đúng trọng tâm, không thêm nội dung ngoài yêu
+cầu. Dữ liệu liên quan và tối đa 12 tin nhắn gần nhất được gửi tới nhà cung cấp
+AI đã cấu hình. Gợi ý trade là phân tích tham khảo, không phải lệnh giao dịch
+hay bảo đảm lợi nhuận.
 
 Các lượt gọi có thể dùng hạn mức miễn phí của nhà cung cấp nhưng không được đảm
 bảo 0 đồng vĩnh viễn. Tavily Search cơ bản tiêu thụ credit; Jina Reader/Search

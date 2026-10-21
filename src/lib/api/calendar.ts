@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import type { CalendarEvent } from "@/engine/calendar";
+import { isValidYmd } from "@/engine/dates";
 
 function mapEvent(r: Record<string, unknown>): CalendarEvent {
   return {
@@ -76,8 +77,8 @@ export const fetchCalendar = createServerFn({ method: "GET" })
 const saveSchema = z.object({
   id: z.string().optional(),
   pin: z.string().optional(),
-  title: z.string().min(1),
-  eventDate: z.string(),
+  title: z.string().trim().min(1),
+  eventDate: z.string().refine(isValidYmd, "Ngày sự kiện không hợp lệ."),
   yearly: z.boolean(),
   notes: z.string().optional(),
 });

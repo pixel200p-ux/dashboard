@@ -128,7 +128,7 @@ export function BankDialog() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Ngày gửi</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+              <Input type="date" value={startDate} max={todayYmd()} onChange={(e) => setStartDate(e.target.value)} required />
             </div>
             <div className="space-y-1">
               <Label>Kỳ hạn (tháng)</Label>

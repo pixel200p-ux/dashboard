@@ -220,6 +220,7 @@ export interface BankView {
   bankName: string;
   originalPrincipal: number;
   currentPrincipal: number;
+  currentValue: number;
   startDate: string;
   currentPeriodStart: string;
   maturityDate: string;

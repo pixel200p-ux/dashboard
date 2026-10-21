@@ -1,13 +1,14 @@
 import { calendarAlerts } from "@/engine/calendar";
-import { formatViDate, todayYmd } from "@/engine/dates";
+import { formatViDate } from "@/engine/dates";
 import { useCalendar } from "@/lib/use-calendar";
+import { useTodayYmd } from "@/lib/use-today";
 import { cn } from "@/lib/utils";
 import { CalendarDays } from "lucide-react";
 import { useMemo } from "react";
 
 export function CalendarBanners() {
   const { data } = useCalendar();
-  const today = todayYmd();
+  const today = useTodayYmd();
   const alerts = useMemo(() => (data ? calendarAlerts(data, today) : []), [data, today]);
   if (alerts.length === 0) return null;
 

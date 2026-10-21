@@ -36,7 +36,7 @@ const VITE_PREFIX = "VITE_";
 export function parseAppEnv(text) {
   let parsed;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(String(text ?? "").replace(/^\uFEFF/, ""));
   } catch {
     return {};
   }

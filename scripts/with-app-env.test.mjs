@@ -27,6 +27,18 @@ function makeWorkspace(appEnvJson) {
   return root;
 }
 
+function createLink(targetPath, linkPath) {
+  try {
+    symlinkSync(targetPath, linkPath);
+  } catch (error) {
+    if (process.platform === "win32" && error && typeof error === "object" && "code" in error && error.code === "EPERM") {
+      symlinkSync(targetPath, linkPath, "junction");
+      return;
+    }
+    throw error;
+  }
+}
+
 test("keeps VITE_-prefixed string entries", () => {
   assert.deepEqual(parseAppEnv('{"VITE_AUTH_ENABLED":"false"}'), {
     VITE_AUTH_ENABLED: "false",
@@ -122,7 +134,7 @@ test("the CLI still runs when invoked through a symlinked path", async () => {
   // node realpaths import.meta.url but not process.argv[1], so a raw comparison
   // turns the wrapper into a no-op that exits 0 without starting anything.
   const link = join(mkdtempSync(join(tmpdir(), "app-env-link-")), "scripts");
-  symlinkSync(join(projectRoot(), "scripts"), link);
+  createLink(join(projectRoot(), "scripts"), link);
   const { stdout } = await execFileAsync(process.execPath, [
     join(link, "with-app-env.mjs"),
     process.execPath,

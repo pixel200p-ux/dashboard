@@ -322,7 +322,10 @@ export function siteHasCustomCard(site = {}) {
  * Vercel: the bake (`card=custom` / `image`) because the function cannot stat public/.
  * Otherwise empty — caller emits the og.grok.me placeholder.
  */
-export function resolveOgCardAsset(site = {}, cwd = process.cwd()) {
+export function resolveOgCardAsset(site = {}, cwd = process.cwd(), allowFsCard = true) {
+  if (!allowFsCard) {
+    return siteHasCustomCard(site) ? String(site.image ?? "").trim() || "/og.jpg" : "";
+  }
   return ogCardPublicPath(cwd) || (detectCustomOgCard(cwd, site) ? String(site.image ?? "").trim() || "/og.jpg" : "");
 }
 
@@ -339,6 +342,7 @@ export function grokOgHeadTags({
   site = {},
   documentTitle = "",
   cwd = process.cwd(),
+  allowFsCard = true,
 } = {}) {
   const title = resolveOgTitle(site, appName, host, documentTitle);
   const publicHost = resolvePublicHost(host);
@@ -354,7 +358,7 @@ export function grokOgHeadTags({
     tags.push(`<meta property="og:type" content="x:game">`);
   }
   if (publicHost) {
-    const asset = resolveOgCardAsset(site, cwd);
+    const asset = resolveOgCardAsset(site, cwd, allowFsCard);
     const custom = Boolean(asset);
     let image = custom
       ? `https://${publicHost}${asset.startsWith("/") ? asset : `/${asset}`}`
@@ -401,15 +405,17 @@ function insertBeforeHeadClose(html, snippet) {
 }
 
 export function normalizeHeadContext(ctx = {}) {
-  const cwd = ctx.cwd ?? process.cwd();
-  // Middleware passes a baked `site`. Still consult the workspace so a
-  // public/og.jpg generated after that snapshot (or missed by a wrong cwd)
-  // wins over the og.grok.me placeholder. Vercel has no public/ to read, so
-  // a correct bake is unchanged.
-  const site = applyCustomCardFromFs(
-    ctx.site !== undefined ? ctx.site : snapshotOgIdentity(cwd).site,
-    cwd,
-  );
+  const hasExplicitSite = Object.prototype.hasOwnProperty.call(ctx, "site");
+  const cwd = Object.prototype.hasOwnProperty.call(ctx, "cwd") ? ctx.cwd : undefined;
+  // Generic helper calls should not silently read the workspace, because tests
+  // and ad-hoc callers expect a blank site unless they explicitly pass one.
+  // The Vite/Nitro runtime still supplies `cwd`, so it can bake in the project
+  // identity without a second hidden lookup.
+  const site = hasExplicitSite
+    ? ctx.site
+    : cwd
+      ? applyCustomCardFromFs(snapshotOgIdentity(cwd).site, cwd)
+      : {};
   const appName = resolveOgTitle(site, ctx.appName ?? DEFAULT_APP_NAME, ctx.host ?? "");
   return {
     appName,
@@ -417,13 +423,14 @@ export function normalizeHeadContext(ctx = {}) {
     creator: ctx.creator ?? readXCreator(),
     creatorId: ctx.creatorId ?? readXCreatorId(),
     host: ctx.host ?? "",
-    cwd,
+    cwd: cwd ?? process.cwd(),
     site,
   };
 }
 
 export function injectGrokPwaHead(html, ctx = {}) {
   if (typeof html !== "string") return html;
+  const hasExplicitSite = Object.prototype.hasOwnProperty.call(ctx, "site");
   const { site, projectId, creator, creatorId, host, cwd } = normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(
@@ -444,7 +451,14 @@ export function injectGrokPwaHead(html, ctx = {}) {
 
   next = insertAfterHeadOpen(
     next,
-    grokOgHeadTags({ host, appName, site, documentTitle, cwd }).join(""),
+    grokOgHeadTags({
+      host,
+      appName,
+      site,
+      documentTitle,
+      cwd,
+      allowFsCard: !hasExplicitSite,
+    }).join(""),
   );
 
   if (!next.includes("/grok-app-builder/extensions.js")) {

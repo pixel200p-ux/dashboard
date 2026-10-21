@@ -155,7 +155,7 @@ export function CapitalDialog() {
           )}
           <div className="space-y-1">
             <Label>Ngày</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+            <Input type="date" value={date} max={todayYmd()} onChange={(e) => setDate(e.target.value)} required />
           </div>
           <div className="space-y-1">
             <Label>Ghi chú</Label>

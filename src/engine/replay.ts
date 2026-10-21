@@ -236,10 +236,11 @@ export function emptyBuckets(): Record<CapitalBucket, number> {
 /** Original từng ô: nạp cộng, rút trừ, không âm. Original Capital = tổng 6 ô. */
 export function replayOriginalByBucket(
   capital: CapitalMovement[],
+  asOf = todayYmd(),
 ): Record<CapitalBucket, number> {
   const o = emptyBuckets();
   const rows = capital
-    .filter((c) => !c.deletedAt)
+    .filter((c) => !c.deletedAt && c.movementDate <= asOf)
     .slice()
     .sort(
       (a, b) =>
@@ -258,10 +259,11 @@ export function replayOriginalByBucket(
 export function replayOriginalByBucketUsd(
   capital: CapitalMovement[],
   fallbackRate: number,
+  asOf = todayYmd(),
 ): Record<CapitalBucket, number> {
   const original = emptyBuckets();
   const rows = capital
-    .filter((c) => !c.deletedAt)
+    .filter((c) => !c.deletedAt && c.movementDate <= asOf)
     .slice()
     .sort(
       (a, b) =>
@@ -286,10 +288,11 @@ export function replayPortfolio(
   ledger: LedgerSnapshot,
   asOf = todayYmd(),
 ): PortfolioState {
-  const originalByBucket = replayOriginalByBucket(ledger.capital);
+  const originalByBucket = replayOriginalByBucket(ledger.capital, asOf);
   const originalByBucketUsd = replayOriginalByBucketUsd(
     ledger.capital,
     ledger.usdVnd,
+    asOf,
   );
   const originalCapital = CAPITAL_BUCKETS.reduce(
     (s, b) => s + originalByBucket[b],
@@ -657,7 +660,12 @@ export function replayPortfolio(
   }
 
   const activeBanks = ledger.banks
-    .filter((b) => !b.deletedAt && b.status === "ACTIVE")
+    .filter(
+      (b) =>
+        !b.deletedAt &&
+        b.status === "ACTIVE" &&
+        b.startDate <= asOf,
+    )
     .map((b) =>
       replayBank(
         b,
@@ -672,7 +680,12 @@ export function replayPortfolio(
     );
 
   const redeemedBanks = ledger.banks
-    .filter((b) => !b.deletedAt && b.status === "REDEEMED")
+    .filter(
+      (b) =>
+        !b.deletedAt &&
+        b.status === "REDEEMED" &&
+        b.startDate <= asOf,
+    )
     .map((b) =>
       replayBank(
         b,
@@ -681,7 +694,10 @@ export function replayPortfolio(
       ),
     );
 
-  const bankValue = activeBanks.reduce((s, b) => s + b.currentPrincipal, 0);
+  const bankValue = [...activeBanks, ...redeemedBanks].reduce(
+    (s, b) => s + b.currentValue,
+    0,
+  );
   const bankInterest =
     activeBanks.reduce((s, b) => s + b.accumulatedInterest, 0) +
     redeemedBanks.reduce((s, b) => s + b.accumulatedInterest, 0);

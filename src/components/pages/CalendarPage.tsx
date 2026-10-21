@@ -18,11 +18,11 @@ import {
   formatViDayMonth,
   remainingDays,
   toDate,
-  todayYmd,
   ymd,
 } from "@/engine/dates";
 import { deleteCalendarEvent, saveCalendarEvent } from "@/lib/api/calendar";
 import { useCalendar, useCalendarMutation } from "@/lib/use-calendar";
+import { useTodayYmd } from "@/lib/use-today";
 import { cn } from "@/lib/utils";
 import { addDays, addMonths, format, getDay, startOfMonth, subMonths } from "date-fns";
 import { CalendarDays, ChevronLeft, ChevronRight, History, Pencil, Trash2 } from "lucide-react";
@@ -41,7 +41,7 @@ type Draft = {
 
 export function CalendarPage() {
   const { data, isPending } = useCalendar();
-  const today = todayYmd();
+  const today = useTodayYmd();
 
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(today);

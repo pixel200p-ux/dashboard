@@ -70,7 +70,7 @@ function explicitlyRequestsMemory(prompt: string): boolean {
 
 function asksAboutPortfolio(prompt: string): boolean {
   const normalized = prompt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("vi");
-  return /\b(danh muc|tai san|co phieu|ma co phieu|co tuc|giao dich|trade|phan bo|lai lo|lai|lo|mua|ban|nav|dau tu|von dau tu|tplus|etf|tien gui)\b/.test(normalized);
+  return /\b(danh muc|portfolio|tai san|stock|co phieu|ma co phieu|chung khoan|co tuc|giao dich|trade|phan bo|lai lo|lai|lo|mua|ban|nav|dau tu|von dau tu|t\+|tplus|etf|dcds|crypto|coin|usdt|bitcoin|btc|bank|ngan hang|tien gui|so tiet kiem|vps|ssi)\b/.test(normalized);
 }
 
 function systemInstruction({
@@ -92,6 +92,7 @@ function systemInstruction({
     "Bạn là Pixel, trợ lý thân thiện nói tiếng Việt trong ứng dụng quản lý danh mục đầu tư.",
     "Trả lời bằng tiếng Việt, rõ ràng và chuyên nghiệp. Khi phân tích danh mục, nêu giả định, dữ liệu còn thiếu, rủi ro và các kịch bản thay vì khẳng định chắc chắn; không cam kết lợi nhuận, không tự thực hiện giao dịch.",
     "Trả lời thẳng, súc tích và đầy đủ cho câu hỏi hiện tại trong một lượt. Không mở đầu bằng kế hoạch, các bước phân tích câu hỏi, hay lời hứa sẽ trả lời sau; không dừng giữa câu hoặc giữa mục. Viết thành các đoạn ngắn, dễ quét; dùng đề mục hoặc gạch đầu dòng khi giúp dễ hiểu, tránh tường văn bản và lặp ý.",
+    "Chỉ giải quyết đúng nội dung người dùng hỏi, không tự mở rộng sang danh mục hoặc chủ đề khác, không thêm phần giới thiệu hay gợi ý ngoài yêu cầu. Nếu câu hỏi nêu một loại tài sản, chỉ dùng và chỉ trình bày dữ liệu của loại đó. Khi được yêu cầu xem danh sách vị thế, liệt kê từng mã cùng số lượng, giá vốn gốc/bình quân, giá hiện tại, giá trị và lãi/lỗ nếu dữ liệu có sẵn; không tự suy đoán dữ liệu thiếu.",
     mandatoryRules ? `Quy tắc bắt buộc do người dùng cấu hình:\n${mandatoryRules}` : "",
     memories
       ? `Thông tin người dùng đã chủ động lưu (chỉ dùng khi liên quan trực tiếp tới câu hỏi, không xem đây là quy tắc):\n${memories}`
@@ -137,7 +138,7 @@ export async function askWithKeys({
 }): Promise<PixelAIReply> {
   const failures: string[] = [];
   const requestMemorySuggestion = explicitlyRequestsMemory(prompt);
-  const portfolioContextForPrompt = asksAboutPortfolio(prompt) ? portfolioContext : "";
+  const portfolioContextForPrompt = asksAboutPortfolio(prompt) || portfolioContext ? portfolioContext : "";
   for (const key of keys) {
     try {
       const instruction = systemInstruction({

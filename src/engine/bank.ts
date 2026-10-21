@@ -18,13 +18,18 @@ export function interestForPeriod(principal: number, ratePct: number, start: str
 }
 
 export function replayBank(deposit: BankDeposit, updates: BankRateUpdate[], asOf = todayYmd()): BankView {
-  if (deposit.status === "REDEEMED") {
+  if (
+    deposit.status === "REDEEMED" &&
+    deposit.redeemedAt &&
+    deposit.redeemedAt <= asOf
+  ) {
     const interest = deposit.redeemedInterest ?? 0;
     return {
       id: deposit.id,
       bankName: deposit.bankName,
       originalPrincipal: deposit.principal,
       currentPrincipal: 0,
+      currentValue: 0,
       startDate: deposit.startDate,
       currentPeriodStart: deposit.startDate,
       maturityDate: deposit.redeemedAt ?? deposit.startDate,
@@ -53,11 +58,18 @@ export function replayBank(deposit: BankDeposit, updates: BankRateUpdate[], asOf
     if (confirmed) lastConfirmedRate = rate;
 
     if (asOf < maturity) {
+      const currentPeriodInterest = interestForPeriod(
+        principal,
+        rate,
+        periodStart,
+        asOf,
+      );
       return {
         id: deposit.id,
         bankName: deposit.bankName,
         originalPrincipal: deposit.principal,
         currentPrincipal: principal,
+        currentValue: principal,
         startDate: deposit.startDate,
         currentPeriodStart: periodStart,
         maturityDate: maturity,
@@ -66,7 +78,7 @@ export function replayBank(deposit: BankDeposit, updates: BankRateUpdate[], asOf
         originalRate: deposit.interestRate,
         autoRollover: deposit.autoRollover,
         renewalCount: period,
-        accumulatedInterest: accumulated,
+        accumulatedInterest: accumulated + currentPeriodInterest,
         remainingDays: remainingDays(asOf, maturity),
         rateUnconfirmed: period > 0 && !confirmed,
         status: "ACTIVE",
@@ -81,6 +93,7 @@ export function replayBank(deposit: BankDeposit, updates: BankRateUpdate[], asOf
         bankName: deposit.bankName,
         originalPrincipal: deposit.principal,
         currentPrincipal: principal,
+        currentValue: principal + accumulated + earned,
         startDate: deposit.startDate,
         currentPeriodStart: periodStart,
         maturityDate: maturity,
@@ -90,7 +103,7 @@ export function replayBank(deposit: BankDeposit, updates: BankRateUpdate[], asOf
         autoRollover: false,
         renewalCount: period,
         accumulatedInterest: accumulated + earned,
-        remainingDays: remainingDays(asOf, maturity),
+        remainingDays: Math.max(0, remainingDays(asOf, maturity)),
         rateUnconfirmed: false,
         status: "ACTIVE",
         notes: deposit.notes,
@@ -109,6 +122,7 @@ export function replayBank(deposit: BankDeposit, updates: BankRateUpdate[], asOf
     bankName: deposit.bankName,
     originalPrincipal: deposit.principal,
     currentPrincipal: principal,
+    currentValue: principal,
     startDate: deposit.startDate,
     currentPeriodStart: periodStart,
     maturityDate: addTermMonths(periodStart, deposit.termMonths),
