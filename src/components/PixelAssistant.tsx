@@ -371,6 +371,8 @@ function BlackHoleIcon({
     const maxOrbit = 100;
     const maxOpacity = 1;
     const lineWidth = 0.6;
+    const opacityBuckets = 16;
+    const minOpacity = 0.05;
     const normalStars = 1400;
     const expanseStars = 2000;
     const stars: {
@@ -382,7 +384,6 @@ function BlackHoleIcon({
       rotation: number;
       startRotation: number;
       collapseBonus: number;
-      color: string;
       hoverPos: number;
       expansePos: number;
       prevR: number;
@@ -402,8 +403,15 @@ function BlackHoleIcon({
     let currentTheme = stateRef.current.theme;
     let wasExpanse = false;
 
-    const colorForStar = (opacity: number) =>
+    const colorForOpacity = (opacity: number) =>
       `rgba(${currentTheme === "dark" ? "255, 255, 255" : "0, 0, 0"}, ${opacity.toFixed(3)})`;
+    const opacityForBucket = (bucket: number) =>
+      minOpacity + (bucket / (opacityBuckets - 1)) * (maxOpacity - minOpacity);
+    const bucketForOpacity = (opacity: number) =>
+      Math.round(
+        ((opacity - minOpacity) / (maxOpacity - minOpacity)) *
+          (opacityBuckets - 1),
+      );
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -441,7 +449,6 @@ function BlackHoleIcon({
           rotation: 0,
           startRotation,
           collapseBonus,
-          color: colorForStar(opacity),
           hoverPos: maxOrbit / 2 + collapseBonus,
           expansePos: -expanseRadius,
           prevR: startRotation,
@@ -464,12 +471,8 @@ function BlackHoleIcon({
       const centerX = iconPosition.x + BUTTON_SIZE / 2;
       const centerY = iconPosition.y + BUTTON_SIZE / 2;
 
-      if (currentTheme !== nextTheme) {
-        currentTheme = nextTheme;
-        for (const star of stars) {
-          star.color = colorForStar(star.opacity);
-        }
-      }
+      currentTheme = nextTheme;
+      const paths = Array.from({ length: opacityBuckets }, () => new Path2D());
 
       if (expanse && !wasExpanse) {
         for (const star of stars) {
@@ -496,26 +499,49 @@ function BlackHoleIcon({
           star.y += (star.yOrigin - star.y) * 0.08;
         }
 
-        ctx.strokeStyle = star.color;
-        ctx.lineWidth = lineWidth;
-        ctx.beginPath();
         const previousCos = Math.cos(star.prevR);
         const previousSin = Math.sin(star.prevR);
-        ctx.moveTo(
-          centerX + previousCos * star.prevX - previousSin * star.prevY,
-          centerY + previousSin * star.prevX + previousCos * star.prevY,
-        );
+        const previousX =
+          centerX + previousCos * star.prevX - previousSin * star.prevY;
+        const previousY =
+          centerY + previousSin * star.prevX + previousCos * star.prevY;
         const currentCos = Math.cos(star.rotation);
         const currentSin = Math.sin(star.rotation);
-        ctx.lineTo(
-          centerX + currentCos * star.x - currentSin * star.y,
-          centerY + currentSin * star.x + currentCos * star.y,
-        );
-        ctx.stroke();
+        const currentX = centerX + currentCos * star.x - currentSin * star.y;
+        const currentY = centerY + currentSin * star.x + currentCos * star.y;
+        const padding = lineWidth / 2 + 1;
+        if (
+          (previousX < -padding && currentX < -padding) ||
+          (previousX > width + padding && currentX > width + padding) ||
+          (previousY < -padding && currentY < -padding) ||
+          (previousY > height + padding && currentY > height + padding)
+        ) {
+          star.prevR = star.rotation;
+          star.prevX = star.x;
+          star.prevY = star.y;
+          continue;
+        }
+
+        const deltaX = currentX - previousX;
+        const deltaY = currentY - previousY;
+        if (deltaX * deltaX + deltaY * deltaY >= 0.25) {
+          const bucket = Math.max(
+            0,
+            Math.min(opacityBuckets - 1, bucketForOpacity(star.opacity)),
+          );
+          paths[bucket].moveTo(previousX, previousY);
+          paths[bucket].lineTo(currentX, currentY);
+        }
 
         star.prevR = star.rotation;
         star.prevX = star.x;
         star.prevY = star.y;
+      }
+
+      ctx.lineWidth = lineWidth;
+      for (let bucket = 0; bucket < opacityBuckets; bucket += 1) {
+        ctx.strokeStyle = colorForOpacity(opacityForBucket(bucket));
+        ctx.stroke(paths[bucket]);
       }
 
       ctx.globalCompositeOperation = "source-over";
@@ -555,7 +581,13 @@ function BlackHoleIcon({
   return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-[119] h-dvh w-screen" aria-hidden="true" />;
 }
 
-export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | undefined }) {
+export function PixelAssistant({
+  portfolio,
+  onOpenChange,
+}: {
+  portfolio: PortfolioPayload | undefined;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const queryClient = useQueryClient();
   const theme = useUiStore((state) => state.theme);
   const setTheme = useUiStore((state) => state.setTheme);
@@ -901,7 +933,8 @@ export function PixelAssistant({ portfolio }: { portfolio: PortfolioPayload | un
 
   useEffect(() => {
     openRef.current = open;
-  }, [open]);
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

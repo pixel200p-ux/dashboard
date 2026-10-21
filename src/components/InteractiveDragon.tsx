@@ -10,7 +10,15 @@ const SIZE_OPTIONS = [
   { label: "x1", value: 1 },
 ] as const;
 
-type PetPart = { use: SVGUseElement; x: number; y: number };
+type PetPart = {
+  use: SVGUseElement;
+  x: number;
+  y: number;
+  lastX: number;
+  lastY: number;
+  lastAngle: number;
+  lastScale: number;
+};
 type Trick =
   | "wander"
   | "circle"
@@ -38,15 +46,19 @@ function PetScene({
   active,
   home = false,
   facingUp,
+  pixelOpen = false,
 }: {
   size: number;
   active: boolean;
   home?: boolean;
   facingUp: boolean;
+  pixelOpen?: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const facingUpRef = useRef(facingUp);
   facingUpRef.current = facingUp;
+  const pixelOpenRef = useRef(pixelOpen);
+  pixelOpenRef.current = pixelOpen;
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -81,7 +93,15 @@ function PetScene({
         i === 1 ? "Cabeza" : i === 8 || i === 14 ? "Aletas" : "Espina";
       elem.setAttribute("href", `/dragon.svg#${symbol}`);
       svg.prepend(elem);
-      parts.push({ use: elem, x: point.x, y: point.y });
+      parts.push({
+        use: elem,
+        x: point.x,
+        y: point.y,
+        lastX: Number.NaN,
+        lastY: Number.NaN,
+        lastAngle: Number.NaN,
+        lastScale: Number.NaN,
+      });
     }
 
     const resize = () => {
@@ -95,6 +115,11 @@ function PetScene({
     };
 
     const onPointerMove = (event: PointerEvent) => {
+      if (pixelOpenRef.current) {
+        mouseFollow = false;
+        return;
+      }
+
       if (facingUpRef.current) {
         mouseFollow = false;
         return;
@@ -282,6 +307,7 @@ function PetScene({
       const scaleFactor = home ? 0.2 : size;
       const box = playBox(width, height);
 
+      if (pixelOpenRef.current) mouseFollow = false;
       if (!mouseFollow && !facingUpRef.current) {
         updateTricks(width, height);
       } else {
@@ -308,10 +334,24 @@ function PetScene({
             (Math.sin(angle) * (99 - i) * scaleFactor) / 5) /
           4;
         const partScale = ((162 - 4 * i) / 50) * scaleFactor * partMul[i];
-        part.use.setAttribute(
-          "transform",
-          `translate(${(previous.x + part.x) / 2},${(previous.y + part.y) / 2}) rotate(${(180 / Math.PI) * angle}) scale(${partScale})`,
-        );
+        const x = (previous.x + part.x) / 2;
+        const y = (previous.y + part.y) / 2;
+        const angleDegrees = (180 / Math.PI) * angle;
+        if (
+          Math.abs(x - part.lastX) >= 0.1 ||
+          Math.abs(y - part.lastY) >= 0.1 ||
+          Math.abs(angle - part.lastAngle) >= 0.01 ||
+          partScale !== part.lastScale
+        ) {
+          part.use.setAttribute(
+            "transform",
+            `translate(${x},${y}) rotate(${angleDegrees}) scale(${partScale})`,
+          );
+          part.lastX = x;
+          part.lastY = y;
+          part.lastAngle = angle;
+          part.lastScale = partScale;
+        }
       }
 
       point.x = Math.min(box.maxX, Math.max(box.minX, point.x));
@@ -362,11 +402,18 @@ function PetScene({
   );
 }
 
-export function InteractiveDragon() {
+export function InteractiveDragon({ pixelOpen = false }: { pixelOpen?: boolean }) {
   const atHome = useUiStore((state) => state.dragonAtHome);
   const size = useUiStore((state) => state.dragonSize);
   const facingUp = useUiStore((state) => state.dragonFacingUp);
-  return <PetScene size={size} active={!atHome} facingUp={facingUp} />;
+  return (
+    <PetScene
+      size={size}
+      active={!atHome}
+      facingUp={facingUp}
+      pixelOpen={pixelOpen}
+    />
+  );
 }
 
 export function PetHome({

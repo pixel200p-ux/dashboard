@@ -82,6 +82,7 @@ export function AppShell() {
   const [mobile, setMobile] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [pixelOpen, setPixelOpen] = useState(false);
   const theme = useUiStore((s) => s.theme);
   const cardOpacity = useUiStore((s) => s.cardOpacity);
   const currency = useUiStore((s) => s.currency);
@@ -201,7 +202,7 @@ export function AppShell() {
 
   return (
     <div className="relative isolate min-h-dvh bg-background text-foreground">
-      <InteractiveDragon />
+      <InteractiveDragon pixelOpen={pixelOpen} />
       {mobile && (
         <button
           className="fixed inset-0 z-120 bg-black/50 md:hidden"
@@ -386,7 +387,7 @@ export function AppShell() {
         <NotificationFooter />
       </div>
 
-      <PixelAssistant portfolio={portfolio} />
+      <PixelAssistant portfolio={portfolio} onOpenChange={setPixelOpen} />
       <SharedNotesCard open={notesOpen} onOpenChange={setNotesOpen} />
 
       <TxDialog />
