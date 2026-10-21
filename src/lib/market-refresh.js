@@ -15,7 +15,7 @@ export function resolveRefreshPrice(asset, stockPx, cryptoPx) {
 
   if (asset.assetType === "CRYPTO") {
     if (!assetSymbol || !cryptoPx) return undefined;
-    const value = cryptoPx[assetSymbol];
+    const value = cryptoPx[normalizeCryptoSymbol(assetSymbol)];
     return typeof value === "number" && value > 0 ? value : undefined;
   }
 
@@ -30,4 +30,17 @@ export function resolveRefreshPrice(asset, stockPx, cryptoPx) {
   }
 
   return undefined;
+}
+
+/**
+ * @param {string} symbol
+ * @returns {string}
+ */
+export function normalizeCryptoSymbol(symbol) {
+  const normalized = symbol.trim().toUpperCase();
+  const [base, quote, ...extra] = normalized.split("/");
+  if (base && quote && extra.length === 0 && ["USD", "USDT", "USDC", "BUSD"].includes(quote)) {
+    return base;
+  }
+  return normalized;
 }

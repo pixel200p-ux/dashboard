@@ -3,7 +3,7 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { replayPortfolio } from "@/engine/replay";
 import { todayVnYmd } from "@/engine/dates";
-import { resolveRefreshPrice } from "@/lib/market-refresh.js";
+import { normalizeCryptoSymbol, resolveRefreshPrice } from "@/lib/market-refresh.js";
 import { buildMarketSourceStatus } from "@/lib/market-status.js";
 import { fetchFmarketDcdsNav } from "@/lib/api/fmarket";
 import { loadLedgerSnapshot } from "@/lib/api/load-snapshot";
@@ -47,22 +47,25 @@ async function fetchUsdVnd(): Promise<number | null> {
   }
 }
 
-async function fetchCrypto(symbols: string[]): Promise<Record<string, number>> {
-  const ids = [...new Set(symbols.map((s) => COINGECKO[s]).filter(Boolean))];
+async function fetchCrypto(symbols: string[]): Promise<Record<string, number> | null> {
+  const normalizedSymbols = [...new Set(symbols.map(normalizeCryptoSymbol))];
+  const ids = [...new Set(normalizedSymbols.map((s) => COINGECKO[s]).filter(Boolean))];
   if (ids.length === 0) return {};
   try {
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=usd`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return {};
+    if (!res.ok) return null;
     const json = (await res.json()) as Record<string, { usd?: number }>;
     const out: Record<string, number> = {};
-    for (const [sym, id] of Object.entries(COINGECKO)) {
+    for (const sym of normalizedSymbols) {
+      const id = COINGECKO[sym];
+      if (!id) continue;
       const px = json[id]?.usd;
       if (px) out[sym] = px;
     }
     return out;
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -126,7 +129,7 @@ export async function ensureDailyPriceSnapshot(): Promise<boolean> {
   const [cryptoPx, stockPx] = await Promise.all([fetchCrypto(cryptoSyms), fetchVnStocks(stockSyms)]);
   for (const a of ledger.assets) {
     let px: number | undefined;
-    if (a.assetType === "CRYPTO") px = cryptoPx[a.symbol];
+    if (a.assetType === "CRYPTO") px = cryptoPx?.[normalizeCryptoSymbol(a.symbol)];
     else if (a.assetType === "STOCK" || a.assetType === "ETF") px = stockPx[a.symbol];
     if (px && px > 0) {
       await sql`update assets set current_price = ${px}, price_updated_at = now() where id = ${a.id}`;
@@ -192,7 +195,7 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
       label: "Crypto",
       hasSymbols: hasCrypto,
       count: cryptoCount,
-      fetchFailed: !hasCrypto ? false : cryptoCount === 0 && !cryptoPx,
+      fetchFailed: hasCrypto && cryptoPx === null,
     });
     status.dcds = {
       ok: dcdsNav.ok,
@@ -202,7 +205,7 @@ export const refreshMarketPrices = createServerFn({ method: "POST" })
 
     let updated = 0;
     for (const a of ledger.assets) {
-      let px = resolveRefreshPrice(a, stockPx, cryptoPx);
+      let px = resolveRefreshPrice(a, stockPx, cryptoPx ?? undefined);
       if (a.assetType === "DCDS" && dcdsNav.ok) {
         px = dcdsNav.nav;
       }

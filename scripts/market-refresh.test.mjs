@@ -11,5 +11,7 @@ test("refresh uses live market prices for stock/ETF/crypto and last known value 
   assert.equal(resolveRefreshPrice(stock, { VHM: 123 }, {}, {}), 123);
   assert.equal(resolveRefreshPrice(etf, { ETFVN: 42 }, {}), 42);
   assert.equal(resolveRefreshPrice(crypto, {}, { BTC: 67000 }), 67000);
+  assert.equal(resolveRefreshPrice({ ...crypto, symbol: "BTC/USDT" }, {}, { BTC: 67000 }), 67000);
+  assert.equal(resolveRefreshPrice({ ...crypto, symbol: "eth/usdt" }, {}, { ETH: 3500 }), 3500);
   assert.equal(resolveRefreshPrice(dcds, {}, {}, {}), 24500);
 });
