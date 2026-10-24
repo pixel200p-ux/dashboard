@@ -38,6 +38,18 @@ function cryptoQty(amountUsd: number, priceUsd: number): number {
   return Math.round((amountUsd / priceUsd) * 1e8) / 1e8;
 }
 
+function parseDistributionPct(input: string, actionType: CorporateActionType): number {
+  const ratio = input.trim().match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+  if (ratio) {
+    if (actionType === "CASH_DIVIDEND") return Number.NaN;
+    const oldShares = Number(ratio[1]);
+    const newShares = Number(ratio[2]);
+    return oldShares > 0 && newShares > 0 ? (newShares / oldShares) * 100 : Number.NaN;
+  }
+  if (input.includes(":")) return Number.NaN;
+  return parseDecimal(input);
+}
+
 function accountFor(type: AssetType, stockAccount: string): { id: string; currency: string; profile: FeeProfile } {
   if (type === "STOCK") return { id: stockAccount, currency: "VND", profile: stockAccount === "ssi" ? "STOCK_SSI" : "STOCK_VPS" };
   if (type === "CRYPTO") return { id: "crypto", currency: "USD", profile: "CRYPTO" };
@@ -295,13 +307,14 @@ export function TxDialog() {
 
     if (isCorporateAction) {
       const sym = symbol.trim().toUpperCase();
-      const pct = parseDecimal(distributionPct);
+      const pct = parseDistributionPct(distributionPct, corporateActionType);
       const beforePrice = parseBrokerPrice(referencePrice);
       const subscribedPrice = parseBrokerPrice(subscriptionPrice);
       const vpsQty = parseDecimal(vpsSubscribedQty);
       const ssiQty = parseDecimal(ssiSubscribedQty);
       if (
         !sym ||
+        !Number.isFinite(pct) ||
         pct <= 0 ||
         (corporateActionType === "RIGHTS_ISSUE" &&
           (beforePrice <= 0 ||
@@ -705,19 +718,21 @@ export function TxDialog() {
                     <div className="space-y-1">
                       <Label>
                         {corporateActionType === "RIGHTS_ISSUE"
-                          ? "Tỷ lệ quyền mua (% số CP đang sở hữu)"
-                          : "Tỷ lệ cổ tức (%)"}
+                          ? "Tỷ lệ quyền mua (% hoặc CP cũ:CP mới)"
+                          : corporateActionType === "STOCK_DIVIDEND"
+                            ? "Tỷ lệ cổ tức (% hoặc CP cũ:CP mới)"
+                            : "Tỷ lệ cổ tức (%)"}
                       </Label>
                       <Input
-                        type="number"
-                        min="0"
-                        step="any"
+                        type="text"
                         value={distributionPct}
                         onChange={(e) => setDistributionPct(e.target.value)}
                         placeholder={
                           corporateActionType === "RIGHTS_ISSUE"
-                            ? "Ví dụ: 50 (2 CP cũ mua 1 CP mới)"
-                            : "Ví dụ: 10"
+                            ? "Ví dụ: 60% hoặc 10:6"
+                            : corporateActionType === "STOCK_DIVIDEND"
+                              ? "Ví dụ: 5 hoặc 20:1"
+                              : "Ví dụ: 10"
                         }
                         required
                       />
@@ -734,7 +749,7 @@ export function TxDialog() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label>Giá mua ưu đãi (13.5 = 13.500đ)</Label>
+                          <Label>Giá mua ưu đãi (vd: 12,000đ/CP)</Label>
                           <Input
                             value={subscriptionPrice}
                             onChange={setGrouped(setSubscriptionPrice)}
