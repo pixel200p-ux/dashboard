@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Check, Grip, History, LoaderCircle, MessageCircle, Play, Plus, Send, Sparkles, Trash2, Volume2, X } from "lucide-react";
+import { Bot, Check, Grip, History, LoaderCircle, MessageCircle, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { getBearerToken } from "@/lib/auth/client";
 import type { CapitalBucket } from "@/engine/types";
 import {
   portfolioCategoriesForPrompt,
@@ -17,14 +16,12 @@ import {
   deletePixelConversations,
   fetchPixelConversation,
   fetchPixelConversations,
-  fetchPixelVoices,
   fetchPixelSettings,
   PIXEL_SETTINGS_QUERY_KEY,
   savePixelExchange,
   savePixelMemorySuggestion,
   sendPixelMessage,
   type PixelConversationMessage,
-  type PixelVoiceOption,
 } from "@/lib/api/pixel";
 import type { PortfolioPayload } from "@/lib/api/portfolio";
 import {
@@ -273,20 +270,6 @@ function parseStoredSources(content: string): { text: string; sources?: PixelSou
   return sources.length
     ? { text: content.slice(0, markerIndex), sources }
     : { text: content };
-}
-
-function speechText(text: string): string {
-  const cleaned = text
-    .replace(/^\s*#{1,6}\s*/gm, "")
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "")
-    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/\[\d+\]/g, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/^\s*---+\s*$/gm, "")
-    .trim();
-  return cleaned || text;
 }
 
 function renderInlineFormatting(text: string): ReactNode[] {
@@ -594,21 +577,11 @@ export function PixelAssistant({
   const setLoginTheme = useUiStore((state) => state.setLoginTheme);
   const assistantPanelSize = useUiStore((state) => state.assistantPanelSize);
   const setAssistantPanelSize = useUiStore((state) => state.setAssistantPanelSize);
-  const pixelElevenLabsVoiceId = useUiStore((state) => state.pixelElevenLabsVoiceId);
-  const setPixelElevenLabsVoiceId = useUiStore((state) => state.setPixelElevenLabsVoiceId);
-  const pixelEdgeVoiceId = useUiStore((state) => state.pixelEdgeVoiceId);
-  const setPixelEdgeVoiceId = useUiStore((state) => state.setPixelEdgeVoiceId);
-  
+
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<PixelMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [elevenLabsVoices, setElevenLabsVoices] = useState<PixelVoiceOption[]>([]);
-  const [edgeVoices, setEdgeVoices] = useState<PixelVoiceOption[]>([]);
-  const [loadingVoices, setLoadingVoices] = useState(false);
-  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
-  const [speechProvider, setSpeechProvider] = useState<"elevenlabs" | "edge" | null>(null);
   const [savingMemoryId, setSavingMemoryId] = useState<string | null>(null);
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -632,10 +605,6 @@ export function PixelAssistant({
     key.status !== "inactive"
       && (key.provider === "gemini" || key.provider === "groq" || key.provider === "openrouter")
   )) ?? false;
-  const hasVoiceKey = settings?.keys.some((key) => (
-    key.provider === "elevenlabs" && key.status !== "inactive"
-  )) ?? false;
-
   const { data: conversations = [], isError: conversationsError, isPending: conversationsPending, refetch: refetchConversations } = useQuery({
     queryKey: ["pixel-conversations"],
     queryFn: () => fetchPixelConversations(),
@@ -651,179 +620,11 @@ export function PixelAssistant({
   const scrollRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef(position);
   positionRef.current = position;
-  const voiceModeRef = useRef(voiceEnabled);
-  voiceModeRef.current = voiceEnabled;
-  const elevenLabsVoiceIdRef = useRef(pixelElevenLabsVoiceId);
-  elevenLabsVoiceIdRef.current = pixelElevenLabsVoiceId;
-  const edgeVoiceIdRef = useRef(pixelEdgeVoiceId);
-  edgeVoiceIdRef.current = pixelEdgeVoiceId;
-  const speechGenerationRef = useRef(0);
-  const audioElementRef = useRef<HTMLAudioElement>(null);
-  const speechAbortRef = useRef<AbortController | null>(null);
-  const audioObjectUrlRef = useRef<string | null>(null);
-
   const panelRef = useRef<HTMLDivElement>(null);
   const targetPanelSize = useRef<AssistantPanelSize>(assistantPanelSize);
   const currentSize = useRef<AssistantPanelSize>(assistantPanelSize);
   const rafResizeRef = useRef<number>(0);
   const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-
-  const stopSpeech = useCallback(() => {
-    speechGenerationRef.current += 1;
-    speechAbortRef.current?.abort();
-    speechAbortRef.current = null;
-    const audio = audioElementRef.current;
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-    }
-    if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
-    audioObjectUrlRef.current = null;
-    setSpeakingMessageId(null);
-    setSpeechProvider(null);
-  }, []);
-
-  const playSpeech = useCallback(async (
-    messageId: string,
-    text: string,
-    mode: "auto" | "elevenlabs" | "edge" = "auto",
-    requireVoiceMode = true,
-  ) => {
-    stopSpeech();
-    const generation = speechGenerationRef.current;
-    const abortController = new AbortController();
-    speechAbortRef.current = abortController;
-    setSpeakingMessageId(messageId);
-    try {
-      const headers = new Headers({ "Content-Type": "application/json" });
-      const bearerToken = getBearerToken();
-      if (bearerToken) headers.set("Authorization", `Bearer ${bearerToken}`);
-      const response = await fetch("/api/pixel-speech", {
-        method: "POST",
-        headers,
-        signal: abortController.signal,
-        body: JSON.stringify({
-          mode,
-          elevenLabsVoiceId: elevenLabsVoiceIdRef.current,
-          edgeVoiceId: edgeVoiceIdRef.current,
-          text,
-        }),
-      });
-      if (generation !== speechGenerationRef.current || (requireVoiceMode && !voiceModeRef.current)) return;
-      if (!response.ok) {
-        const error = await response.json().catch(() => null) as { message?: string } | null;
-        throw new Error(error?.message || `Không tạo được giọng nói (HTTP ${response.status}).`);
-      }
-      const audio = audioElementRef.current;
-      if (!audio || !response.body) throw new Error("Trình duyệt không nhận được luồng âm thanh.");
-      setSpeechProvider(response.headers.get("X-Pixel-TTS-Provider") === "edge" ? "edge" : "elevenlabs");
-
-      const supportsStreaming = typeof MediaSource !== "undefined"
-        && MediaSource.isTypeSupported("audio/mpeg");
-      let reader: ReadableStreamDefaultReader<Uint8Array> | null = response.body.getReader();
-      if (supportsStreaming) {
-        const mediaSource = new MediaSource();
-        const objectUrl = URL.createObjectURL(mediaSource);
-        audioObjectUrlRef.current = objectUrl;
-        audio.src = objectUrl;
-        await new Promise<void>((resolve, reject) => {
-          const cleanup = () => {
-            mediaSource.removeEventListener("sourceopen", handleOpen);
-            mediaSource.removeEventListener("sourceclose", handleClose);
-            abortController.signal.removeEventListener("abort", handleAbort);
-          };
-          const handleOpen = () => {
-            cleanup();
-            resolve();
-          };
-          const handleClose = () => {
-            cleanup();
-            reject(new Error("Luồng âm thanh đã đóng."));
-          };
-          const handleAbort = () => {
-            cleanup();
-            reject(new DOMException("Đã dừng phát âm thanh.", "AbortError"));
-          };
-          mediaSource.addEventListener("sourceopen", handleOpen, { once: true });
-          mediaSource.addEventListener("sourceclose", handleClose, { once: true });
-          abortController.signal.addEventListener("abort", handleAbort, { once: true });
-          if (abortController.signal.aborted) handleAbort();
-        });
-        if (generation !== speechGenerationRef.current) return;
-        const sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
-        let started = false;
-        while (reader) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (generation !== speechGenerationRef.current) return;
-          await new Promise<void>((resolve, reject) => {
-            sourceBuffer.addEventListener("updateend", () => resolve(), { once: true });
-            sourceBuffer.addEventListener("error", () => reject(new Error("Không giải mã được luồng âm thanh.")), { once: true });
-            try {
-              const buffer = new ArrayBuffer(value.byteLength);
-              new Uint8Array(buffer).set(value);
-              sourceBuffer.appendBuffer(buffer);
-            } catch (error) {
-              reject(error);
-            }
-          });
-          if (!started) {
-            await audio.play();
-            started = true;
-          }
-        }
-        reader.releaseLock();
-        reader = null;
-        if (mediaSource.readyState === "open") mediaSource.endOfStream();
-        if (!started) throw new Error("Nhà cung cấp không trả về âm thanh.");
-      } else {
-        const chunks: Uint8Array[] = [];
-        while (reader) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (generation !== speechGenerationRef.current) return;
-          chunks.push(value);
-        }
-        reader.releaseLock();
-        reader = null;
-        const parts = chunks.map((chunk) => {
-          const buffer = new ArrayBuffer(chunk.byteLength);
-          new Uint8Array(buffer).set(chunk);
-          return buffer;
-        });
-        const objectUrl = URL.createObjectURL(new Blob(parts, { type: "audio/mpeg" }));
-        audioObjectUrlRef.current = objectUrl;
-        audio.src = objectUrl;
-        await audio.play();
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        audio.addEventListener("ended", () => resolve(), { once: true });
-        audio.addEventListener("error", () => reject(new Error("Không phát được âm thanh.")), { once: true });
-        if (audio.ended) resolve();
-        else if (audio.error) reject(new Error("Không phát được âm thanh."));
-      });
-    } catch (error) {
-      if (generation === speechGenerationRef.current && !abortController.signal.aborted) {
-        setSpeakingMessageId(null);
-        toast.error(error instanceof Error ? error.message : "Không phát được giọng nói Pixel.");
-      }
-    } finally {
-      if (generation === speechGenerationRef.current) {
-        speechAbortRef.current = null;
-        setSpeakingMessageId(null);
-        if (audioObjectUrlRef.current) {
-          audioElementRef.current?.removeAttribute("src");
-          audioElementRef.current?.load();
-          URL.revokeObjectURL(audioObjectUrlRef.current);
-          audioObjectUrlRef.current = null;
-        }
-      }
-    }
-  }, [stopSpeech]);
-
-  useEffect(() => () => stopSpeech(), [stopSpeech]);
 
   useEffect(() => {
     targetPanelSize.current = assistantPanelSize;
@@ -920,16 +721,13 @@ export function PixelAssistant({
   const addPixelMessage = useCallback((text: string, options: Pick<PixelMessage, "choices" | "quizAnswer" | "quizExplanation" | "memorySuggestion" | "sources"> = {}) => {
     const message: PixelMessage = { id: crypto.randomUUID(), role: "pixel", text, ...options };
     setMessages((current) => [...current, message]);
-    if (voiceModeRef.current && elevenLabsVoiceIdRef.current) {
-      void playSpeech(message.id, speechText(text));
-    }
     if (!openRef.current) {
       setNotification(message);
       setUnread(true);
       if (notificationTimer.current) clearTimeout(notificationTimer.current);
       notificationTimer.current = setTimeout(() => setNotification(null), 12_000);
     }
-  }, [playSpeech]);
+  }, []);
 
   useEffect(() => {
     openRef.current = open;
@@ -1094,73 +892,10 @@ export function PixelAssistant({
 
   }
 
-  async function toggleVoiceMode() {
-    if (voiceModeRef.current) {
-      voiceModeRef.current = false;
-      setVoiceEnabled(false);
-      stopSpeech();
-      return;
-    }
-    if (!settingsFetched) {
-      toast.error("Đang tải cài đặt Pixel. Hãy thử lại sau giây lát.");
-      return;
-    }
-    if (!hasVoiceKey) {
-      toast.error("Thêm API key ElevenLabs trong Cài đặt để bật giọng nói.");
-      return;
-    }
-
-    voiceModeRef.current = true;
-    setVoiceEnabled(true);
-    setLoadingVoices(true);
-    try {
-      const availableVoices = elevenLabsVoices.length > 0
-        ? [...elevenLabsVoices, ...edgeVoices]
-        : await fetchPixelVoices();
-      if (!voiceModeRef.current) return;
-      const availableElevenLabsVoices = availableVoices.filter((voice) => !voice.id.startsWith("vi-VN-"));
-      const availableEdgeVoices = availableVoices.filter((voice) => voice.id.startsWith("vi-VN-"));
-      if (availableElevenLabsVoices.length === 0) throw new Error("Tài khoản ElevenLabs chưa có giọng nào khả dụng.");
-      setElevenLabsVoices(availableElevenLabsVoices);
-      setEdgeVoices(availableEdgeVoices);
-      const selectedVoice = availableElevenLabsVoices.find((voice) => voice.id === elevenLabsVoiceIdRef.current)
-        ?? availableElevenLabsVoices[0];
-      if (selectedVoice.id !== elevenLabsVoiceIdRef.current) {
-        elevenLabsVoiceIdRef.current = selectedVoice.id;
-        setPixelElevenLabsVoiceId(selectedVoice.id);
-      }
-      const latestReply = [...messages].reverse().find((message) => message.role === "pixel");
-      if (latestReply) void playSpeech(latestReply.id, speechText(latestReply.text));
-    } catch (error) {
-      voiceModeRef.current = false;
-      setVoiceEnabled(false);
-      stopSpeech();
-      toast.error(error instanceof Error ? error.message : "Không thể bật giọng nói Pixel.");
-    } finally {
-      setLoadingVoices(false);
-    }
-  }
-
-  async function previewVoice(mode: "elevenlabs" | "edge") {
-    const voiceId = mode === "elevenlabs" ? pixelElevenLabsVoiceId : pixelEdgeVoiceId;
-    if (!voiceId) return;
-    try {
-      await playSpeech(
-        `voice-preview-${mode}`,
-        "Xin chào, mình là Pixel. Mình sẽ đồng hành cùng bạn quản lý danh mục đầu tư.",
-        mode,
-        false,
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không nghe thử được giọng nói.");
-    }
-  }
-
   async function sendMessage(text: string) {
     const prompt = text.trim();
     if (!prompt || sending) return;
     const portfolioPrompt = portfolioPromptForFollowup(prompt, messages);
-    stopSpeech();
     setDraft("");
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", text: prompt }]);
 
@@ -1287,7 +1022,6 @@ export function PixelAssistant({
   }
 
   function startNewConversation() {
-    stopSpeech();
     setConversationId(null);
     setMessages([]);
     setHistoryOpen(false);
@@ -1295,7 +1029,6 @@ export function PixelAssistant({
   }
 
   async function openConversation(id: string) {
-    stopSpeech();
     setConversationId(id);
     setMessages([]);
     setHistoryOpen(false);
@@ -1346,7 +1079,6 @@ export function PixelAssistant({
 
     return (
       <>
-        <audio ref={audioElementRef} className="hidden" preload="none" />
         {notification && !open && (
 
         <div
@@ -1548,88 +1280,8 @@ export function PixelAssistant({
             {sending && <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Pixel đang suy nghĩ…</div>}
           </div>
 
-          {elevenLabsVoices.length > 0 && (
-            <div className="space-y-2 border-t border-border/70 px-3 py-2">
-              <p className="text-[11px] text-muted-foreground">
-                {speechProvider === "edge"
-                  ? "Đang dùng Edge TTS dự phòng · ElevenLabs sẽ được thử lại ở câu tiếp theo"
-                  : "Ưu tiên ElevenLabs · Chỉ chuyển sang Edge TTS khi quota hết"}
-              </p>
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
-                <label htmlFor="pixel-elevenlabs-voice" className="text-xs text-muted-foreground">ElevenLabs</label>
-                <select
-                  id="pixel-elevenlabs-voice"
-                  aria-label="Chọn giọng ElevenLabs"
-                  value={pixelElevenLabsVoiceId}
-                  onChange={(event) => {
-                    stopSpeech();
-                    elevenLabsVoiceIdRef.current = event.target.value;
-                    setPixelElevenLabsVoiceId(event.target.value);
-                  }}
-                  className="min-w-0 rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {elevenLabsVoices.map((voice) => (
-                    <option key={voice.id} value={voice.id}>{voice.name}</option>
-                  ))}
-                </select>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label="Nghe thử giọng ElevenLabs"
-                  title="Nghe thử giọng ElevenLabs"
-                  disabled={!pixelElevenLabsVoiceId || loadingVoices}
-                  onClick={() => void previewVoice("elevenlabs")}
-                >
-                  {speakingMessageId === "voice-preview-elevenlabs" ? <LoaderCircle className="animate-spin" /> : <Play />}
-                </Button>
-
-                <label htmlFor="pixel-edge-voice" className="text-xs text-muted-foreground">Edge dự phòng</label>
-                <select
-                  id="pixel-edge-voice"
-                  aria-label="Chọn giọng Edge TTS dự phòng"
-                  value={pixelEdgeVoiceId}
-                  onChange={(event) => {
-                    stopSpeech();
-                    edgeVoiceIdRef.current = event.target.value;
-                    setPixelEdgeVoiceId(event.target.value);
-                  }}
-                  className="min-w-0 rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {edgeVoices.map((voice) => (
-                    <option key={voice.id} value={voice.id}>{voice.name.replace(" (Edge TTS)", "")}</option>
-                  ))}
-                </select>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label="Nghe thử giọng Edge TTS"
-                  title="Nghe thử giọng Edge TTS"
-                  disabled={!pixelEdgeVoiceId || loadingVoices}
-                  onClick={() => void previewVoice("edge")}
-                >
-                  {speakingMessageId === "voice-preview-edge" ? <LoaderCircle className="animate-spin" /> : <Play />}
-                </Button>
-              </div>
-            </div>
-          )}
           <form className="flex items-center gap-2 border-t border-border/70 p-3" onSubmit={(event) => { event.preventDefault(); void sendMessage(draft); }}>
             <Input className="min-w-0 flex-1" aria-label="Tin nhắn cho Pixel" placeholder={hasAiKey ? "Hỏi Pixel về danh mục…" : "Thêm API key AI trong Cài đặt"} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={sending || loadingConversation} />
-            <button
-              type="button"
-              aria-label={voiceEnabled ? "Tắt chế độ giọng nói" : "Bật chế độ giọng nói"}
-              aria-pressed={voiceEnabled}
-              title={voiceEnabled ? "Tắt chế độ giọng nói" : "Bật chế độ giọng nói"}
-              onClick={() => void toggleVoiceMode()}
-              disabled={!settingsFetched}
-              className={cn(
-                "grid h-9 w-9 shrink-0 place-items-center rounded-md bg-[#0b1f4f] text-white transition hover:bg-[#152f67] disabled:cursor-not-allowed disabled:opacity-60",
-                voiceEnabled && "bg-[#e9eef8] text-[#0b1f4f] ring-1 ring-[#0b1f4f] hover:bg-[#dce5f5]",
-              )}
-            >
-              {loadingVoices ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
-            </button>
             <Button type="submit" size="icon" aria-label="Gửi tin nhắn" disabled={!draft.trim() || sending}><Send /></Button>
           </form>
 

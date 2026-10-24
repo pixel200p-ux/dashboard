@@ -15,6 +15,7 @@ const actionSchema = z.object({
   paymentDate: z.string().date().nullable(),
   actionType: z.enum(["CASH_DIVIDEND", "STOCK_DIVIDEND", "RIGHTS_ISSUE"]),
   distributionPct: z.number().positive(),
+  referencePrice: z.number().positive().nullable(),
   subscriptionPrice: z.number().positive().nullable(),
   vpsSubscribedQty: z.number().int().nonnegative(),
   ssiSubscribedQty: z.number().int().nonnegative(),
@@ -51,6 +52,9 @@ export const saveCorporateAction = createServerFn({ method: "POST" })
       data.paymentDate < data.exDate
     ) {
       throw new Error("Ngày cổ phiếu quyền mua về tài khoản không thể trước ngày GDKHQ.");
+    }
+    if (data.actionType === "RIGHTS_ISSUE" && !data.referencePrice) {
+      throw new Error("Vui lòng nhập giá tham chiếu trước ngày GDKHQ để quy đổi giá giao dịch.");
     }
     if (data.actionType === "RIGHTS_ISSUE") {
       const ledger = await loadLedgerSnapshot();
@@ -149,7 +153,7 @@ export const saveCorporateAction = createServerFn({ method: "POST" })
             record_date = ${data.recordDate},
             payment_date = ${data.paymentDate},
             distribution_pct = ${data.distributionPct},
-            reference_price = null,
+            reference_price = ${data.referencePrice},
             subscription_price = ${data.subscriptionPrice},
             vps_subscribed_qty = ${data.vpsSubscribedQty},
             ssi_subscribed_qty = ${data.ssiSubscribedQty},
@@ -165,7 +169,7 @@ export const saveCorporateAction = createServerFn({ method: "POST" })
             vps_subscribed_qty, ssi_subscribed_qty, notes, source
           ) values (
             ${id}, ${symbol}, ${data.exDate}, ${data.recordDate}, ${data.paymentDate},
-            ${data.actionType}, ${data.distributionPct}, null,
+            ${data.actionType}, ${data.distributionPct}, ${data.referencePrice},
             ${data.subscriptionPrice}, ${data.vpsSubscribedQty}, ${data.ssiSubscribedQty},
             ${notes}, 'MANUAL'
           )

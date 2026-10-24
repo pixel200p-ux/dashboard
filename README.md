@@ -98,25 +98,6 @@ không phải luân phiên để né quota, giới hạn tốc độ hay chi ph�
 Pixel chỉ đề xuất ghi nhớ khi tin nhắn có ý định rõ ràng (ví dụ “hãy nhớ”,
 “tôi thích”, “luôn luôn”); nội dung chỉ được lưu sau khi người dùng xác nhận.
 
-Thêm key **ElevenLabs** trong Cài đặt Pixel để bật giọng nói. Trong khung chat,
-bật nút loa để Pixel tự đọc câu trả lời mới; tắt nút sẽ dừng âm thanh và chỉ
-hiển thị chữ. Có thể chọn và nghe thử giọng; lựa chọn giọng được lưu trên trình
-duyệt. Pixel không thu âm câu hỏi: người dùng vẫn nhập bằng văn bản. Nội dung câu
-trả lời được gửi tới ElevenLabs để tạo âm thanh, nên lượt đọc sử dụng quota/chi
-phí theo gói ElevenLabs. Chỉ khi ElevenLabs báo rõ quota đã hết, Pixel mới dùng
-Edge TTS cho lượt đó; lỗi key, mạng, giới hạn tốc độ hay lỗi dịch vụ sẽ được báo,
-không tự chuyển nhà cung cấp. ElevenLabs luôn được thử lại ở lượt đọc tiếp theo.
-Có thể chọn riêng giọng ElevenLabs và giọng Edge dự phòng.
-
-Key ElevenLabs được mã hóa trên server bằng cùng cấu hình
-`PIXEL_KEY_ENCRYPTION_SECRET` như các key Pixel khác. Trên Vercel, nhập key trong
-**Cài đặt → Pixel Assistant → API**; không đưa key vào mã nguồn, biến `VITE_*`
-hay cuộc trò chuyện. Khi dùng Edge dự phòng, chỉ câu trả lời cần đọc được gửi
-tới dịch vụ Microsoft Edge TTS. Ứng dụng kết nối Edge qua thư viện Node
-`node-edge-tts`, không phải API chính thức được bảo đảm bởi edge-tts.com; dịch vụ
-có thể bị giới hạn, thay đổi hoặc ngừng hoạt động và không được đảm bảo miễn phí
-hay không giới hạn.
-
 Thêm key **Tavily Search** và **Jina Reader** trong Cài đặt Pixel để bật tra
 cứu web. Với câu hỏi thời sự/cổ tức, Pixel dùng Tavily tìm tối đa 5 kết quả,
 sau đó dùng Jina Reader đọc tối đa 2 trang đầu; nếu Tavily không trả kết quả

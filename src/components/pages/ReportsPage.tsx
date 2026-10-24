@@ -284,7 +284,7 @@ export function ReportsPage() {
                 <th className="px-2 py-2">Mã</th>
                 <th className="px-2 py-2">Loại</th>
                 <th className="px-2 py-2 text-right">SL</th>
-                <th className="px-2 py-2 text-right">Giá</th>
+                <th className="px-2 py-2 text-right">Giá quy đổi / gốc</th>
                 <th className="px-2 py-2 text-right">Số tiền</th>
                 <th className="px-2 py-2">Ghi chú</th>
                 <th className="w-24 px-2 py-2 text-right">Thao tác</th>
@@ -309,9 +309,26 @@ export function ReportsPage() {
                     {r.quantity != null ? formatQty(r.quantity, r.assetType === "ORIGINAL" ? "STOCK" : r.assetType) : "—"}
                   </td>
                   <td className="px-2 py-2 text-right font-mono tabular-nums">
-                    {r.price != null && r.assetType !== "ORIGINAL" && r.assetType !== "BANK"
-                      ? displayPrice(r.price, r.assetType, currency, usd)
-                      : "—"}
+                    {r.price != null && r.assetType !== "ORIGINAL" && r.assetType !== "BANK" ? (
+                      <div>
+                        <div>
+                          {displayPrice(
+                            r.adjustedPrice ?? r.price,
+                            r.assetType,
+                            currency,
+                            usd,
+                          )}
+                        </div>
+                        {r.adjustedPrice != null &&
+                          Math.abs(r.adjustedPrice - r.price) > 0.5 && (
+                            <div className="text-[10px] text-muted-foreground">
+                              gốc {displayPrice(r.price, r.assetType, currency, usd)}
+                            </div>
+                          )}
+                      </div>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className={`px-2 py-2 text-right font-mono tabular-nums ${signedClass(r.amount)}`}>
                     {r.amount !== 0 ? displayMoney(Math.abs(r.amount), currency, usd) : "—"}
@@ -349,6 +366,7 @@ export function ReportsPage() {
                                 txDate: action.exDate,
                                 corporateActionType: action.actionType,
                                 distributionPct: action.distributionPct,
+                                referencePrice: action.referencePrice ?? undefined,
                                 subscriptionPrice: action.subscriptionPrice ?? undefined,
                                 vpsSubscribedQty: action.vpsSubscribedQty,
                                 ssiSubscribedQty: action.ssiSubscribedQty,

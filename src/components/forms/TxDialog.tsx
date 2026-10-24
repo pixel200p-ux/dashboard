@@ -81,6 +81,7 @@ export function TxDialog() {
   const [corporateActionType, setCorporateActionType] =
     useState<CorporateActionType>("CASH_DIVIDEND");
   const [distributionPct, setDistributionPct] = useState("");
+  const [referencePrice, setReferencePrice] = useState("");
   const [subscriptionPrice, setSubscriptionPrice] = useState("");
   const [vpsSubscribedQty, setVpsSubscribedQty] = useState("");
   const [ssiSubscribedQty, setSsiSubscribedQty] = useState("");
@@ -124,6 +125,11 @@ export function TxDialog() {
     setCorporateActionType(prefill.corporateActionType ?? "CASH_DIVIDEND");
     setDistributionPct(
       prefill.distributionPct != null ? String(prefill.distributionPct) : "",
+    );
+    setReferencePrice(
+      prefill.referencePrice != null
+        ? formatBrokerPrice(prefill.referencePrice)
+        : "",
     );
     setSubscriptionPrice(
       prefill.subscriptionPrice != null
@@ -290,6 +296,7 @@ export function TxDialog() {
     if (isCorporateAction) {
       const sym = symbol.trim().toUpperCase();
       const pct = parseDecimal(distributionPct);
+      const beforePrice = parseBrokerPrice(referencePrice);
       const subscribedPrice = parseBrokerPrice(subscriptionPrice);
       const vpsQty = parseDecimal(vpsSubscribedQty);
       const ssiQty = parseDecimal(ssiSubscribedQty);
@@ -297,7 +304,8 @@ export function TxDialog() {
         !sym ||
         pct <= 0 ||
         (corporateActionType === "RIGHTS_ISSUE" &&
-          (subscribedPrice <= 0 ||
+          (beforePrice <= 0 ||
+            subscribedPrice <= 0 ||
             !Number.isInteger(vpsQty) ||
             !Number.isInteger(ssiQty) ||
             vpsQty < 0 ||
@@ -319,6 +327,8 @@ export function TxDialog() {
             paymentDate: paymentDate || null,
             actionType: corporateActionType,
             distributionPct: pct,
+            referencePrice:
+              corporateActionType === "RIGHTS_ISSUE" ? beforePrice : null,
             subscriptionPrice:
               corporateActionType === "RIGHTS_ISSUE" ? subscribedPrice : null,
             vpsSubscribedQty:
@@ -671,7 +681,7 @@ export function TxDialog() {
                 <div className="space-y-3 rounded-lg border border-border p-3">
                   <p className="text-sm text-muted-foreground">
                     {corporateActionType === "RIGHTS_ISSUE"
-                      ? "Nhập lượng đăng ký riêng theo VPS/SSI. Cổ phiếu mua thêm được cộng vào danh mục theo ngày thanh toán (hoặc ngày GDKHQ nếu chưa nhập ngày thanh toán)."
+                      ? "Nhập lượng đăng ký riêng theo VPS/SSI. Cổ phiếu mua thêm được cộng vào danh mục theo ngày thanh toán; giá lệnh mua/bán trước GDKHQ sẽ được quy đổi theo giá lý thuyết để dễ đối chiếu."
                       : "Sự kiện GDKHQ là nguồn duy nhất ghi nhận cổ tức; tiền mặt được tính gộp trước thuế và cổ phiếu theo lượng đủ điều kiện trước ngày GDKHQ."}
                     {corporateActionType === "STOCK_DIVIDEND" &&
                       " Cổ phiếu thưởng được làm tròn xuống riêng theo từng broker."}
@@ -714,6 +724,15 @@ export function TxDialog() {
                     </div>
                     {corporateActionType === "RIGHTS_ISSUE" && (
                       <>
+                        <div className="space-y-1">
+                          <Label>Giá tham chiếu trước GDKHQ (13.5 = 13.500đ)</Label>
+                          <Input
+                            value={referencePrice}
+                            onChange={setGrouped(setReferencePrice)}
+                            placeholder="Giá đóng cửa trước ngày GDKHQ"
+                            required
+                          />
+                        </div>
                         <div className="space-y-1">
                           <Label>Giá mua ưu đãi (13.5 = 13.500đ)</Label>
                           <Input

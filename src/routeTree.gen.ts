@@ -24,7 +24,6 @@ import { Route as AppStockRouteImport } from './routes/_app/stock'
 import { Route as AppTplusRouteImport } from './routes/_app/tplus'
 import { Route as ApiDcdsNavRouteImport } from './routes/api/dcds-nav'
 import { Route as ApiLoginThemeRouteImport } from './routes/api/login-theme'
-import { Route as ApiPixelSpeechRouteImport } from './routes/api/pixel-speech'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const AppRoute = AppRouteImport.update({
@@ -101,11 +100,6 @@ const ApiLoginThemeRoute = ApiLoginThemeRouteImport.update({
   path: '/api/login-theme',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPixelSpeechRoute = ApiPixelSpeechRouteImport.update({
-  id: '/api/pixel-speech',
-  path: '/api/pixel-speech',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -127,7 +121,6 @@ export interface FileRoutesByFullPath {
   '/tplus': typeof AppTplusRoute
   '/api/dcds-nav': typeof ApiDcdsNavRoute
   '/api/login-theme': typeof ApiLoginThemeRoute
-  '/api/pixel-speech': typeof ApiPixelSpeechRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
@@ -144,7 +137,6 @@ export interface FileRoutesByTo {
   '/tplus': typeof AppTplusRoute
   '/api/dcds-nav': typeof ApiDcdsNavRoute
   '/api/login-theme': typeof ApiLoginThemeRoute
-  '/api/pixel-speech': typeof ApiPixelSpeechRoute
   '/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -164,7 +156,6 @@ export interface FileRoutesById {
   '/_app/tplus': typeof AppTplusRoute
   '/api/dcds-nav': typeof ApiDcdsNavRoute
   '/api/login-theme': typeof ApiLoginThemeRoute
-  '/api/pixel-speech': typeof ApiPixelSpeechRoute
   '/_app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -185,7 +176,6 @@ export interface FileRouteTypes {
     | '/tplus'
     | '/api/dcds-nav'
     | '/api/login-theme'
-    | '/api/pixel-speech'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -202,7 +192,6 @@ export interface FileRouteTypes {
     | '/tplus'
     | '/api/dcds-nav'
     | '/api/login-theme'
-    | '/api/pixel-speech'
     | '/'
     | '/api/auth/$'
   id:
@@ -221,7 +210,6 @@ export interface FileRouteTypes {
     | '/_app/tplus'
     | '/api/dcds-nav'
     | '/api/login-theme'
-    | '/api/pixel-speech'
     | '/_app/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -231,7 +219,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ApiDcdsNavRoute: typeof ApiDcdsNavRoute
   ApiLoginThemeRoute: typeof ApiLoginThemeRoute
-  ApiPixelSpeechRoute: typeof ApiPixelSpeechRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -342,13 +329,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLoginThemeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/pixel-speech': {
-      id: '/api/pixel-speech'
-      path: '/api/pixel-speech'
-      fullPath: '/api/pixel-speech'
-      preLoaderRoute: typeof ApiPixelSpeechRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -394,7 +374,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ApiDcdsNavRoute: ApiDcdsNavRoute,
   ApiLoginThemeRoute: ApiLoginThemeRoute,
-  ApiPixelSpeechRoute: ApiPixelSpeechRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

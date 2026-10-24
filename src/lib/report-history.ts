@@ -28,6 +28,7 @@ export type ReportRow = {
   kindLabel: string;
   quantity: number | null;
   price: number | null;
+  adjustedPrice?: number | null;
   amount: number;
   notes: string | null;
   assetType: "STOCK" | "ETF" | "DCDS" | "CRYPTO" | "BANK" | "ORIGINAL";
@@ -164,6 +165,19 @@ function bankRows(ledger: LedgerSnapshot, asOf: string): ReportRow[] {
 
 export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): ReportRow[] {
   const rows: ReportRow[] = [];
+  const rightsActions = ledger.corporateActions
+    .filter(
+      (action) =>
+        !action.deletedAt &&
+        action.actionType === "RIGHTS_ISSUE" &&
+        action.exDate <= asOf &&
+        action.referencePrice != null &&
+        action.referencePrice > 0 &&
+        action.subscriptionPrice != null &&
+        action.subscriptionPrice > 0,
+    )
+    .slice()
+    .sort((a, b) => a.exDate.localeCompare(b.exDate));
 
   for (const c of ledger.capital) {
     if (c.deletedAt) continue;
@@ -205,6 +219,25 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
       kindLabel: KIND_LABEL[kind],
       quantity: t.txType === "STOCK_DIVIDEND" ? (t.stockDivQty ?? t.quantity) : t.quantity,
       price: t.price,
+      adjustedPrice:
+        (t.txType === "BUY" || t.txType === "SELL") &&
+        t.price != null &&
+        asset?.assetType === "STOCK"
+          ? t.price *
+            rightsActions
+              .filter(
+                (action) =>
+                  action.symbol === asset.symbol &&
+                  t.txDate < action.exDate,
+              )
+              .reduce((factor, action) => {
+                const ratio = action.distributionPct / 100;
+                const theoreticalExPrice =
+                  (action.referencePrice! + ratio * action.subscriptionPrice!) /
+                  (1 + ratio);
+                return factor * (theoreticalExPrice / action.referencePrice!);
+              }, 1)
+          : null,
       amount: signed,
       notes: t.notes,
       assetType: asset?.assetType ?? "STOCK",
@@ -277,6 +310,9 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
         action.paymentDate ? `Ngày thanh toán ${action.paymentDate}` : null,
         action.actionType === "RIGHTS_ISSUE" && action.subscriptionPrice != null
           ? `Giá đăng ký ${action.subscriptionPrice}`
+          : null,
+        action.actionType === "RIGHTS_ISSUE" && action.referencePrice != null
+          ? `Giá tham chiếu trước GDKHQ ${action.referencePrice}`
           : null,
         action.actionType === "RIGHTS_ISSUE"
           ? `Đăng ký VPS ${action.vpsSubscribedQty} CP · SSI ${action.ssiSubscribedQty} CP`

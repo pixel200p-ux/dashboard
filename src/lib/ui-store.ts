@@ -40,6 +40,7 @@ export type TxPrefill = {
   corporateActionId?: string | null;
   corporateActionType?: CorporateActionType;
   distributionPct?: number;
+  referencePrice?: number;
   subscriptionPrice?: number;
   vpsSubscribedQty?: number;
   ssiSubscribedQty?: number;
@@ -61,8 +62,6 @@ type UiState = {
   dragonSize: number;
   dragonFacingUp: boolean;
   assistantPanelSize: AssistantPanelSize;
-  pixelElevenLabsVoiceId: string;
-  pixelEdgeVoiceId: string;
   txOpen: TxPrefill | null;
   capitalOpen: "DEPOSIT" | "WITHDRAW" | null;
   capitalEdit: CapitalPrefill | null;
@@ -79,8 +78,6 @@ type UiState = {
   setDragonSize: (size: number) => void;
   setDragonFacingUp: (facingUp: boolean) => void;
   setAssistantPanelSize: (size: AssistantPanelSize) => void;
-  setPixelElevenLabsVoiceId: (voiceId: string) => void;
-  setPixelEdgeVoiceId: (voiceId: string) => void;
   setStockFilter: (f: UiState["stockFilter"]) => void;
   openTx: (p?: TxPrefill) => void;
   closeTx: () => void;
@@ -106,8 +103,6 @@ export const useUiStore = create<UiState>()(
       dragonSize: 1,
       dragonFacingUp: false,
       assistantPanelSize: { width: 360, height: 560 },
-      pixelElevenLabsVoiceId: "",
-      pixelEdgeVoiceId: "vi-VN-HoaiMyNeural",
       txOpen: null,
       capitalOpen: null,
       capitalEdit: null,
@@ -139,8 +134,6 @@ export const useUiStore = create<UiState>()(
       setDragonSize: (dragonSize) => set({ dragonSize }),
       setDragonFacingUp: (dragonFacingUp) => set({ dragonFacingUp }),
       setAssistantPanelSize: (assistantPanelSize) => set({ assistantPanelSize }),
-      setPixelElevenLabsVoiceId: (pixelElevenLabsVoiceId) => set({ pixelElevenLabsVoiceId }),
-      setPixelEdgeVoiceId: (pixelEdgeVoiceId) => set({ pixelEdgeVoiceId }),
       setStockFilter: (stockFilter) => set({ stockFilter }),
       openTx: (p) => set({ txOpen: p ?? {} }),
       closeTx: () => set({ txOpen: null }),
@@ -169,8 +162,6 @@ export const useUiStore = create<UiState>()(
         dragonSize: s.dragonSize,
         dragonFacingUp: s.dragonFacingUp,
         assistantPanelSize: s.assistantPanelSize,
-        pixelElevenLabsVoiceId: s.pixelElevenLabsVoiceId,
-        pixelEdgeVoiceId: s.pixelEdgeVoiceId,
       }),
     },
   ),

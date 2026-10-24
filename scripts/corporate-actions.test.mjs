@@ -125,6 +125,7 @@ function action(actionType, distributionPct) {
     paymentDate: null,
     actionType,
     distributionPct,
+    referencePrice: null,
     subscriptionPrice: null,
     vpsSubscribedQty: 0,
     ssiSubscribedQty: 0,
@@ -382,4 +383,34 @@ test("rights subscriptions add account-specific shares and cost on payment date"
   assert.equal(ssiHolding.quantity, 55);
   assert.ok(Math.abs(ssiHolding.adjustedAvgCost - 8_181.8181818) < 1e-6);
   assert.equal(adjustedLotPrice(ssiHolding, "rights:ca-1:ssi"), 10_000);
+});
+
+test("rights issue normalizes earlier buy prices to the ex-rights price basis", () => {
+  const rightsAction = {
+    ...action("RIGHTS_ISSUE", 100),
+    referencePrice: 36_000,
+    subscriptionPrice: 16_000,
+    vpsSubscribedQty: 100,
+  };
+  const snapshot = ledger(
+    [
+      tx("buy-before", "BUY", "2026-01-01", 100, 36_000),
+      tx("sell-after", "SELL", "2026-01-04", 100, 26_000),
+    ],
+    rightsAction,
+  );
+  const rows = buildReportRows(snapshot, "2026-01-05");
+  const buy = rows.find((row) => row.id === "buy-before");
+  const sell = rows.find((row) => row.id === "sell-after");
+
+  assert.ok(buy);
+  assert.ok(sell);
+  assert.equal(buy.price, 36_000);
+  assert.equal(buy.adjustedPrice, 26_000);
+  assert.equal(sell.price, 26_000);
+  assert.equal(sell.adjustedPrice, 26_000);
+  assert.equal(
+    holdingFrom(replay(snapshot, "2026-01-05")).adjustedAvgCost,
+    26_000,
+  );
 });

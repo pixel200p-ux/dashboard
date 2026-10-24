@@ -80,6 +80,7 @@ export interface CorporateAction {
   paymentDate: string | null;
   actionType: CorporateActionType;
   distributionPct: number;
+  referencePrice: number | null;
   subscriptionPrice: number | null;
   vpsSubscribedQty: number;
   ssiSubscribedQty: number;
