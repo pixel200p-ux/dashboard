@@ -38,18 +38,6 @@ function cryptoQty(amountUsd: number, priceUsd: number): number {
   return Math.round((amountUsd / priceUsd) * 1e8) / 1e8;
 }
 
-function parseDistributionPct(input: string, actionType: CorporateActionType): number {
-  const ratio = input.trim().match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
-  if (ratio) {
-    if (actionType === "CASH_DIVIDEND") return Number.NaN;
-    const oldShares = Number(ratio[1]);
-    const newShares = Number(ratio[2]);
-    return oldShares > 0 && newShares > 0 ? (newShares / oldShares) * 100 : Number.NaN;
-  }
-  if (input.includes(":")) return Number.NaN;
-  return parseDecimal(input);
-}
-
 function accountFor(type: AssetType, stockAccount: string): { id: string; currency: string; profile: FeeProfile } {
   if (type === "STOCK") return { id: stockAccount, currency: "VND", profile: stockAccount === "ssi" ? "STOCK_SSI" : "STOCK_VPS" };
   if (type === "CRYPTO") return { id: "crypto", currency: "USD", profile: "CRYPTO" };
@@ -92,7 +80,11 @@ export function TxDialog() {
   const [corporateActionId, setCorporateActionId] = useState<string | null>(null);
   const [corporateActionType, setCorporateActionType] =
     useState<CorporateActionType>("CASH_DIVIDEND");
+  const [distributionInputMode, setDistributionInputMode] =
+    useState<"PERCENT" | "RATIO">("PERCENT");
   const [distributionPct, setDistributionPct] = useState("");
+  const [ratioOldShares, setRatioOldShares] = useState("");
+  const [ratioNewShares, setRatioNewShares] = useState("");
   const [referencePrice, setReferencePrice] = useState("");
   const [subscriptionPrice, setSubscriptionPrice] = useState("");
   const [vpsSubscribedQty, setVpsSubscribedQty] = useState("");
@@ -135,9 +127,12 @@ export function TxDialog() {
     setStockDivQty(prefill.stockDivQty != null ? formatThousandsInput(String(prefill.stockDivQty)) : "");
     setCorporateActionId(prefill.corporateActionId ?? null);
     setCorporateActionType(prefill.corporateActionType ?? "CASH_DIVIDEND");
+    setDistributionInputMode("PERCENT");
     setDistributionPct(
       prefill.distributionPct != null ? String(prefill.distributionPct) : "",
     );
+    setRatioOldShares("");
+    setRatioNewShares("");
     setReferencePrice(
       prefill.referencePrice != null
         ? formatBrokerPrice(prefill.referencePrice)
@@ -307,7 +302,17 @@ export function TxDialog() {
 
     if (isCorporateAction) {
       const sym = symbol.trim().toUpperCase();
-      const pct = parseDistributionPct(distributionPct, corporateActionType);
+      const oldShares = parseDecimal(ratioOldShares);
+      const newShares = parseDecimal(ratioNewShares);
+      const pct =
+        distributionInputMode === "PERCENT"
+          ? parseDecimal(distributionPct)
+          : Number.isInteger(oldShares) &&
+              Number.isInteger(newShares) &&
+              oldShares > 0 &&
+              newShares > 0
+            ? (newShares / oldShares) * 100
+            : Number.NaN;
       const beforePrice = parseBrokerPrice(referencePrice);
       const subscribedPrice = parseBrokerPrice(subscriptionPrice);
       const vpsQty = parseDecimal(vpsSubscribedQty);
@@ -324,7 +329,9 @@ export function TxDialog() {
             vpsQty < 0 ||
             ssiQty < 0))
       ) {
-        toast.error("Vui lòng kiểm tra mã và các thông số của sự kiện.");
+        toast.error(
+          "Vui lòng kiểm tra mã, tỷ lệ (phần trăm hoặc số cổ phiếu cũ:mới là số nguyên dương) và các thông số của sự kiện.",
+        );
         return;
       }
       const pin = editing ? await askEditPin() : null;
@@ -704,9 +711,13 @@ export function TxDialog() {
                       <Label>Loại phân phối</Label>
                       <Select
                         value={corporateActionType}
-                        onValueChange={(value) =>
-                          setCorporateActionType(value as CorporateActionType)
-                        }
+                        onValueChange={(value) => {
+                          const nextType = value as CorporateActionType;
+                          setCorporateActionType(nextType);
+                          if (nextType === "CASH_DIVIDEND") {
+                            setDistributionInputMode("PERCENT");
+                          }
+                        }}
                         disabled={editing}
                         options={[
                           { value: "CASH_DIVIDEND", label: "Cổ tức tiền mặt" },
@@ -715,28 +726,85 @@ export function TxDialog() {
                         ]}
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label>
-                        {corporateActionType === "RIGHTS_ISSUE"
-                          ? "Tỷ lệ quyền mua (% hoặc CP cũ:CP mới)"
-                          : corporateActionType === "STOCK_DIVIDEND"
-                            ? "Tỷ lệ cổ tức (% hoặc CP cũ:CP mới)"
+                    {corporateActionType !== "CASH_DIVIDEND" && (
+                      <div className="space-y-1">
+                        <Label>Kiểu nhập tỷ lệ</Label>
+                        <Select
+                          value={distributionInputMode}
+                          onValueChange={(value) => {
+                            setDistributionInputMode(value as "PERCENT" | "RATIO");
+                            setDistributionPct("");
+                            setRatioOldShares("");
+                            setRatioNewShares("");
+                          }}
+                          options={[
+                            { value: "PERCENT", label: "Phần trăm (%)" },
+                            { value: "RATIO", label: "Tỷ lệ cổ phiếu (CP cũ:CP mới)" },
+                          ]}
+                        />
+                      </div>
+                    )}
+                    {distributionInputMode === "RATIO" &&
+                    corporateActionType !== "CASH_DIVIDEND" ? (
+                      <div className="col-span-2 space-y-1">
+                        <Label>
+                          {corporateActionType === "RIGHTS_ISSUE"
+                            ? "Tỷ lệ quyền mua (CP đang có:CP được mua thêm)"
+                            : "Tỷ lệ cổ tức (CP đang có:CP được nhận thêm)"}
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={ratioOldShares}
+                            onChange={(event) => setRatioOldShares(event.target.value)}
+                            placeholder="CP đang có"
+                            required
+                          />
+                          <span className="text-muted-foreground">:</span>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={ratioNewShares}
+                            onChange={(event) => setRatioNewShares(event.target.value)}
+                            placeholder={
+                              corporateActionType === "RIGHTS_ISSUE"
+                                ? "CP mua thêm"
+                                : "CP nhận thêm"
+                            }
+                            required
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {corporateActionType === "RIGHTS_ISSUE"
+                            ? "Ví dụ 10 : 6 nghĩa là có 10 CP thì được quyền mua thêm 6 CP."
+                            : "Ví dụ 20 : 1 nghĩa là có 20 CP thì được nhận thêm 1 CP."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div
+                        className={`space-y-1 ${
+                          corporateActionType !== "CASH_DIVIDEND" ? "col-span-2" : ""
+                        }`}
+                      >
+                        <Label>
+                          {corporateActionType === "RIGHTS_ISSUE"
+                            ? "Tỷ lệ quyền mua (%)"
                             : "Tỷ lệ cổ tức (%)"}
-                      </Label>
-                      <Input
-                        type="text"
-                        value={distributionPct}
-                        onChange={(e) => setDistributionPct(e.target.value)}
-                        placeholder={
-                          corporateActionType === "RIGHTS_ISSUE"
-                            ? "Ví dụ: 60% hoặc 10:6"
-                            : corporateActionType === "STOCK_DIVIDEND"
-                              ? "Ví dụ: 5 hoặc 20:1"
-                              : "Ví dụ: 10"
-                        }
-                        required
-                      />
-                    </div>
+                        </Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={distributionPct}
+                          onChange={(e) => setDistributionPct(e.target.value)}
+                          placeholder="Ví dụ: 10"
+                          required
+                        />
+                      </div>
+                    )}
                     {corporateActionType === "RIGHTS_ISSUE" && (
                       <>
                         <div className="space-y-1">
