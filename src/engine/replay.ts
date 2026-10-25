@@ -17,6 +17,13 @@ import type {
 } from "./types";
 import { CAPITAL_BUCKETS } from "./types";
 
+const CASH_DIVIDEND_NET_FACTOR = 0.95;
+
+function netCashDividend(gross: number, declaredTax: number): number {
+  const tax = declaredTax > 0 ? declaredTax : gross * (1 - CASH_DIVIDEND_NET_FACTOR);
+  return Math.max(0, gross - tax);
+}
+
 interface Pos {
   asset: Asset;
   accountId: string;
@@ -25,6 +32,7 @@ interface Pos {
   coreQty: number;
   coreCostTotal: number;
   coreCostVndTotal: number;
+  coreOriginalCostVndTotal: number;
   tplusReduction: number;
   tplusReductionVnd: number;
   realizedTradePnl: number;
@@ -121,6 +129,7 @@ function ensurePos(
     coreQty: 0,
     coreCostTotal: 0,
     coreCostVndTotal: 0,
+    coreOriginalCostVndTotal: 0,
     tplusReduction: 0,
     tplusReductionVnd: 0,
     realizedTradePnl: 0,
@@ -154,6 +163,7 @@ function applyCorporateAction(
       p.coreQty += subscribedQty;
       p.coreCostTotal += subscriptionCost;
       p.coreCostVndTotal += subscriptionCost;
+      p.coreOriginalCostVndTotal += subscriptionCost;
       p.totalInvested += subscriptionCost;
       p.coreCostLots.push({
         buyTxId: `rights:${action.id}:${p.accountId}`,
@@ -167,14 +177,15 @@ function applyCorporateAction(
     if (eligibleQty <= 1e-12) continue;
 
     if (action.actionType === "CASH_DIVIDEND") {
-      const cashPerShare = 10_000 * (action.distributionPct / 100);
-      p.cashDividend += eligibleQty * cashPerShare;
+      const grossCashPerShare = 10_000 * (action.distributionPct / 100);
+      const netCashPerShare = grossCashPerShare * CASH_DIVIDEND_NET_FACTOR;
+      p.cashDividend += eligibleQty * grossCashPerShare;
       let coreCostReduction = 0;
       for (const lot of p.coreCostLots) {
         if (lot.quantity <= 1e-12) continue;
         const reduction = Math.min(
           lot.adjustedCost,
-          cashPerShare * lot.quantity,
+          netCashPerShare * lot.quantity,
         );
         lot.adjustedCost -= reduction;
         coreCostReduction += reduction;
@@ -184,9 +195,17 @@ function applyCorporateAction(
         0,
         p.coreCostVndTotal - coreCostReduction,
       );
+      let dividendProfit = Math.max(
+        0,
+        p.coreQty * netCashPerShare - coreCostReduction,
+      );
       for (const lot of p.openLots) {
-        lot.buyPrice = Math.max(0, lot.buyPrice - cashPerShare);
+        const reduction = Math.min(lot.buyPrice, netCashPerShare);
+        dividendProfit +=
+          (netCashPerShare - reduction) * lot.qtyRemaining;
+        lot.buyPrice -= reduction;
       }
+      p.realizedTradePnl += dividendProfit;
       continue;
     }
 
@@ -212,6 +231,19 @@ function sortTx(a: Transaction, b: Transaction): number {
   return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 }
 
+function accountBucket(
+  accountId: string,
+  accounts: LedgerSnapshot["accounts"],
+): CapitalBucket | null {
+  const kind = accounts.find((account) => account.id === accountId)?.kind;
+  if (kind === "STOCK_VPS") return "VPS";
+  if (kind === "STOCK_SSI") return "SSI";
+  if (kind === "CRYPTO") return "CRYPTO";
+  if (kind === "ETF") return "ETF";
+  if (kind === "DCDS") return "DCDS";
+  return null;
+}
+
 function applyCoreSell(p: Pos, qty: number, netProceedsVnd: number) {
   if (p.coreQty <= 0 || qty <= 0) return;
   const sellQty = Math.min(qty, p.coreQty);
@@ -220,6 +252,7 @@ function applyCoreSell(p: Pos, qty: number, netProceedsVnd: number) {
   p.realizedTradePnl += netProceedsVnd * (sellQty / qty) - costVnd;
   p.coreCostTotal -= p.coreCostTotal * frac;
   p.coreCostVndTotal -= p.coreCostVndTotal * frac;
+  p.coreOriginalCostVndTotal -= p.coreOriginalCostVndTotal * frac;
   p.tplusReduction -= p.tplusReduction * frac;
   p.tplusReductionVnd -= p.tplusReductionVnd * frac;
   for (const lot of p.coreCostLots) {
@@ -301,11 +334,35 @@ export function replayPortfolio(
 
   const assets = new Map(ledger.assets.map((a) => [a.id, a]));
   const positions = new Map<string, Pos>();
+  const cashByBucket = emptyBuckets();
+  const corporateActionReceivableByBucket = emptyBuckets();
   const txs = ledger.transactions
     .filter((t) => !t.deletedAt)
     .slice()
     .sort(sortTx);
+  const cashDividendActions = ledger.corporateActions.filter(
+    (action) =>
+      !action.deletedAt &&
+      action.actionType === "CASH_DIVIDEND" &&
+      action.exDate <= asOf,
+  );
+  const cashDividendEntitlements = new Map<string, Map<string, number>>();
+  const rightsEntitlements = new Map<string, Map<string, number>>();
   const timeline = [
+    ...ledger.capital
+      .filter(
+        (movement) =>
+          !movement.deletedAt &&
+          movement.bucket !== "BANK" &&
+          movement.movementDate <= asOf,
+      )
+      .map((movement) => ({
+        date: movement.movementDate,
+        priority: -1,
+        createdAt: movement.createdAt,
+        id: movement.id,
+        capitalMovement: movement,
+      })),
     ...ledger.corporateActions
       .filter(
         (action) =>
@@ -319,16 +376,39 @@ export function replayPortfolio(
           action.actionType === "RIGHTS_ISSUE"
             ? action.paymentDate ?? action.exDate
             : action.exDate,
-        priority: 0,
+        priority: action.actionType === "RIGHTS_ISSUE" ? 1 : 0,
         createdAt: action.createdAt,
         id: action.id,
         action,
+      })),
+    ...ledger.corporateActions
+      .filter(
+        (action) =>
+          !action.deletedAt &&
+          action.actionType === "RIGHTS_ISSUE" &&
+          action.exDate <= asOf,
+      )
+      .map((action) => ({
+        date: action.exDate,
+        priority: 0,
+        createdAt: action.createdAt,
+        id: `${action.id}:rights-entitlement`,
+        rightsEntitlement: action,
+      })),
+    ...cashDividendActions
+      .filter((action) => (action.paymentDate ?? action.exDate) <= asOf)
+      .map((action) => ({
+        date: action.paymentDate ?? action.exDate,
+        priority: 1,
+        createdAt: action.createdAt,
+        id: `${action.id}:cash-payment`,
+        dividendPayment: action,
       })),
     ...txs
       .filter((tx) => tx.txDate <= asOf)
       .map((tx) => ({
         date: tx.txDate,
-        priority: 1,
+        priority: 2,
         createdAt: tx.createdAt,
         id: tx.id,
         transaction: tx,
@@ -348,11 +428,164 @@ export function replayPortfolio(
   }
 
   for (const item of timeline) {
+    if ("capitalMovement" in item) {
+      const movement = item.capitalMovement;
+      cashByBucket[movement.bucket] +=
+        movement.kind === "DEPOSIT" ? movement.amount : -movement.amount;
+      continue;
+    }
+    if ("dividendPayment" in item) {
+      const action = item.dividendPayment;
+      const entitlements = cashDividendEntitlements.get(action.id);
+      for (const [accountId, amount] of entitlements ?? []) {
+        const hasLinkedPayment = txs.some(
+          (tx) =>
+            tx.txType === "CASH_DIVIDEND" &&
+            tx.accountId === accountId &&
+            tx.assetId != null &&
+            assets.get(tx.assetId)?.symbol === action.symbol &&
+            (tx.corporateActionId === action.id ||
+              tx.txDate === (action.paymentDate ?? action.exDate)),
+        );
+        if (hasLinkedPayment) continue;
+        const bucket = accountBucket(accountId, ledger.accounts);
+        if (!bucket || amount === 0) continue;
+        const receivable = Math.min(
+          amount,
+          corporateActionReceivableByBucket[bucket],
+        );
+        corporateActionReceivableByBucket[bucket] -= receivable;
+        cashByBucket[bucket] += receivable;
+      }
+      continue;
+    }
+    if ("rightsEntitlement" in item) {
+      const action = item.rightsEntitlement;
+      const entitlements = new Map<string, number>();
+      const referencePrice = action.referencePrice ?? 0;
+      const subscriptionPrice = action.subscriptionPrice ?? 0;
+      const ratio = action.distributionPct / 100;
+      const theoreticalExPrice =
+        referencePrice > 0 && ratio > 0
+          ? (referencePrice + ratio * subscriptionPrice) / (1 + ratio)
+          : 0;
+      const rightValuePerShare = Math.max(
+        0,
+        theoreticalExPrice - subscriptionPrice,
+      );
+      for (const position of positions.values()) {
+        if (
+          position.asset.assetType !== "STOCK" ||
+          position.asset.symbol !== action.symbol
+        ) {
+          continue;
+        }
+        const subscribedQty =
+          position.accountId === "vps"
+            ? action.vpsSubscribedQty
+            : position.accountId === "ssi"
+              ? action.ssiSubscribedQty
+              : 0;
+        const eligibleQty = position.coreQty + openQty(position);
+        const maxEntitlement = Math.floor(
+          eligibleQty * ratio + 1e-9,
+        );
+        const recognizedQty = Math.min(subscribedQty, maxEntitlement);
+        const amount = recognizedQty * rightValuePerShare;
+        const bucket = accountBucket(position.accountId, ledger.accounts);
+        if (!bucket || amount <= 0) continue;
+        entitlements.set(
+          position.accountId,
+          (entitlements.get(position.accountId) ?? 0) + amount,
+        );
+        corporateActionReceivableByBucket[bucket] += amount;
+      }
+      rightsEntitlements.set(action.id, entitlements);
+      continue;
+    }
     if ("action" in item) {
+      const action = item.action;
+      if (action.actionType === "CASH_DIVIDEND") {
+        const entitlement = new Map<string, number>();
+        for (const position of positions.values()) {
+          if (
+            position.asset.assetType !== "STOCK" ||
+            position.asset.symbol !== action.symbol
+          ) {
+            continue;
+          }
+          const bucket = accountBucket(position.accountId, ledger.accounts);
+          if (!bucket) continue;
+          const eligibleQty = position.coreQty + openQty(position);
+          const amount =
+            eligibleQty *
+            10_000 *
+            (action.distributionPct / 100) *
+            CASH_DIVIDEND_NET_FACTOR;
+          entitlement.set(
+            position.accountId,
+            (entitlement.get(position.accountId) ?? 0) + amount,
+          );
+          corporateActionReceivableByBucket[bucket] += amount;
+        }
+        cashDividendEntitlements.set(action.id, entitlement);
+      } else if (action.actionType === "RIGHTS_ISSUE") {
+        const entitlements = rightsEntitlements.get(action.id);
+        for (const [accountId, amount] of entitlements ?? []) {
+          const bucket = accountBucket(accountId, ledger.accounts);
+          if (!bucket) continue;
+          corporateActionReceivableByBucket[bucket] -= Math.min(
+            amount,
+            corporateActionReceivableByBucket[bucket],
+          );
+        }
+        cashByBucket.VPS -=
+          action.vpsSubscribedQty * (action.subscriptionPrice ?? 0);
+        cashByBucket.SSI -=
+          action.ssiSubscribedQty * (action.subscriptionPrice ?? 0);
+      }
       applyCorporateAction(item.action, positions);
       continue;
     }
     const tx = item.transaction;
+    const txAsset = tx.assetId ? assets.get(tx.assetId) : undefined;
+    const bucket = accountBucket(tx.accountId, ledger.accounts);
+    if (bucket) {
+      const fx = tx.fxRate ?? ledger.usdVnd;
+      const currencyMultiplier = txAsset?.assetType === "CRYPTO" ? fx : 1;
+      const qty = num(tx.quantity);
+      const price = num(tx.price);
+      const grossAmount = num(tx.amount) || qty * price;
+      if (tx.txType === "BUY") {
+        cashByBucket[bucket] -=
+          (grossAmount + num(tx.fee)) * currencyMultiplier;
+      } else if (tx.txType === "SELL") {
+        cashByBucket[bucket] +=
+          (grossAmount - num(tx.fee) - num(tx.tax)) * currencyMultiplier;
+      } else if (tx.txType === "CASH_DIVIDEND") {
+        const matchingAction = cashDividendActions.find(
+          (action) =>
+            txAsset?.symbol === action.symbol &&
+            (tx.corporateActionId === action.id ||
+              tx.txDate === (action.paymentDate ?? action.exDate)),
+        );
+        if (matchingAction) {
+          const entitlement =
+            cashDividendEntitlements
+              .get(matchingAction.id)
+              ?.get(tx.accountId) ?? 0;
+          const receivable = Math.min(
+            entitlement,
+            corporateActionReceivableByBucket[bucket],
+          );
+          corporateActionReceivableByBucket[bucket] -= receivable;
+        }
+        cashByBucket[bucket] += netCashDividend(
+          num(tx.amount),
+          num(tx.tax),
+        );
+      }
+    }
     if (!tx.assetId) continue;
     const asset = assets.get(tx.assetId);
     if (!asset) continue;
@@ -381,11 +614,13 @@ export function replayPortfolio(
           qtyOriginal: qty,
           buyPrice: price,
           buyFee: fee,
+          originalCostVnd: buyCostVnd,
           fxRate: tx.fxRate,
         });
       } else {
         p.coreCostTotal += buyCostNative;
         p.coreCostVndTotal += buyCostVnd;
+        p.coreOriginalCostVndTotal += buyCostVnd;
         p.coreQty += qty;
         p.coreCostLots.push({
           buyTxId: tx.id,
@@ -398,7 +633,7 @@ export function replayPortfolio(
     }
 
     if (tx.txType === "CASH_DIVIDEND") {
-      const net = Math.max(0, num(tx.amount) - tax);
+      const net = netCashDividend(num(tx.amount), tax);
       const coveredByCorporateAction = ledger.corporateActions.some(
         (action) =>
           !action.deletedAt &&
@@ -562,6 +797,16 @@ export function replayPortfolio(
         }, 0)
       : openCost(p);
     const costBasis = coreBasisVnd + tplusBasis;
+    const originalOpenCostBasis = p.openLots.reduce(
+      (sum, lot) =>
+        sum +
+        (lot.qtyOriginal > 0
+          ? (lot.originalCostVnd * lot.qtyRemaining) / lot.qtyOriginal
+          : 0),
+      0,
+    );
+    const originalCostBasis =
+      p.coreOriginalCostVndTotal + originalOpenCostBasis;
     const unreal = mv - costBasis;
     const cryptoCostBasisUsd = isCrypto
       ? coreBasisNative + tplusBasisNative
@@ -600,6 +845,7 @@ export function replayPortfolio(
         currentPrice: price,
         marketValue: mv,
         costBasis,
+        originalCostBasis,
         unrealizedPnl: unreal,
         cryptoCostBasisUsd,
         cryptoUnrealizedPnlUsd,
@@ -703,10 +949,10 @@ export function replayPortfolio(
     redeemedBanks.reduce((s, b) => s + b.accumulatedInterest, 0);
 
   const cat: Record<string, number> = {
-    DCDS: 0,
-    ETF: 0,
+    DCDS: cashByBucket.DCDS + corporateActionReceivableByBucket.DCDS,
+    ETF: cashByBucket.ETF + corporateActionReceivableByBucket.ETF,
     STOCK: 0,
-    CRYPTO: 0,
+    CRYPTO: cashByBucket.CRYPTO + corporateActionReceivableByBucket.CRYPTO,
     BANK: bankValue,
   };
   for (const h of holdings) {
@@ -726,7 +972,24 @@ export function replayPortfolio(
       : ledger.usdtBalance;
   const usdtNav = usdtBalance * ledger.usdVnd;
   cat.CRYPTO += usdtNav;
-  const nav = cat.DCDS + cat.ETF + cat.STOCK + cat.CRYPTO + cat.BANK;
+  const vpsCash =
+    cashByBucket.VPS + corporateActionReceivableByBucket.VPS;
+  const ssiCash =
+    cashByBucket.SSI + corporateActionReceivableByBucket.SSI;
+  const nav =
+    cat.DCDS +
+    cat.ETF +
+    cat.CRYPTO +
+    cat.BANK +
+    holdings
+      .filter((h) => h.assetType === "STOCK" && h.accountId === "vps")
+      .reduce((sum, h) => sum + h.marketValue, 0) +
+    holdings
+      .filter((h) => h.assetType === "STOCK" && h.accountId === "ssi")
+      .reduce((sum, h) => sum + h.marketValue, 0) +
+    vpsCash +
+    ssiCash;
+  cat.STOCK += vpsCash + ssiCash;
   const allocation: PortfolioState["allocation"] = {};
   for (const key of ["DCDS", "ETF", "STOCK", "CRYPTO", "BANK"]) {
     allocation[key] = {
@@ -747,10 +1010,10 @@ export function replayPortfolio(
   navByBucket.BANK = cat.BANK;
   navByBucket.VPS = holdings
     .filter((h) => h.accountId === "vps")
-    .reduce((s, h) => s + h.marketValue, 0);
+    .reduce((s, h) => s + h.marketValue, vpsCash);
   navByBucket.SSI = holdings
     .filter((h) => h.accountId === "ssi")
-    .reduce((s, h) => s + h.marketValue, 0);
+    .reduce((s, h) => s + h.marketValue, ssiCash);
   const tplusByBucket = {
     VPS: holdings
       .filter((h) => h.accountId === "vps")
@@ -784,6 +1047,8 @@ export function replayPortfolio(
     originalCapital,
     originalByBucket,
     originalByBucketUsd,
+    cashByBucket,
+    corporateActionReceivableByBucket,
     nav,
     navByBucket,
     tplusByBucket,

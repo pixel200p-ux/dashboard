@@ -171,9 +171,9 @@ test("cash action adjusts eligible holdings, not ex-date buys, and replays later
   const holding = holdingFrom(state);
 
   assert.equal(holding.quantity, 125);
-  assert.equal(adjustedLotPrice(holding, "buy-before"), 19_000);
+  assert.equal(adjustedLotPrice(holding, "buy-before"), 19_050);
   assert.equal(adjustedLotPrice(holding, "buy-on-ex-date"), 20_000);
-  assert.ok(Math.abs(holding.realizedTradePnl - -53_571.42857142858) < 1);
+  assert.ok(Math.abs(holding.realizedTradePnl - -54_642.85714285714) < 1);
 });
 
 test("linked cash payment does not reduce cost basis a second time", () => {
@@ -181,6 +181,7 @@ test("linked cash payment does not reduce cost basis a second time", () => {
     tx("buy-before", "BUY", "2026-01-01", 100, 20_000),
     tx("cash-payment", "CASH_DIVIDEND", "2026-01-04", null, null, {
       amount: 100_000,
+      tax: 5_000,
       corporateActionId: "ca-1",
     }),
   ];
@@ -190,7 +191,7 @@ test("linked cash payment does not reduce cost basis a second time", () => {
   );
 
   const holding = holdingFrom(state);
-  assert.equal(holding.adjustedAvgCost, 19_000);
+  assert.equal(holding.adjustedAvgCost, 19_050);
   assert.equal(holding.cashDividend, 100_000);
 });
 
@@ -202,6 +203,7 @@ test("legacy unlinked cash payment on the action payment date is not double-coun
         tx("buy-before", "BUY", "2026-01-01", 100, 20_000),
         tx("cash-payment", "CASH_DIVIDEND", "2026-01-04", null, null, {
           amount: 100_000,
+          tax: 5_000,
         }),
       ],
       cashAction,
@@ -211,7 +213,7 @@ test("legacy unlinked cash payment on the action payment date is not double-coun
 
   const holding = holdingFrom(state);
   assert.equal(holding.cashDividend, 100_000);
-  assert.equal(holding.adjustedAvgCost, 19_000);
+  assert.equal(holding.adjustedAvgCost, 19_050);
 });
 
 test("stock action increases only shares held before ex-date", () => {
@@ -294,6 +296,60 @@ test("cash action recognizes gross dividend from ex-date eligible shares only", 
   assert.equal(holdingFrom(state).cashDividend, 100_000);
 });
 
+test("portfolio return includes cash dividend entitlement and sale proceeds exactly once", () => {
+  const snapshot = ledger(
+    [
+      tx("buy-before", "BUY", "2026-01-01", 10, 34_000),
+      tx("sell-after", "SELL", "2026-01-06", 10, 25_000),
+    ],
+    { ...action("CASH_DIVIDEND", 10), paymentDate: "2026-01-05" },
+  );
+  snapshot.assets[0].currentPrice = 24_000;
+  snapshot.capital = [
+    {
+      id: "deposit",
+      kind: "DEPOSIT",
+      amount: 340_000,
+      fxRate: null,
+      movementDate: "2026-01-01",
+      bucket: "VPS",
+      notes: null,
+      deletedAt: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      sourceType: null,
+      sourceId: null,
+    },
+  ];
+
+  const beforePayment = replay(snapshot, "2026-01-04");
+  assert.equal(beforePayment.corporateActionReceivableByBucket.VPS, 9_500);
+  assert.equal(beforePayment.cashByBucket.VPS, 0);
+  assert.equal(beforePayment.nav, 249_500);
+  assert.equal(beforePayment.totalPnl, -90_500);
+  assert.equal(holdingFrom(beforePayment).originalCostBasis, 340_000);
+  assert.ok(
+    Math.abs(
+      (holdingFrom(beforePayment).unrealizedPnl /
+        holdingFrom(beforePayment).originalCostBasis) *
+        100 -
+        (-90_500 / 340_000) * 100,
+    ) < 1e-10,
+  );
+  assert.ok(Math.abs(beforePayment.totalReturnPct - (-90_500 / 340_000) * 100) < 1e-10);
+
+  const afterPayment = replay(snapshot, "2026-01-05");
+  assert.equal(afterPayment.corporateActionReceivableByBucket.VPS, 0);
+  assert.equal(afterPayment.cashByBucket.VPS, 9_500);
+  assert.equal(afterPayment.nav, 249_500);
+
+  const afterSale = replay(snapshot, "2026-01-06");
+  assert.equal(afterSale.cashByBucket.VPS, 259_500);
+  assert.equal(afterSale.nav, 259_500);
+  assert.equal(afterSale.totalPnl, -80_500);
+  assert.ok(Math.abs(afterSale.totalReturnPct - (-80_500 / 340_000) * 100) < 1e-10);
+  assert.equal(holdingFrom(afterSale).realizedTradePnl, -80_500);
+});
+
 test("cash action directly reduces each eligible share's cost basis by face-value dividend", () => {
   const snapshot = ledger(
     [
@@ -304,9 +360,9 @@ test("cash action directly reduces each eligible share's cost basis by face-valu
   );
   const holding = holdingFrom(replay(snapshot, "2026-01-04"));
 
-  assert.equal(adjustedLotPrice(holding, "high-cost"), 29_000);
-  assert.equal(adjustedLotPrice(holding, "low-cost"), 4_000);
-  assert.equal(holding.adjustedAvgCost, 16_500);
+  assert.equal(adjustedLotPrice(holding, "high-cost"), 29_050);
+  assert.equal(adjustedLotPrice(holding, "low-cost"), 4_050);
+  assert.equal(holding.adjustedAvgCost, 16_550);
   assert.equal(holding.cashDividend, 200_000);
 });
 
@@ -320,6 +376,7 @@ test("cash cost basis cannot go below zero", () => {
   assert.equal(adjustedLotPrice(holding, "low-cost"), 0);
   assert.equal(holding.adjustedAvgCost, 0);
   assert.equal(holding.cashDividend, 10_000);
+  assert.equal(holding.realizedTradePnl, 4_500);
 });
 
 test("cash corporate-action report row shows gross entitlement", () => {
@@ -385,6 +442,48 @@ test("rights subscriptions add account-specific shares and cost on payment date"
   assert.equal(adjustedLotPrice(ssiHolding, "rights:ca-1:ssi"), 10_000);
 });
 
+test("rights subscription value is counted from ex-date and converted to shares on payment date", () => {
+  const rightsAction = {
+    ...action("RIGHTS_ISSUE", 60),
+    paymentDate: "2026-01-06",
+    referencePrice: 34_000,
+    subscriptionPrice: 12_000,
+    vpsSubscribedQty: 6,
+  };
+  const snapshot = ledger(
+    [tx("buy-before", "BUY", "2026-01-01", 10, 34_000)],
+    rightsAction,
+  );
+  snapshot.assets[0].currentPrice = 25_750;
+  snapshot.capital = [
+    {
+      id: "deposit",
+      kind: "DEPOSIT",
+      amount: 340_000,
+      fxRate: null,
+      movementDate: "2026-01-01",
+      bucket: "VPS",
+      notes: null,
+      deletedAt: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      sourceType: null,
+      sourceId: null,
+    },
+  ];
+
+  const beforePayment = replay(snapshot, "2026-01-05");
+  assert.equal(beforePayment.corporateActionReceivableByBucket.VPS, 82_500);
+  assert.equal(beforePayment.nav, 340_000);
+  assert.equal(beforePayment.totalPnl, 0);
+
+  const afterPayment = replay(snapshot, "2026-01-06");
+  assert.equal(afterPayment.corporateActionReceivableByBucket.VPS, 0);
+  assert.equal(afterPayment.cashByBucket.VPS, -72_000);
+  assert.equal(holdingFrom(afterPayment).quantity, 16);
+  assert.equal(afterPayment.nav, 340_000);
+  assert.equal(afterPayment.totalPnl, 0);
+});
+
 test("rights issue normalizes earlier buy prices to the ex-rights price basis", () => {
   const rightsAction = {
     ...action("RIGHTS_ISSUE", 100),
@@ -412,5 +511,31 @@ test("rights issue normalizes earlier buy prices to the ex-rights price basis", 
   assert.equal(
     holdingFrom(replay(snapshot, "2026-01-05")).adjustedAvgCost,
     26_000,
+  );
+});
+
+test("cash and stock dividends normalize prior trade prices without changing fill prices", () => {
+  const buy = tx("buy-before", "BUY", "2026-01-01", 100, 34_000);
+  const cashRows = buildReportRows(
+    ledger([buy], {
+      ...action("CASH_DIVIDEND", 10),
+      referencePrice: 34_000,
+    }),
+    "2026-01-05",
+  );
+  const stockRows = buildReportRows(
+    ledger([buy], {
+      ...action("STOCK_DIVIDEND", 5),
+      referencePrice: 34_000,
+    }),
+    "2026-01-05",
+  );
+
+  assert.equal(cashRows.find((row) => row.id === "buy-before")?.price, 34_000);
+  assert.equal(cashRows.find((row) => row.id === "buy-before")?.adjustedPrice, 33_000);
+  assert.equal(stockRows.find((row) => row.id === "buy-before")?.price, 34_000);
+  assert.equal(
+    stockRows.find((row) => row.id === "buy-before")?.adjustedPrice,
+    34_000 / 1.05,
   );
 });

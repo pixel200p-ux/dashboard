@@ -9,7 +9,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatViDate } from "@/engine/dates";
 import { formatPct, formatQty, signedClass } from "@/engine/money";
-import type { CapitalBucket, HoldingView, Transaction } from "@/engine/types";
+import {
+  CAPITAL_BUCKETS,
+  type CapitalBucket,
+  type HoldingView,
+  type Transaction,
+} from "@/engine/types";
 import { displayMoney, displayPrice } from "@/lib/display";
 import type { DisplayCurrency } from "@/lib/ui-store";
 import { SmartDeleteTransactionDialog } from "@/components/SmartDeleteTransactionDialog";
@@ -52,7 +57,9 @@ function RealizedProfitCard({
         </Badge>
       </div>
       <div className="mt-1 flex flex-col">
-        <span className="text-xs text-muted-foreground uppercase tracking-wider">Tổng Lãi/Lỗ</span>
+        <span className="text-xs text-muted-foreground uppercase tracking-wider">
+          Lãi/Lỗ đã chốt (gồm tác động cổ tức)
+        </span>
         <span className={`text-xl font-mono font-bold ${signedClass(totalPnl)}`}>
           {displayMoney(totalPnl, currency, usd)}
         </span>
@@ -63,7 +70,7 @@ function RealizedProfitCard({
           <span className="font-mono">{displayMoney(holding.totalInvested, currency, usd)}</span>
         </div>
         <div className="text-right">
-          <span>Cổ tức: </span>
+          <span>Cổ tức gộp (đã phản ánh vào Lãi/Lỗ): </span>
           <span className="font-mono text-emerald-600">{displayMoney(holding.cashDividend, currency, usd)}</span>
         </div>
       </div>
@@ -110,6 +117,15 @@ export function ReportsPage() {
   if (isPending || !data) return <Skeleton className="h-64" />;
   const s = data.state;
   const usd = s.usdVnd;
+  const cashAndReceivables = CAPITAL_BUCKETS.filter(
+    (capitalBucket) => capitalBucket !== "BANK",
+  ).reduce(
+    (sum, capitalBucket) =>
+      sum +
+      s.cashByBucket[capitalBucket] +
+      s.corporateActionReceivableByBucket[capitalBucket],
+    0,
+  );
 
   const sumIn = rows.filter((r) => r.kind === "DEPOSIT").reduce((n, r) => n + r.amount, 0);
   const sumOut = rows.filter((r) => r.kind === "WITHDRAW").reduce((n, r) => n + r.amount, 0);
@@ -136,9 +152,20 @@ export function ReportsPage() {
         <p className="text-sm text-muted-foreground">Sổ lịch sử toàn danh mục · sửa/xóa cần mã bảo vệ 6 số</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="col-span-2 min-w-0 sm:col-span-1">
           <Kpi label="Original Capital" value={displayMoney(s.originalCapital, currency, usd)} />
+        </div>
+        <div className="min-w-0">
+          <Kpi
+            label="Tiền mặt & quyền/cổ tức chờ về"
+            value={displayMoney(cashAndReceivables, currency, usd)}
+            hint={
+              cashAndReceivables < 0
+                ? "Âm: kiểm tra vốn nạp hoặc giao dịch đã nhập"
+                : "Gồm tiền bán chưa tái đầu tư"
+            }
+          />
         </div>
         <div className="min-w-0">
           <Kpi label="NAV" value={displayMoney(s.nav, currency, usd)} />

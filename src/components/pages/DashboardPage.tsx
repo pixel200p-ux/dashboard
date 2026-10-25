@@ -72,7 +72,7 @@ export function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Sổ cái thật · Asset-Only Ledger</p>
+          <p className="text-sm text-muted-foreground">Sổ cái giao dịch và dòng tiền</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <DepositCapitalButton
@@ -100,7 +100,7 @@ export function DashboardPage() {
         <PnlCard
           pnl={state.totalPnl}
           original={state.originalCapital}
-          subtitle="NAV − Original Capital"
+          subtitle="NAV (gồm tiền và cổ tức) − Original Capital"
           usdVnd={usd}
         />
         <TplusLoweredCard

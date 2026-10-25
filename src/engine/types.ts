@@ -151,6 +151,7 @@ export interface OpenTplusLot {
   qtyOriginal: number;
   buyPrice: number;
   buyFee: number;
+  originalCostVnd: number;
   fxRate: number | null;
 }
 
@@ -200,6 +201,7 @@ export interface HoldingView {
   currentPrice: number;
   marketValue: number;
   costBasis: number;
+  originalCostBasis: number;
   unrealizedPnl: number;
   cryptoCostBasisUsd?: number;
   cryptoUnrealizedPnlUsd?: number;
@@ -263,6 +265,8 @@ export interface PortfolioState {
   originalCapital: number;
   originalByBucket: Record<CapitalBucket, number>;
   originalByBucketUsd: Record<CapitalBucket, number>;
+  cashByBucket: Record<CapitalBucket, number>;
+  corporateActionReceivableByBucket: Record<CapitalBucket, number>;
   nav: number;
   navByBucket: Record<CapitalBucket, number>;
   tplusByBucket: { VPS: number; SSI: number; CRYPTO: number };

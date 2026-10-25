@@ -53,8 +53,14 @@ export const saveCorporateAction = createServerFn({ method: "POST" })
     ) {
       throw new Error("Ngày cổ phiếu quyền mua về tài khoản không thể trước ngày GDKHQ.");
     }
-    if (data.actionType === "RIGHTS_ISSUE" && !data.referencePrice) {
-      throw new Error("Vui lòng nhập giá tham chiếu trước ngày GDKHQ để quy đổi giá giao dịch.");
+    if (!data.referencePrice) {
+      throw new Error("Vui lòng nhập giá tham chiếu trước ngày GDKHQ để quy đổi giá lịch sử.");
+    }
+    if (
+      data.actionType === "CASH_DIVIDEND" &&
+      data.referencePrice <= 10_000 * (data.distributionPct / 100)
+    ) {
+      throw new Error("Tiền cổ tức mỗi cổ phiếu phải thấp hơn giá tham chiếu trước GDKHQ.");
     }
     if (data.actionType === "RIGHTS_ISSUE") {
       const ledger = await loadLedgerSnapshot();

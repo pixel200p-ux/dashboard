@@ -81,8 +81,9 @@ export function TxDialog() {
   const [corporateActionType, setCorporateActionType] =
     useState<CorporateActionType>("CASH_DIVIDEND");
   const [distributionInputMode, setDistributionInputMode] =
-    useState<"PERCENT" | "RATIO">("PERCENT");
+    useState<"PERCENT" | "RATIO" | "AMOUNT_PER_SHARE">("PERCENT");
   const [distributionPct, setDistributionPct] = useState("");
+  const [distributionAmountPerShare, setDistributionAmountPerShare] = useState("");
   const [ratioOldShares, setRatioOldShares] = useState("");
   const [ratioNewShares, setRatioNewShares] = useState("");
   const [referencePrice, setReferencePrice] = useState("");
@@ -131,6 +132,7 @@ export function TxDialog() {
     setDistributionPct(
       prefill.distributionPct != null ? String(prefill.distributionPct) : "",
     );
+    setDistributionAmountPerShare("");
     setRatioOldShares("");
     setRatioNewShares("");
     setReferencePrice(
@@ -302,12 +304,16 @@ export function TxDialog() {
 
     if (isCorporateAction) {
       const sym = symbol.trim().toUpperCase();
+      const amountPerShare = parseVndAmount(distributionAmountPerShare);
       const oldShares = parseDecimal(ratioOldShares);
       const newShares = parseDecimal(ratioNewShares);
       const pct =
         distributionInputMode === "PERCENT"
           ? parseDecimal(distributionPct)
-          : Number.isInteger(oldShares) &&
+          : distributionInputMode === "AMOUNT_PER_SHARE" &&
+              corporateActionType === "CASH_DIVIDEND"
+            ? (amountPerShare / 10_000) * 100
+            : Number.isInteger(oldShares) &&
               Number.isInteger(newShares) &&
               oldShares > 0 &&
               newShares > 0
@@ -321,16 +327,20 @@ export function TxDialog() {
         !sym ||
         !Number.isFinite(pct) ||
         pct <= 0 ||
+        beforePrice <= 0 ||
+        (corporateActionType === "CASH_DIVIDEND" &&
+          beforePrice <= 10_000 * (pct / 100)) ||
+        (distributionInputMode === "AMOUNT_PER_SHARE" &&
+          corporateActionType !== "CASH_DIVIDEND") ||
         (corporateActionType === "RIGHTS_ISSUE" &&
-          (beforePrice <= 0 ||
-            subscribedPrice <= 0 ||
+          (subscribedPrice <= 0 ||
             !Number.isInteger(vpsQty) ||
             !Number.isInteger(ssiQty) ||
             vpsQty < 0 ||
             ssiQty < 0))
       ) {
         toast.error(
-          "Vui lòng kiểm tra mã, tỷ lệ (phần trăm hoặc số cổ phiếu cũ:mới là số nguyên dương) và các thông số của sự kiện.",
+          "Vui lòng kiểm tra mã, cách nhập tỷ lệ hoặc số tiền/CP và các thông số của sự kiện.",
         );
         return;
       }
@@ -347,8 +357,7 @@ export function TxDialog() {
             paymentDate: paymentDate || null,
             actionType: corporateActionType,
             distributionPct: pct,
-            referencePrice:
-              corporateActionType === "RIGHTS_ISSUE" ? beforePrice : null,
+            referencePrice: beforePrice,
             subscriptionPrice:
               corporateActionType === "RIGHTS_ISSUE" ? subscribedPrice : null,
             vpsSubscribedQty:
@@ -705,6 +714,8 @@ export function TxDialog() {
                       : "Sự kiện GDKHQ là nguồn duy nhất ghi nhận cổ tức; tiền mặt được tính gộp trước thuế và cổ phiếu theo lượng đủ điều kiện trước ngày GDKHQ."}
                     {corporateActionType === "STOCK_DIVIDEND" &&
                       " Cổ phiếu thưởng được làm tròn xuống riêng theo từng broker."}
+                    {corporateActionType === "CASH_DIVIDEND" &&
+                      " Tỷ suất danh mục tính cổ tức tiền mặt sau khi khấu trừ 5% thuế."}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -714,9 +725,7 @@ export function TxDialog() {
                         onValueChange={(value) => {
                           const nextType = value as CorporateActionType;
                           setCorporateActionType(nextType);
-                          if (nextType === "CASH_DIVIDEND") {
-                            setDistributionInputMode("PERCENT");
-                          }
+                          setDistributionInputMode("PERCENT");
                         }}
                         disabled={editing}
                         options={[
@@ -726,25 +735,58 @@ export function TxDialog() {
                         ]}
                       />
                     </div>
-                    {corporateActionType !== "CASH_DIVIDEND" && (
-                      <div className="space-y-1">
-                        <Label>Kiểu nhập tỷ lệ</Label>
-                        <Select
-                          value={distributionInputMode}
-                          onValueChange={(value) => {
-                            setDistributionInputMode(value as "PERCENT" | "RATIO");
-                            setDistributionPct("");
-                            setRatioOldShares("");
-                            setRatioNewShares("");
-                          }}
-                          options={[
-                            { value: "PERCENT", label: "Phần trăm (%)" },
-                            { value: "RATIO", label: "Tỷ lệ cổ phiếu (CP cũ:CP mới)" },
-                          ]}
+                    <div className="space-y-1">
+                      <Label>
+                        {corporateActionType === "CASH_DIVIDEND"
+                          ? "Kiểu nhập cổ tức"
+                          : "Kiểu nhập tỷ lệ"}
+                      </Label>
+                      <Select
+                        value={distributionInputMode}
+                        onValueChange={(value) => {
+                          setDistributionInputMode(
+                            value as "PERCENT" | "RATIO" | "AMOUNT_PER_SHARE",
+                          );
+                          setDistributionPct("");
+                          setDistributionAmountPerShare("");
+                          setRatioOldShares("");
+                          setRatioNewShares("");
+                        }}
+                        options={
+                          corporateActionType === "CASH_DIVIDEND"
+                            ? [
+                                { value: "PERCENT", label: "Phần trăm (%)" },
+                                {
+                                  value: "AMOUNT_PER_SHARE",
+                                  label: "Số tiền/cổ phiếu",
+                                },
+                              ]
+                            : [
+                                { value: "PERCENT", label: "Phần trăm (%)" },
+                                {
+                                  value: "RATIO",
+                                  label: "Tỷ lệ cổ phiếu (CP cũ:CP mới)",
+                                },
+                              ]
+                        }
+                      />
+                    </div>
+                    {distributionInputMode === "AMOUNT_PER_SHARE" &&
+                    corporateActionType === "CASH_DIVIDEND" ? (
+                      <div className="col-span-2 space-y-1">
+                        <Label>Tiền cổ tức trên mỗi cổ phiếu (đồng/CP)</Label>
+                        <Input
+                          value={distributionAmountPerShare}
+                          onChange={setGrouped(setDistributionAmountPerShare)}
+                          placeholder="Ví dụ: 1,000"
+                          required
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Tổng cổ tức gộp = số CP đủ điều kiện × tiền/CP. Ví dụ 100 CP ×
+                          1.000đ = 100.000đ trước thuế; NAV tính 95.000đ sau thuế 5%.
+                        </p>
                       </div>
-                    )}
-                    {distributionInputMode === "RATIO" &&
+                    ) : distributionInputMode === "RATIO" &&
                     corporateActionType !== "CASH_DIVIDEND" ? (
                       <div className="col-span-2 space-y-1">
                         <Label>
@@ -803,19 +845,32 @@ export function TxDialog() {
                           placeholder="Ví dụ: 10"
                           required
                         />
+                        {corporateActionType === "CASH_DIVIDEND" && (
+                          <p className="text-xs text-muted-foreground">
+                            Tỷ suất danh mục khấu trừ 5% thuế cổ tức tiền mặt.
+                          </p>
+                        )}
                       </div>
                     )}
+                    <div
+                      className={`space-y-1 ${
+                        corporateActionType !== "RIGHTS_ISSUE" ? "col-span-2" : ""
+                      }`}
+                    >
+                      <Label>Giá tham chiếu trước GDKHQ (13.5 = 13.500đ)</Label>
+                      <Input
+                        value={referencePrice}
+                        onChange={setGrouped(setReferencePrice)}
+                        placeholder="Giá đóng cửa trước ngày GDKHQ"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Dùng để quy đổi giá giao dịch lịch sử sang mặt bằng sau GDKHQ; giá
+                        khớp lệnh gốc không bị thay đổi.
+                      </p>
+                    </div>
                     {corporateActionType === "RIGHTS_ISSUE" && (
                       <>
-                        <div className="space-y-1">
-                          <Label>Giá tham chiếu trước GDKHQ (13.5 = 13.500đ)</Label>
-                          <Input
-                            value={referencePrice}
-                            onChange={setGrouped(setReferencePrice)}
-                            placeholder="Giá đóng cửa trước ngày GDKHQ"
-                            required
-                          />
-                        </div>
                         <div className="space-y-1">
                           <Label>Giá mua ưu đãi (vd: 12,000đ/CP)</Label>
                           <Input

@@ -165,16 +165,16 @@ function bankRows(ledger: LedgerSnapshot, asOf: string): ReportRow[] {
 
 export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): ReportRow[] {
   const rows: ReportRow[] = [];
-  const rightsActions = ledger.corporateActions
+  const priceAdjustmentActions = ledger.corporateActions
     .filter(
       (action) =>
         !action.deletedAt &&
-        action.actionType === "RIGHTS_ISSUE" &&
         action.exDate <= asOf &&
         action.referencePrice != null &&
         action.referencePrice > 0 &&
-        action.subscriptionPrice != null &&
-        action.subscriptionPrice > 0,
+        (action.actionType !== "RIGHTS_ISSUE" ||
+          (action.subscriptionPrice != null &&
+            action.subscriptionPrice > 0)),
     )
     .slice()
     .sort((a, b) => a.exDate.localeCompare(b.exDate));
@@ -224,7 +224,7 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
         t.price != null &&
         asset?.assetType === "STOCK"
           ? t.price *
-            rightsActions
+            priceAdjustmentActions
               .filter(
                 (action) =>
                   action.symbol === asset.symbol &&
@@ -232,10 +232,15 @@ export function buildReportRows(ledger: LedgerSnapshot, asOf = todayYmd()): Repo
               )
               .reduce((factor, action) => {
                 const ratio = action.distributionPct / 100;
+                const referencePrice = action.referencePrice!;
                 const theoreticalExPrice =
-                  (action.referencePrice! + ratio * action.subscriptionPrice!) /
-                  (1 + ratio);
-                return factor * (theoreticalExPrice / action.referencePrice!);
+                  action.actionType === "CASH_DIVIDEND"
+                    ? referencePrice - 10_000 * ratio
+                    : action.actionType === "STOCK_DIVIDEND"
+                      ? referencePrice / (1 + ratio)
+                      : (referencePrice + ratio * action.subscriptionPrice!) /
+                        (1 + ratio);
+                return factor * (theoreticalExPrice / referencePrice);
               }, 1)
           : null,
       amount: signed,

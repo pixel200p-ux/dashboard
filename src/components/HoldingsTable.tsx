@@ -144,7 +144,7 @@ export function HoldingsTable({
                       const pnlBasis =
                         h.assetType === "CRYPTO"
                           ? h.cryptoCostBasisUsd
-                          : h.costBasis;
+                          : h.originalCostBasis;
                       return (
                         <tr
                           key={h.assetId}
