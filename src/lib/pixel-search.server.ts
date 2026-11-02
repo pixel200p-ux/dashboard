@@ -95,10 +95,11 @@ function trustedPublicUrl(value: string | undefined): value is string {
   }
 }
 
-async function tavilySearch(key: string, query: string): Promise<PixelWebSource[]> {
+async function tavilySearch(key: string, query: string, signal?: AbortSignal): Promise<PixelWebSource[]> {
   const response = await fetch("https://api.tavily.com/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal,
     body: JSON.stringify({
       api_key: key,
       query,
@@ -122,10 +123,11 @@ async function tavilySearch(key: string, query: string): Promise<PixelWebSource[
     }));
 }
 
-async function jinaSearch(key: string, query: string): Promise<PixelWebSource[]> {
+async function jinaSearch(key: string, query: string, signal?: AbortSignal): Promise<PixelWebSource[]> {
   const url = new URL("https://s.jina.ai/");
   url.searchParams.set("q", query);
   const response = await fetch(url, {
+    signal,
     headers: { Authorization: `Bearer ${key}`, Accept: "text/plain" },
   });
   if (!response.ok) throw new Error(`Jina Search lỗi ${response.status}: ${await readError(response)}`);
@@ -147,8 +149,9 @@ async function jinaSearch(key: string, query: string): Promise<PixelWebSource[]>
   return results;
 }
 
-async function readWithJina(key: string, source: PixelWebSource): Promise<PixelWebSource> {
+async function readWithJina(key: string, source: PixelWebSource, signal?: AbortSignal): Promise<PixelWebSource> {
   const response = await fetch(`https://r.jina.ai/${source.url}`, {
+    signal,
     headers: {
       Authorization: `Bearer ${key}`,
       Accept: "text/plain",
@@ -162,7 +165,9 @@ async function readWithJina(key: string, source: PixelWebSource): Promise<PixelW
 export async function searchPixelWeb(
   keys: PlainSearchKey[],
   query: string,
+  signal?: AbortSignal,
 ): Promise<PixelWebSource[]> {
+  signal?.throwIfAborted();
   const tavily = keys.find((key) => key.provider === "tavily");
   const jina = keys.find((key) => key.provider === "jina");
   if (!tavily && !jina) {
@@ -173,15 +178,17 @@ export async function searchPixelWeb(
   let tavilyFailure: string | null = null;
   if (tavily) {
     try {
-      sources = await tavilySearch(tavily.value, query);
+      sources = await tavilySearch(tavily.value, query, signal);
     } catch (error) {
+      signal?.throwIfAborted();
       tavilyFailure = error instanceof Error ? error.message : "Không kết nối được Tavily.";
     }
   }
   if (sources.length === 0 && jina) {
     try {
-      sources = await jinaSearch(jina.value, query);
+      sources = await jinaSearch(jina.value, query, signal);
     } catch (error) {
+      signal?.throwIfAborted();
       const jinaFailure = error instanceof Error ? error.message : "Không kết nối được Jina.";
       throw new Error([tavilyFailure, jinaFailure].filter(Boolean).join(" · "));
     }
@@ -192,7 +199,8 @@ export async function searchPixelWeb(
   }
 
   if (jina && sources.some((source) => source.url.startsWith("https://")) && !sources[0]?.url.startsWith("https://s.jina.ai/")) {
-    const pages = await Promise.allSettled(sources.slice(0, 2).map((source) => readWithJina(jina.value, source)));
+    const pages = await Promise.allSettled(sources.slice(0, 2).map((source) => readWithJina(jina.value, source, signal)));
+    signal?.throwIfAborted();
     sources = sources.map((source, index) => {
       const page = pages[index];
       return index < 2 && page?.status === "fulfilled" ? page.value : source;

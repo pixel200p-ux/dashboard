@@ -125,6 +125,7 @@ export async function askWithKeys({
   webSources,
   webSearchPerformed,
   onKeyStatus,
+  signal,
 }: {
   keys: PlainAIKey[];
   prompt: string;
@@ -135,11 +136,13 @@ export async function askWithKeys({
   webSources: PixelWebSource[];
   webSearchPerformed: boolean;
   onKeyStatus: (keyId: string, active: boolean) => Promise<void>;
+  signal?: AbortSignal;
 }): Promise<PixelAIReply> {
   const failures: string[] = [];
   const requestMemorySuggestion = explicitlyRequestsMemory(prompt);
   const portfolioContextForPrompt = asksAboutPortfolio(prompt) || portfolioContext ? portfolioContext : "";
   for (const key of keys) {
+    signal?.throwIfAborted();
     try {
       const instruction = systemInstruction({
         portfolioContext: portfolioContextForPrompt,
@@ -156,6 +159,7 @@ export async function askWithKeys({
         const request = (maxOutputTokens: number) => fetch(`${GEMINI_API}/models/${GEMINI_MODEL}:generateContent`, {
           method: "POST",
           headers: { "x-goog-api-key": key.value, "Content-Type": "application/json" },
+          signal,
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: instruction }] },
             contents: history.slice(-12).map((item) => ({
@@ -189,6 +193,7 @@ export async function askWithKeys({
               ? { "HTTP-Referer": process.env.APP_URL ?? "https://localhost", "X-Title": "Portfolio Manager Pixel" }
               : {}),
           },
+          signal,
           body: JSON.stringify({
             model: config.model,
             messages: [
@@ -261,6 +266,7 @@ export async function askWithKeys({
       }
       failures.push(`${key.name} (${key.provider}): ${message || `lỗi ${response.status}`}`);
     } catch (error) {
+      signal?.throwIfAborted();
       failures.push(`${key.name} (${key.provider}): ${error instanceof Error ? error.message : "Không thể kết nối"}`);
     }
   }

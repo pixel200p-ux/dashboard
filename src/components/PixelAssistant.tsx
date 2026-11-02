@@ -582,6 +582,7 @@ export function PixelAssistant({
   const [messages, setMessages] = useState<PixelMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const requestController = useRef<AbortController | null>(null);
   const [savingMemoryId, setSavingMemoryId] = useState<string | null>(null);
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -936,6 +937,8 @@ export function PixelAssistant({
     }
 
     setSending(true);
+    const controller = new AbortController();
+    requestController.current = controller;
     try {
       const result = await sendPixelMessage({
         data: {
@@ -949,6 +952,7 @@ export function PixelAssistant({
             })
             .map((holding) => holding.symbol),
         },
+        signal: controller.signal,
       });
       setConversationId(result.conversationId);
       addPixelMessage(result.answer, {
@@ -959,11 +963,24 @@ export function PixelAssistant({
       void queryClient.invalidateQueries({ queryKey: ["pixel-conversations"] });
       void queryClient.invalidateQueries({ queryKey: PIXEL_SETTINGS_QUERY_KEY });
     } catch (error) {
+      if (controller.signal.aborted) return;
       const text = error instanceof Error ? error.message : "Không gửi được yêu cầu tới AI.";
       addPixelMessage(`Mình chưa kết nối được AI: ${text}`, { choices: ["Thử lại", "Đố vui tài chính"] });
     } finally {
-      setSending(false);
+      if (requestController.current === controller) {
+        requestController.current = null;
+        setSending(false);
+      }
     }
+  }
+
+  function cancelRequest() {
+    const controller = requestController.current;
+    if (!controller) return;
+    requestController.current = null;
+    controller.abort();
+    setSending(false);
+    addPixelMessage("Đã hủy yêu cầu.");
   }
 
   async function saveLocalAnswer(prompt: string, answer: string) {
@@ -1277,7 +1294,15 @@ export function PixelAssistant({
                 </div>
               </div>
             ))}
-            {sending && <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Pixel đang suy nghĩ…</div>}
+            {sending && (
+              <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground" aria-live="polite">
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                <span>Pixel đang suy nghĩ…</span>
+                <Button type="button" size="sm" variant="ghost" className="h-8 min-h-8 px-2 text-destructive hover:bg-destructive/10" onClick={cancelRequest} aria-label="Hủy yêu cầu">
+                  <X /> Hủy
+                </Button>
+              </div>
+            )}
           </div>
 
           <form className="flex items-center gap-2 border-t border-border/70 p-3" onSubmit={(event) => { event.preventDefault(); void sendMessage(draft); }}>

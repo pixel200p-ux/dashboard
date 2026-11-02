@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
@@ -394,6 +395,8 @@ export const sendPixelMessage = createServerFn({ method: "POST" })
     memorySuggestion?: string;
     sources?: { title: string; url: string; publishedDate?: string }[];
   }> => {
+    const signal = getRequest().signal;
+    signal.throwIfAborted();
     const sql = await getSql();
     const { randomUUID } = await import("node:crypto");
     const keyRows = await sql`
@@ -411,23 +414,14 @@ export const sendPixelMessage = createServerFn({ method: "POST" })
         select id from pixel_conversations where id = ${conversationId} and user_id = ${SHARED_OWNER}
       `;
       if (existing.length === 0) throw new Error("Không tìm thấy hội thoại.");
-    } else {
-      await sql`
-        insert into pixel_conversations (id, user_id, title)
-        values (${conversationId}, ${SHARED_OWNER}, ${data.prompt.slice(0, 80)})
-      `;
     }
-    await sql`
-      insert into pixel_messages (id, conversation_id, user_id, role, content)
-      values (${randomUUID()}, ${conversationId}, ${SHARED_OWNER}, 'user', ${data.prompt})
-    `;
 
     const [preferences, historyRows] = await Promise.all([
       sql`select mandatory_rules, memories from pixel_preferences where user_id = ${SHARED_OWNER}`,
       sql`
         select role, content from pixel_messages
         where conversation_id = ${conversationId} and user_id = ${SHARED_OWNER}
-        order by created_at desc, id desc limit 12
+        order by created_at desc, id desc limit 11
       `,
     ]);
     const { decryptSecret } = await import("@/lib/pixel-encryption.server");
@@ -463,6 +457,7 @@ export const sendPixelMessage = createServerFn({ method: "POST" })
       ? await searchResults.searchPixelWeb(
           searchKeys,
           searchResults.buildPixelSearchQuery(data.prompt, data.portfolioSymbols),
+          signal,
         )
       : [];
     const prefs = preferences[0];
@@ -473,12 +468,16 @@ export const sendPixelMessage = createServerFn({ method: "POST" })
       portfolioContext: data.portfolioContext,
       mandatoryRules: String(prefs?.mandatory_rules ?? ""),
       memories: String(prefs?.memories ?? ""),
-      history: historyRows.reverse().map((row) => ({
-        role: String(row.role) as "user" | "pixel",
-        content: String(row.content),
-      })),
+      history: [
+        ...historyRows.reverse().map((row) => ({
+          role: String(row.role) as "user" | "pixel",
+          content: String(row.content),
+        })),
+        { role: "user", content: data.prompt },
+      ],
       webSources,
       webSearchPerformed: searchResults.isWebSearchNeeded(data.prompt),
+      signal,
       onKeyStatus: async (keyId, active) => {
         const status = active ? "active" : "inactive";
         await sql`
@@ -487,9 +486,20 @@ export const sendPixelMessage = createServerFn({ method: "POST" })
         `;
       },
     });
+    signal.throwIfAborted();
     const storedAnswer = webSources.length
       ? `${reply.answer}\n\nNguồn tham khảo:\n${webSources.map((source, index) => `[${index + 1}] ${source.title} — ${source.url}`).join("\n")}`
       : reply.answer;
+    if (!data.conversationId) {
+      await sql`
+        insert into pixel_conversations (id, user_id, title)
+        values (${conversationId}, ${SHARED_OWNER}, ${data.prompt.slice(0, 80)})
+      `;
+    }
+    await sql`
+      insert into pixel_messages (id, conversation_id, user_id, role, content)
+      values (${randomUUID()}, ${conversationId}, ${SHARED_OWNER}, 'user', ${data.prompt})
+    `;
     await sql`
       insert into pixel_messages (id, conversation_id, user_id, role, content)
       values (${randomUUID()}, ${conversationId}, ${SHARED_OWNER}, 'pixel', ${storedAnswer})
